@@ -1,0 +1,47 @@
+{
+  "name": "samaritan",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.32.1",
+  "engines": {
+    "node": ">=22 <23",
+    "pnpm": ">=10 <11"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "check": "pnpm typecheck && pnpm test",
+    "smoke:replay": "tsx src/replay/smoke.ts",
+    "smoke:live": "tsx src/replay/live-smoke.ts",
+    "smoke:discovery": "tsx src/replay/discovery-smoke.ts",
+    "import:mappings": "tsx src/import/build-mapping-registry.ts",
+    "import:archives": "tsx src/import/import-archives.ts"
+  },
+  "dependencies": {
+    "@duckdb/node-api": "1.5.4-r.1",
+    "better-sqlite3": "^12.11.1",
+    "stream-json": "^3.5.0",
+    "ws": "^8.21.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^22.20.1",
+    "@types/stream-json": "^1.7.8",
+    "@types/ws": "^8.18.1",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.10"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "better-sqlite3",
+      "bufferutil",
+      "esbuild",
+      "utf-8-validate"
+    ]
+  }
+}

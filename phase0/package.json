@@ -1,0 +1,31 @@
+{
+  "name": "samaritan-phase0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "airdrop:devnet": "tsx src/devnet-airdrop.ts",
+    "auth:devnet": "tsx src/txline-auth.ts --network devnet",
+    "auth:mainnet": "tsx src/txline-auth.ts --network mainnet",
+    "fixtures": "tsx src/capture-fixtures.ts",
+    "archive": "tsx src/archive-historical.ts",
+    "sse": "tsx src/capture-sse.ts",
+    "polymarket": "tsx src/polymarket-smoke.ts",
+    "polymarket:history": "tsx src/archive-polymarket-history.ts",
+    "polymarket:ws": "tsx src/capture-polymarket-ws.ts",
+    "capture:paired": "tsx src/capture-polymarket-ws.ts --paired",
+    "analyze": "tsx src/analyze-samples.ts"
+  },
+  "dependencies": {
+    "@solana/spl-token": "^0.4.13",
+    "@solana/web3.js": "^1.98.4",
+    "dotenv": "^17.2.3",
+    "tweetnacl": "^1.0.3",
+    "ws": "^8.21.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.0",
+    "@types/ws": "^8.18.1",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
+  }
+}

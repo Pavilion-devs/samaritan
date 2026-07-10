@@ -1,0 +1,26 @@
+{
+  "captureId": "paired-spain-belgium-2026-07-10",
+  "status": "human_confirmed_for_capture_only",
+  "tradeable": false,
+  "confirmedBy": "Deborah",
+  "confirmedAt": "2026-07-10",
+  "txline": {
+    "fixtureId": "18218149",
+    "home": "Spain",
+    "away": "Belgium",
+    "kickoffUtc": "2026-07-10T19:00:00.000Z"
+  },
+  "polymarket": {
+    "eventId": "676288",
+    "eventSlug": "fifwc-esp-bel-2026-07-10",
+    "home": "Spain",
+    "away": "Belgium",
+    "kickoffUtc": "2026-07-10T19:00:00.000Z",
+    "matchResultRulesPeriod": "first_90_minutes_plus_stoppage_time"
+  },
+  "evidence": {
+    "mappingReport": "samples/POLYMARKET-MAPPING-CANDIDATES.md",
+    "gammaEvent": "samples/polymarket-live/polymarket-ws-smoke-2026-07-10-v3/discovery/events/676288-fifwc-esp-bel-2026-07-10.json"
+  },
+  "note": "This confirmation authorizes synchronized public-data capture only. It is not settlement verification and cannot authorize an order."
+}
