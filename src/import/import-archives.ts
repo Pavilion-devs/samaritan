@@ -148,6 +148,30 @@ try {
   );
   console.log(`[archive-import] TXLine complete (${elapsed(startedAt)})`);
 
+  console.log("[archive-import] retaining TXLine source metadata for canonical replay");
+  await connection.run(
+    `CREATE TABLE txline_quote_metadata AS
+     SELECT DISTINCT
+       'txline:odds:' || MessageId AS event_id,
+       Bookmaker::VARCHAR AS bookmaker,
+       BookmakerId::INTEGER AS bookmaker_id,
+       InRunning::BOOLEAN AS in_running,
+       GameState::VARCHAR AS game_state
+     FROM read_json(
+       $txlineGlob,
+       format = 'array',
+       columns = {
+         MessageId: 'VARCHAR', Bookmaker: 'VARCHAR', BookmakerId: 'INTEGER',
+         SuperOddsType: 'VARCHAR', GameState: 'VARCHAR', InRunning: 'BOOLEAN'
+       }
+     )
+     WHERE SuperOddsType IN ('1X2_PARTICIPANT_RESULT', 'OVERUNDER_PARTICIPANT_GOALS')`,
+    { txlineGlob }
+  );
+  await connection.run(
+    `CREATE UNIQUE INDEX txline_metadata_event_lookup ON txline_quote_metadata (event_id)`
+  );
+
   const historyList = `[${historyPaths.map(sqlString).join(",")}]`;
   console.log(`[archive-import] importing mapped Polymarket histories (${historyPaths.length} files)`);
   await connection.run(
@@ -186,6 +210,9 @@ try {
     SELECT 'txline_quote_outcomes' AS table_name, COUNT(*) AS rows,
            COUNT(DISTINCT fixture_id) AS fixtures, MIN(source_ts_ms) AS first_ts_ms, MAX(source_ts_ms) AS last_ts_ms
     FROM txline_quote_outcomes
+    UNION ALL
+    SELECT 'txline_quote_metadata', COUNT(*), NULL, NULL, NULL
+    FROM txline_quote_metadata
     UNION ALL
     SELECT 'polymarket_history', COUNT(*), COUNT(DISTINCT fixture_id), MIN(source_ts_ms), MAX(source_ts_ms)
     FROM polymarket_history

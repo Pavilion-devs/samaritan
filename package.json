@@ -18,7 +18,9 @@
     "smoke:live": "tsx src/replay/live-smoke.ts",
     "smoke:discovery": "tsx src/replay/discovery-smoke.ts",
     "import:mappings": "tsx src/import/build-mapping-registry.ts",
-    "import:archives": "tsx src/import/import-archives.ts"
+    "import:archives": "tsx src/import/import-archives.ts",
+    "import:txline-metadata": "tsx src/import/backfill-txline-metadata.ts",
+    "research:total-evidence": "tsx src/research/build-total-line-evidence.ts"
   },
   "dependencies": {
     "@duckdb/node-api": "1.5.4-r.1",

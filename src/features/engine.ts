@@ -19,6 +19,7 @@ export type FeatureEngineConfig = {
 export type VelocityFeature = EwmaObservation & {
   windowMs: number;
   velocity: number | null;
+  accelerationPerSecond: number | null;
 };
 
 export type FeatureSnapshot = {
@@ -74,6 +75,7 @@ type SourceState = {
   sourceTsMs: number | null;
   updateCount: number;
   velocities: VelocityFeature[];
+  previousVelocity: Map<number, { value: number; tsMs: number }>;
 };
 
 type OutcomeState = {
@@ -198,9 +200,11 @@ export class FeatureEngine {
       probability: null,
       sourceTsMs: null,
       updateCount: 0,
+      previousVelocity: new Map(),
       velocities: this.config.velocityWindowsMs.map((windowMs) => ({
         windowMs,
         velocity: null,
+        accelerationPerSecond: null,
         zScore: null,
         baselineMean: null,
         baselineStdDev: null
@@ -243,10 +247,28 @@ export class FeatureEngine {
     source.velocities = this.config.velocityWindowsMs.map((windowMs) => {
       const anchor = source.series.valueAtOrBefore(tsMs - windowMs);
       if (!anchor || previous === null) {
-        return { windowMs, velocity: null, zScore: null, baselineMean: null, baselineStdDev: null };
+        return {
+          windowMs,
+          velocity: null,
+          accelerationPerSecond: null,
+          zScore: null,
+          baselineMean: null,
+          baselineStdDev: null
+        };
       }
       const velocity = value - anchor.value;
-      return { windowMs, velocity, ...source.moments.get(windowMs)!.observe(velocity, tsMs) };
+      const priorVelocity = source.previousVelocity.get(windowMs);
+      const accelerationPerSecond =
+        priorVelocity && tsMs > priorVelocity.tsMs
+          ? (velocity - priorVelocity.value) / ((tsMs - priorVelocity.tsMs) / 1_000)
+          : null;
+      source.previousVelocity.set(windowMs, { value: velocity, tsMs });
+      return {
+        windowMs,
+        velocity,
+        accelerationPerSecond,
+        ...source.moments.get(windowMs)!.observe(velocity, tsMs)
+      };
     });
   }
 

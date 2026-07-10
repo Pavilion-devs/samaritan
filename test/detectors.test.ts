@@ -21,6 +21,7 @@ function velocity(value: number, zScore: number): VelocityFeature {
   return {
     windowMs: 60_000,
     velocity: value,
+    accelerationPerSecond: null,
     zScore,
     baselineMean: 0,
     baselineStdDev: 0.01
@@ -103,6 +104,35 @@ describe("detector bank", () => {
     expect(signal?.kind).toBe("CONSENSUS_MOVE");
     expect(signal?.eligibility).toBe("pretrade_review_required");
     expect(bank.ingest({ ...moving, triggerEventId: "next" })).toEqual([]);
+  });
+
+  it("uses sampled mid gaps for historical consensus research without granting eligibility", () => {
+    const bank = new DetectorBank(config);
+    const historical = snapshot({
+      triggerSource: "txline",
+      spread: {
+        consensusMinusPolymarket: 0.05,
+        rawBuyGap: null,
+        rawSellGap: null
+      },
+      polymarket: {
+        ...snapshot().polymarket,
+        bestBid: null,
+        bestAsk: null,
+        observation: "sampled_history"
+      },
+      consensus: {
+        ...snapshot().consensus,
+        velocities: [velocity(0.04, 3)],
+        cusumUp: 0.04
+      }
+    });
+    const [signal] = bank.ingest(historical);
+    expect(signal).toMatchObject({
+      kind: "CONSENSUS_MOVE",
+      eligibility: "research_only",
+      evidence: { gapBasis: "sampled_history_proxy", rawGap: 0.05 }
+    });
   });
 
   it("identifies a fade direction and suppresses score-explained moves", () => {

@@ -72,7 +72,15 @@ export class DetectorBank {
   ): DetectorSignal | null {
     const direction: SignalDirection | null =
       consensus.zScore === null ? null : consensus.zScore > 0 ? "buy" : "sell";
-    const gap = direction === "buy" ? snapshot.spread.rawBuyGap : snapshot.spread.rawSellGap;
+    const midGap = snapshot.spread.consensusMinusPolymarket;
+    const liveGap = direction === "buy" ? snapshot.spread.rawBuyGap : snapshot.spread.rawSellGap;
+    const gap =
+      liveGap ??
+      (direction === null || midGap === null
+        ? null
+        : direction === "buy"
+          ? midGap
+          : -midGap);
     const cusum = direction === "buy" ? snapshot.consensus.cusumUp : snapshot.consensus.cusumDown;
     const key = this.#key("CONSENSUS_MOVE", snapshot, direction);
     const condition =

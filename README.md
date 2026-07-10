@@ -9,7 +9,7 @@
 
 **PHASE: PHASE 1 COMPLETE — PHASE 2 SIGNAL CORE STARTED.** The strict Node 22 workspace, canonical event contracts, evidence-bearing mapping registry, TXLine SSE clients, Gamma-refreshed Polymarket WebSocket source, streaming replay adapters, and append-only SQLite/DuckDB stores are implemented. The local research database holds 9,025,361 normalized TXLine outcomes and 85,249,582 mapped Polymarket points. Combined three-source live and two-source archive replay smokes pass. Tonight's synchronized capture supplies Phase-3 microstructure evidence while Phase 2 proceeds.
 
-Phase 2 now has rolling velocity/EWMA/CUSUM features, feed freshness and score context, research-gated `CONSENSUS_MOVE`/`XMARKET_DIVERGENCE`/`FADER_CANDIDATE`, timestamp-merged replay, and classification/Brier/CLV metric primitives. Numeric thresholds remain deliberately unset outside explicit test configuration until the Phase-3 gate.
+Phase 2 now has rolling velocity/acceleration/EWMA/CUSUM features, feed freshness and score context, research-gated `CONSENSUS_MOVE`/`XMARKET_DIVERGENCE`/`FADER_CANDIDATE`, timestamp-merged DuckDB replay, bounded forward-horizon labeling, streaming threshold-grid/classification/Brier/CLV metrics, and an evidence-weighted dynamic main-total selector. Numeric thresholds and selector weights remain deliberately unset outside explicit tests and smoke studies until the Phase-3 gate.
 Decisions locked so far:
 
 | Decision | Choice |
@@ -34,6 +34,7 @@ Decisions locked so far:
 | [docs/04-algorithms.md](docs/04-algorithms.md) | The detector math: trigger conditions, free parameters, sizing, scoring — the spec the gate study fills with numbers |
 | [docs/05-harness.md](docs/05-harness.md) | The agent harness machine room: case lifecycle, context assembly, two-speed deliberation, memory stores, hooks, budgets |
 | [docs/PHASE-1-STATUS.md](docs/PHASE-1-STATUS.md) | Implemented backbone contracts, verification evidence, and the remaining Phase-1 work |
+| [docs/PHASE-2-STATUS.md](docs/PHASE-2-STATUS.md) | Current feature/detector/replay implementation, real-archive smoke evidence, and open Phase-2 work |
 | [plan.md](plan.md) | 7 phases to submission (July 18) with exit criteria and the mandatory Phase-3 gate |
 | [AGENTS.md](AGENTS.md) | Hard invariants + conventions for any AI agent writing Samaritan code |
 

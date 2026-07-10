@@ -59,10 +59,11 @@ The docs only tell us so much; now we touch the real thing.
 ### Phase 2 — Probability, features, detectors, replay (Jul 11–13)
 
 - [x] Normalization: `market_key = fixtureId + oddsType + period + parameters`; probability space everywhere; use TXLine `Pct` as fair-prob source, compute our own de-vig as cross-check
-- [x] Feature engine foundation: TXLine StablePrice velocity and CUSUM state, consensus-vs-Polymarket spread, Polymarket-only velocity, score-event context, feed freshness (acceleration is the next derived feature)
+- [x] Feature engine foundation: TXLine StablePrice velocity and acceleration, EWMA/CUSUM state, consensus-vs-Polymarket spread, Polymarket-only velocity, score-event context, and feed freshness
 - [ ] Detector bank v1: `CONSENSUS_MOVE`, `XMARKET_DIVERGENCE`, `FADER_CANDIDATE`, `MODEL_MARKET_GAP`, `STALE_QUOTE` (paper/live measurement only)
 - [x] Replay engine: timestamp-merge and re-emit historical sources onto the bus at configurable speed
-- [ ] Detector metrics harness: precision/recall vs labeled score events
+- [x] Dynamic main-total research harness: build per-fixture balance/volume/liquidity/coverage evidence and rank exact full-time lines under injected weights; production rule remains unfrozen until Phase 3
+- [ ] Detector metrics harness: streaming threshold grids and forward convergence/reversal labels are implemented; score-event labels and STALE latency labels await the synchronized capture
 
 **Exit criteria:** detectors firing sensibly on replayed group-stage matches, with dashboards-in-terminal output.
 

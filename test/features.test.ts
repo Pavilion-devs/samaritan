@@ -124,6 +124,12 @@ describe("feature engine", () => {
     expect(home?.scoreContext).toEqual([
       { action: "goal", confirmed: true, participant: 1, sourceTsMs: 10_750 }
     ]);
+
+    const accelerated = engine
+      .ingest(quote(12_000, 0.54))
+      .find((snapshot) => snapshot.outcome === "home");
+    expect(accelerated?.consensus.velocities[0]?.velocity).toBeCloseTo(0.03);
+    expect(accelerated?.consensus.velocities[0]?.accelerationPerSecond).toBeCloseTo(0.02);
   });
 
   it("does not turn complement tokens into additional canonical outcomes", () => {
