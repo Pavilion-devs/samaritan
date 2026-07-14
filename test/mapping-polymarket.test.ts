@@ -119,4 +119,29 @@ describe("evidence-bearing mappings and Polymarket normalization", () => {
     expect(book.outcome).toBe("under");
     expect(book.bids[0]).toEqual({ price: 0.37, size: "10" });
   });
+
+  it("normalizes public market resolution by winning asset without inferring from price", () => {
+    const registry = new MappingRegistry([mapping()]);
+    const [resolution] = normalizePolymarketPayload(
+      {
+        market: "0xcondition",
+        assets_ids: ["over-token", "under-token"],
+        winning_asset_id: "under-token",
+        winning_outcome: "Under",
+        timestamp: "1783717968900",
+        event_type: "market_resolved"
+      },
+      1783717968929,
+      registry
+    );
+    expect(resolution).toMatchObject({
+      kind: "polymarket.resolution",
+      fixtureId: "18218149",
+      conditionId: "0xcondition",
+      winningAssetId: "under-token",
+      winningOutcomeLabel: "Under",
+      sourceTsMs: 1783717968900,
+      observedTsMs: 1783717968929
+    });
+  });
 });

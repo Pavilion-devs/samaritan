@@ -21,6 +21,14 @@ data/
 *.sqlite-wal
 
 # Phase 0 local secrets and raw licensed captures.
+.wallet/
 phase0/.wallet/
 phase0/.tokens/
 samples/
+
+# Local design explorations, social renders, and one-off verification helpers
+# are deliberately outside the public bounty submission. The production UI and
+# licence-safe judge artifacts live under apps/ and public/ respectively.
+content/
+design/
+.spain-belgium-verify*.ts

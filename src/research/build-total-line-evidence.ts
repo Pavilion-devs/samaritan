@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { mkdir } from "node:fs/promises";
@@ -5,18 +6,11 @@ import { DuckDBInstance } from "@duckdb/node-api";
 import { marketKey } from "../bus/events.js";
 import { probability } from "../domain/probability.js";
 import { MappingRegistry } from "../mapping/registry.js";
-import { readJsonArray } from "../replay/files.js";
+import { PAPER_STUDY_TOTAL_SELECTOR_AS_OF_BEFORE_KICKOFF_MS } from "../config/paper-study.js";
 import type { TotalLineEvidence } from "./main-total-selector.js";
+import { buildTotalLineHistoryEvidenceQuery } from "./total-line-evidence-query.js";
 
 type CandidateFile = { records?: unknown[] };
-type GammaMarket = {
-  id?: string | number;
-  volume?: string | number;
-  volumeNum?: number;
-  liquidity?: string | number;
-  liquidityNum?: number;
-};
-type GammaEvent = { markets?: GammaMarket[] };
 type Target = {
   fixtureId: string;
   marketId: string;
@@ -25,7 +19,7 @@ type Target = {
   mappingStatus: "candidate" | "verified" | "rejected";
   txlineMarketObserved: boolean;
   overAssetId: string;
-  cutoffTsMs: number;
+  selectorCutoffTsMs: number;
 };
 
 function argument(name: string, fallback: string): string {
@@ -33,22 +27,12 @@ function argument(name: string, fallback: string): string {
   return resolve(index >= 0 && process.argv[index + 1] ? process.argv[index + 1]! : fallback);
 }
 
-function sqlString(value: string): string {
-  return `'${value.replaceAll("'", "''")}'`;
-}
-
-function finiteMetadata(value: unknown): number {
-  const parsed = Number(value ?? 0);
-  return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
-}
-
 const databasePath = argument("db", "data/research/samaritan-research-v1.duckdb");
 const candidatesPath = argument("candidates", "data/research/mappings/world-cup-candidates.json");
-const eventsPath = argument(
-  "events",
-  "samples/polymarket-history/world-cup-2026-v1/world-cup-events.json"
-);
-const outputPath = argument("output", "data/research/main-total-line-evidence.json");
+const outputPath = argument("output", "data/research/main-total-line-evidence-causal-v2.json");
+if (existsSync(outputPath)) {
+  throw new Error(`Refusing to replace existing total-line evidence: ${outputPath}`);
+}
 const candidateFile = JSON.parse(await readFile(candidatesPath, "utf8")) as CandidateFile;
 const registry = new MappingRegistry(candidateFile.records ?? []);
 const targets: Target[] = [];
@@ -80,54 +64,23 @@ for (const record of registry.records()) {
       mappingStatus: record.status,
       txlineMarketObserved: condition.evidence?.txlineMarketObserved === true,
       overAssetId: over.assetId,
-      cutoffTsMs: record.kickoff.polymarketTsMs - 5 * 60_000
+      selectorCutoffTsMs:
+        record.kickoff.txlineTsMs - PAPER_STUDY_TOTAL_SELECTOR_AS_OF_BEFORE_KICKOFF_MS
     });
   }
 }
 
-const metadata = new Map<string, { volume: number; liquidity: number }>();
-for await (const event of readJsonArray<GammaEvent>(eventsPath)) {
-  for (const market of event.markets ?? []) {
-    const id = String(market.id ?? "");
-    if (!targetIds.has(id) || metadata.has(id)) continue;
-    metadata.set(id, {
-      volume: finiteMetadata(market.volumeNum ?? market.volume),
-      liquidity: finiteMetadata(market.liquidityNum ?? market.liquidity)
-    });
-  }
-  if (metadata.size === targetIds.size) break;
-}
-const missingMetadata = targets.filter((target) => !metadata.has(target.marketId));
-if (missingMetadata.length > 0) {
-  throw new Error(
-    `Gamma metadata missing for ${missingMetadata.length} total markets; first ${missingMetadata[0]!.marketId}`
-  );
-}
-
-const valuesSql = targets
-  .map(
-    (target) =>
-      `(${sqlString(target.marketId)}, ${sqlString(target.overAssetId)}, ${target.cutoffTsMs})`
-  )
-  .join(",\n");
 const instance = await DuckDBInstance.create(databasePath, { access_mode: "READ_ONLY" });
 const connection = await instance.connect();
 let historyRows: Record<string, unknown>[];
 try {
-  const result = await connection.runAndReadAll(`
-    WITH targets(market_id, asset_id, cutoff_ts_ms) AS (VALUES ${valuesSql})
-    SELECT
-      targets.market_id,
-      COUNT(history.event_id) AS coverage_points,
-      arg_max(history.price, history.source_ts_ms)
-        FILTER (WHERE history.source_ts_ms <= targets.cutoff_ts_ms) AS pre_kickoff_probability,
-      MAX(history.source_ts_ms)
-        FILTER (WHERE history.source_ts_ms <= targets.cutoff_ts_ms) AS pre_kickoff_point_ts_ms
-    FROM targets
-    LEFT JOIN polymarket_history history ON history.asset_id = targets.asset_id
-    GROUP BY targets.market_id
-    ORDER BY targets.market_id
-  `);
+  const result = await connection.runAndReadAll(buildTotalLineHistoryEvidenceQuery(
+    targets.map((target) => ({
+      marketId: target.marketId,
+      assetId: target.overAssetId,
+      selectorCutoffTsMs: target.selectorCutoffTsMs
+    }))
+  ));
   historyRows = result.getRowObjectsJson() as Record<string, unknown>[];
 } finally {
   connection.closeSync();
@@ -135,7 +88,6 @@ try {
 }
 const history = new Map(historyRows.map((row) => [String(row["market_id"]), row]));
 const evidence: TotalLineEvidence[] = targets.map((target) => {
-  const marketMetadata = metadata.get(target.marketId)!;
   const historyRow = history.get(target.marketId);
   const priceValue = historyRow?.["pre_kickoff_probability"];
   return {
@@ -145,6 +97,7 @@ const evidence: TotalLineEvidence[] = targets.map((target) => {
     lineMilli: target.lineMilli,
     mappingStatus: target.mappingStatus,
     txlineMarketObserved: target.txlineMarketObserved,
+    selectorCutoffTsMs: target.selectorCutoffTsMs,
     preKickoffOverProbability:
       priceValue === null || priceValue === undefined ? null : probability(Number(priceValue)),
     preKickoffPointTsMs:
@@ -152,19 +105,37 @@ const evidence: TotalLineEvidence[] = targets.map((target) => {
       historyRow?.["pre_kickoff_point_ts_ms"] === undefined
         ? null
         : Number(historyRow["pre_kickoff_point_ts_ms"]),
-    volume: marketMetadata.volume,
-    liquidity: marketMetadata.liquidity,
+    coverageFirstPointTsMs:
+      historyRow?.["coverage_first_point_ts_ms"] === null ||
+      historyRow?.["coverage_first_point_ts_ms"] === undefined
+        ? null
+        : Number(historyRow["coverage_first_point_ts_ms"]),
+    coverageLastPointTsMs:
+      historyRow?.["coverage_last_point_ts_ms"] === null ||
+      historyRow?.["coverage_last_point_ts_ms"] === undefined
+        ? null
+        : Number(historyRow["coverage_last_point_ts_ms"]),
+    // The captured Gamma volume/liquidity snapshot is post-close and has no
+    // historical timestamp. It is deliberately excluded from causal evidence.
+    volume: 0,
+    liquidity: 0,
     coveragePoints: Number(historyRow?.["coverage_points"] ?? 0)
   };
 });
 
 const payload = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   generatedAt: new Date().toISOString(),
   status: "research_evidence_only",
   selectionRuleFrozen: false,
-  preKickoffCutoffMinutes: 5,
-  sourcePaths: { databasePath, candidatesPath, eventsPath },
+  selectorEvidence: {
+    asOfBeforeKickoffMs: PAPER_STUDY_TOTAL_SELECTOR_AS_OF_BEFORE_KICKOFF_MS,
+    kickoffBasis: "txline_kickoff_ts_ms",
+    probabilityRule: "source_ts_ms_lte_selector_cutoff",
+    coverageRule: "source_ts_ms_lte_selector_cutoff",
+    volumeAndLiquidity: "unavailable_zeroed_no_timestamped_as_of_evidence"
+  },
+  sourcePaths: { databasePath, candidatesPath },
   counts: {
     fixtures: new Set(evidence.map((row) => row.fixtureId)).size,
     lines: evidence.length,

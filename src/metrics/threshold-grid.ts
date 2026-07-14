@@ -1,6 +1,10 @@
 import { createHash } from "node:crypto";
 import { DetectorBank, type DetectorBankConfig } from "../detectors/bank.js";
-import type { SignalKind } from "../detectors/types.js";
+import {
+  normalizeExecutableEconomicCases,
+  type EconomicCaseNormalizationSummary
+} from "../detectors/economic-cases.js";
+import type { DetectorSignal, SignalKind } from "../detectors/types.js";
 import { stableJson } from "../domain/json.js";
 import type { FeatureSnapshot } from "../features/engine.js";
 import {
@@ -18,7 +22,11 @@ export type ThresholdGridResult = {
   configId: string;
   config: DetectorBankConfig;
   snapshots: number;
+  /** Executable economic cases after binary Total Goals normalization. */
   signalCounts: Record<SignalKind, number>;
+  /** Raw detector emissions retained for audit, never for minimum-n gates. */
+  rawSignalCounts: Record<SignalKind, number>;
+  economicCaseNormalization: EconomicCaseNormalizationSummary;
   classification: ClassificationSummary[];
 };
 
@@ -28,7 +36,8 @@ type GridEntry = {
   bank: DetectorBank;
   metrics: ClassificationMetrics;
   snapshots: number;
-  signalCounts: Record<SignalKind, number>;
+  rawSignalCounts: Record<SignalKind, number>;
+  rawSignals: Array<{ signal: DetectorSignal; caseId: string }>;
 };
 
 const signalKinds: SignalKind[] = [
@@ -66,6 +75,7 @@ export function expandDetectorThresholdGrid(
 export class DetectorThresholdGrid {
   readonly #entries: GridEntry[];
   readonly #pendingPredictions = new Map<string, Map<string, Set<SignalKind>>>();
+  readonly #labeledCaseIds = new Set<string>();
 
   constructor(configs: readonly DetectorBankConfig[]) {
     if (configs.length === 0) throw new Error("Threshold grid requires at least one detector configuration");
@@ -80,14 +90,17 @@ export class DetectorThresholdGrid {
         bank: new DetectorBank(config),
         metrics: new ClassificationMetrics(),
         snapshots: 0,
-        signalCounts: emptySignalCounts()
+        rawSignalCounts: emptySignalCounts(),
+        rawSignals: []
       };
     });
   }
 
   ingest(snapshot: FeatureSnapshot, labels: DetectorLabels = {}): void {
+    const id = detectorCaseId(snapshot);
     const predictions = this.#predict(snapshot);
     this.#recordLabels(predictions, labels);
+    this.#labeledCaseIds.add(id);
   }
 
   ingestDeferred(snapshot: FeatureSnapshot): string {
@@ -102,6 +115,7 @@ export class DetectorThresholdGrid {
     if (!predictions) throw new Error(`Unknown deferred detector case: ${caseId}`);
     this.#recordLabels(predictions, labels);
     this.#pendingPredictions.delete(caseId);
+    this.#labeledCaseIds.add(caseId);
   }
 
   discard(caseId: string): void {
@@ -116,12 +130,16 @@ export class DetectorThresholdGrid {
 
   #predict(snapshot: FeatureSnapshot): Map<string, Set<SignalKind>> {
     const predictions = new Map<string, Set<SignalKind>>();
+    const caseId = detectorCaseId(snapshot);
     for (const entry of this.#entries) {
       entry.snapshots += 1;
       const signals = entry.bank.ingest(snapshot);
       const predictedKinds = new Set(signals.map((signal) => signal.kind));
       predictions.set(entry.configId, predictedKinds);
-      for (const signal of signals) entry.signalCounts[signal.kind] += 1;
+      for (const signal of signals) {
+        entry.rawSignalCounts[signal.kind] += 1;
+        entry.rawSignals.push({ signal, caseId });
+      }
     }
     return predictions;
   }
@@ -139,12 +157,22 @@ export class DetectorThresholdGrid {
   }
 
   results(): ThresholdGridResult[] {
-    return this.#entries.map((entry) => ({
-      configId: entry.configId,
-      config: { ...entry.config },
-      snapshots: entry.snapshots,
-      signalCounts: { ...entry.signalCounts },
-      classification: entry.metrics.summaries()
-    }));
+    return this.#entries.map((entry) => {
+      const labeledSignals = entry.rawSignals
+        .filter((item) => this.#labeledCaseIds.has(item.caseId))
+        .map((item) => item.signal);
+      const normalization = normalizeExecutableEconomicCases(labeledSignals);
+      const signalCounts = emptySignalCounts();
+      for (const signal of normalization.signals) signalCounts[signal.kind] += 1;
+      return {
+        configId: entry.configId,
+        config: { ...entry.config },
+        snapshots: entry.snapshots,
+        signalCounts,
+        rawSignalCounts: { ...entry.rawSignalCounts },
+        economicCaseNormalization: normalization.summary,
+        classification: entry.metrics.summaries()
+      };
+    });
   }
 }

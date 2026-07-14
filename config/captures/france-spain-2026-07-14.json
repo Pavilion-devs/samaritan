@@ -1,0 +1,34 @@
+{
+  "captureId": "paired-france-spain-2026-07-14",
+  "status": "human_confirmed_for_capture_only",
+  "tradeable": false,
+  "confirmedBy": "Deborah",
+  "confirmedAt": "2026-07-12",
+  "txline": {
+    "fixtureId": "18237038",
+    "home": "France",
+    "away": "Spain",
+    "kickoffUtc": "2026-07-14T19:00:00.000Z"
+  },
+  "polymarket": {
+    "eventId": "691040",
+    "eventSlug": "fifwc-fra-esp-2026-07-14",
+    "totalsEventId": "691131",
+    "totalsEventSlug": "fifwc-fra-esp-2026-07-14-more-markets",
+    "home": "France",
+    "away": "Spain",
+    "kickoffUtc": "2026-07-14T19:00:00.000Z",
+    "rulesPeriod": "first_90_minutes_plus_stoppage_time"
+  },
+  "capture": {
+    "scheduledStartUtc": "2026-07-14T16:00:00.000Z",
+    "durationMinutes": 360,
+    "runLabel": "paired-france-spain-2026-07-14"
+  },
+  "evidence": {
+    "txlineFixtures": "samples/fixtures/mainnet-world-cup-fixtures.json",
+    "polymarketEvents": "data/live/gamma-discovery/open-world-cup-events.json",
+    "readinessReport": "docs/research/capture-readiness.md"
+  },
+  "note": "Deborah confirmed public-data capture only. This config cannot authorize authentication beyond existing TXLine data access, token activation, wallet access, trading, approval, deposit, order placement, or money movement."
+}

@@ -61,6 +61,23 @@ describe("TXLine normalization", () => {
     expect(event.outcomes.map((outcome) => outcome.fairProbability)).toEqual([null, null]);
   });
 
+  it("skips a mapped market row when both quote arrays are empty", () => {
+    const suspended = {
+      ...odds,
+      MessageId: "total-empty",
+      SuperOddsType: "OVERUNDER_PARTICIPANT_GOALS",
+      MarketParameters: "line=1.75",
+      PriceNames: ["over", "under"],
+      Prices: [],
+      Pct: []
+    };
+    expect(normalizeTxLineEnvelope(envelope(suspended))).toEqual([]);
+
+    expect(() => normalizeTxLineEnvelope(envelope({ ...suspended, Prices: [2000] }))).toThrow(
+      /outcome array lengths disagree/
+    );
+  });
+
   it("uses the same normalizer for a synthetic replay-shaped frame and a live envelope", () => {
     const rawFrame = `data: ${JSON.stringify(odds)}\nid: synthetic-sse-1`;
     const replayEnvelope = capturedFrameToEnvelope({ receivedAt, stream: "odds", rawFrame });

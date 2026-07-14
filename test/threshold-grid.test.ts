@@ -37,6 +37,7 @@ function snapshot(): FeatureSnapshot {
     triggerEventId: "trigger",
     triggerSource: "polymarket",
     asOfTsMs: 10_000,
+    observedAtTsMs: 10_000,
     fixtureId: "fixture-1",
     market: {
       family: "match_result",
@@ -108,5 +109,36 @@ describe("detector threshold grid", () => {
     grid.label(caseId, { XMARKET_DIVERGENCE: true });
     expect(grid.pendingCaseCount).toBe(0);
     expect(grid.results()[0]?.classification[0]?.truePositive).toBe(1);
+  });
+
+  it("uses normalized total-goals cases for grid signal counts while retaining raw audit counts", () => {
+    const grid = new DetectorThresholdGrid([base]);
+    const totalMarket = {
+      family: "total_goals" as const,
+      period: "full_time" as const,
+      lineMilli: 2_500,
+      key: "fixture-1:total_goals:full_time:2500"
+    };
+    const over = { ...snapshot(), triggerEventId: "over", market: totalMarket, outcome: "over" as const };
+    const under = {
+      ...snapshot(),
+      triggerEventId: "under",
+      market: totalMarket,
+      outcome: "under" as const,
+      consensus: { ...snapshot().consensus, probability: probability(0.45) },
+      spread: { consensusMinusPolymarket: -0.05, rawBuyGap: null, rawSellGap: null }
+    };
+
+    grid.ingest(over, { XMARKET_DIVERGENCE: true });
+    grid.ingest(under, { XMARKET_DIVERGENCE: true });
+    const result = grid.results()[0]!;
+
+    expect(result.rawSignalCounts.XMARKET_DIVERGENCE).toBe(2);
+    expect(result.signalCounts.XMARKET_DIVERGENCE).toBe(1);
+    expect(result.economicCaseNormalization).toMatchObject({
+      rawEmissions: 2,
+      normalizedCases: 1,
+      complementarySellsCollapsed: 1
+    });
   });
 });

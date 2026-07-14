@@ -63,7 +63,7 @@ The docs only tell us so much; now we touch the real thing.
 - [ ] Detector bank v1: `CONSENSUS_MOVE`, `XMARKET_DIVERGENCE`, `FADER_CANDIDATE`, `MODEL_MARKET_GAP`, `STALE_QUOTE` (paper/live measurement only)
 - [x] Replay engine: timestamp-merge and re-emit historical sources onto the bus at configurable speed
 - [x] Dynamic main-total research harness: build per-fixture balance/volume/liquidity/coverage evidence and rank exact full-time lines under injected weights; production rule remains unfrozen until Phase 3
-- [ ] Detector metrics harness: streaming threshold grids and forward convergence/reversal labels are implemented; score-event labels and STALE latency labels await the synchronized capture
+- [x] Detector metrics harness: streaming threshold grids, forward convergence/reversal labels, and outage-aware score-event/book latency labels are implemented; Spain-Belgium produced no supporting STALE_QUOTE case, so the detector remains disabled
 
 **Exit criteria:** detectors firing sensibly on replayed group-stage matches, with dashboards-in-terminal output.
 
@@ -71,25 +71,38 @@ The docs only tell us so much; now we touch the real thing.
 
 The mandatory study before any real-money trading. Deliverable is a written report (`docs/06-gate-study.md`):
 
-- [ ] Historical lane: align 5-minute TXLine StablePrice with one-minute Polymarket sampled prices; measure divergence, convergence, signal CLV, continuation/reversal, and FADER behavior with train/test separation
-- [ ] Freeze a dynamic main-full-time-total selection rule from captured evidence; never hard-code O/U 2.5
-- [ ] Apply conservative historical fee/spread/slippage proxies and label all historical results as signal research, not executable-fill proof
-- [ ] Live lane: use synchronized TXLine SSE + Polymarket books to measure feed availability, event→repricing lag, spread/depth, and STALE_QUOTE feasibility; in-play stays paper-only
-- [ ] Tune `CONSENSUS_MOVE`, XMARKET, and FADER thresholds on replay; report precision/recall and sample sizes
+- [x] Historical lane: timestamp-align TXLine StablePrice with Polymarket sampled prices; measure divergence, convergence, signal CLV, continuation/reversal, and FADER behavior with chronological train/test separation
+- [x] Preserve and suspend the invalidated v1 paper protocol; corrected causal selector and execution timing now exist only in an unregistered v2 engineering candidate pending Deborah sign-off
+- [x] Apply conservative historical fee/spread/slippage proxies and label all historical results as signal research, not executable-fill proof
+- [x] Live lane: synchronized Spain-Belgium TXLine SSE + Polymarket books measured feed availability, event→repricing lag, spread/depth, and STALE_QUOTE feasibility; 0/18 cases showed a clean post-TXLine stale window, so in-play remains paper-only and STALE_QUOTE stays disabled
+- [x] Tune `CONSENSUS_MOVE`, XMARKET, and FADER threshold candidates on training replay; report sealed heldout precision/recall, CLV, market-family attribution, cost sensitivity, and sample sizes without freezing them
 - [ ] MODELER calibration baseline: fit the in-play goal model on group stage, report Brier vs market
 - [ ] **Go/No-Go review with Deborah:** which pre-match edges are real; set per-trade and drawdown caps within the locked $50 bankroll / $15 initial aggregate-exposure ceiling
+- [ ] Run the signed two-lane paper validation in `docs/07-paper-study-preregistration.md` (`$3` stake, `$15` exposure, `$20` rejection stop; executable CLV, match-clustered CI, per-match P&L; real-money gate stays closed)
 
 **Exit criteria:** signed-off study; thresholds frozen for v1; real-money numbers agreed and written into config.
 
 ### Phase 4 — Claude reasoning layer (Jul 14–15)
 
-- [ ] Trade-thesis schema (strict) — the only bridge from AI to money
-- [ ] Triage agent (Haiku 4.5): dedupe/classify/drop, one-line rationale
-- [ ] Analyst agent (Opus 4.8, adaptive thinking, prompt-cached context): tools = `query_series`, `get_match_state`, `web_search`, `get_polymarket_book`, `submit_thesis`
-- [ ] Risk manager: deterministic rule layer (caps, quarter-Kelly, correlation buckets, drawdown breakers, kill switch) + agent review pass; veto logged with reasons
-- [ ] Decision ledger: append-only record of every signal → triage → thesis → veto/approval → fill
-- [ ] Paper execution adapter (slippage-modeled fills)
-- [ ] Spend controls: $200 operating target, $300 hard project ceiling; fail to detectors-only mode rather than exceed it
+- [x] Trade-thesis schema (strict) — the only bridge from AI to deterministic risk; unknown sizing/order fields are rejected
+- [x] Triage agent (Haiku 4.5): bounded strict-tool classify/drop/escalate with one-line rationale
+- [x] Analyst agent bounty slice: Opus 4.8 adaptive thinking over a bounded code-assembled signal bundle; strict `submit_thesis` is the only tool/exit
+- [ ] Analyst pull-tools extension: `query_series`, `get_match_state`, `web_search`, and `get_polymarket_book` remain unimplemented and are not submission claims
+- [ ] Risk manager: signed paper caps/drawdown/market/evidence rules and settled portfolio state are implemented; quarter-Kelly, correlation buckets, global kill switch, and agent judgment pass remain
+- [x] Decision ledger: append-only hash-chained record of every signal → triage → thesis → veto/approval → execution intent → paper result
+- [x] Paper execution adapter: deterministic limit, post-latency canonical book, depth walking, partial/no fills, per-market fees, micro-unit accounting
+- [x] Paper case scheduler/runtime: pre-model lane-specific ledgering, measured wall-clock decision latency mapped to event time, frozen detector/selector config, 15-minute kickoff cutoff, first eligible post-decision canonical book, duplicate suppression, terminal expiry
+- [x] Public CLOB execution metadata: cached V2 fee curve, taker-only flag, minimum shares, tick size, condition/token identity; malformed or legacy-only metadata fails closed
+- [x] Paper portfolio evidence: actual entry cost, midpoint/executable CLV, settlement P&L/Brier, exposure, equity peak, and drawdown state
+- [x] Kickoff/settlement lifecycle: latest canonical pre-kickoff close, public winning-asset resolution, and pre-mutation append-only accounting
+- [x] Registered evidence evaluator: ledger reconstruction, sealed long-run endpoints, per-match rows, 10,000-iteration match-block bootstrap, random-direction control, and guardrails
+- [x] Preserve the v1 two-lane zero-observation ledgers as audit history; do not append under the unregistered v2 candidate
+- [x] Fixture evidence/readiness gates: paired-book vs sampled-history classification, physical scheduler exclusion, observed-time captured replay merge, and three-hour pre-kickoff capture target
+- [x] Semifinal capture candidates: authenticated read-only TXLine refresh, exact France-Spain / England-Argentina cross-source identity, full-time totals rules check, and launch withheld pending human capture-only confirmation
+- [x] Semifinal capture schedule: Deborah capture-only confirmation, fail-closed starts three hours pre-kickoff, detached process checks, and post-run canonical replay verification
+- [x] Rolling fixture admission: atomic two-lane refresh, verified mapping + paired executable evidence, immutable admitted identity, and pre-Claude research-only rejection
+- [x] Evidence artifact writer: ledger-derived JSON + preregistered per-match Markdown table with strict long-run sealing
+- [x] Spend controls: shared append-only reservations, $200 operating target, $300 pre-request hard project ceiling, and fail-closed API accounting
 
 **Exit criteria:** end-to-end on replay — signal fires, Haiku triages, Opus writes a thesis, risk manager rules, paper fill lands, ledger records all of it.
 
@@ -107,7 +120,7 @@ The mandatory study before any real-money trading. Deliverable is a written repo
 
 - [ ] Ledger anchoring: hash ledger segments → Solana memo tx per match/hour; explorer links surfaced
 - [ ] Merkle spot-validation of TXLine data we acted on (validation endpoints)
-- [ ] Dashboard (the judge surface): live board, signal tape, agent reasoning feed (triage→thesis→veto visible), tournament leaderboard, CLV/calibration curves, verification panel (message IDs, proofs, anchor txs)
+- [ ] Dashboard (the judge surface), implemented against the approved Matchroom v2 dark-hybrid direction in [`docs/UI.md`](docs/UI.md): Command, Matchroom, Decision Rail, Casebook, Study, and Proof; live/replay state, triage -> thesis -> veto/approval, CLV/calibration, and verification remain visibly auditable. Light mode is deferred and non-blocking.
 - [ ] Hosted deployment: credentials server-side, judges get a URL, read-only
 
 **Exit criteria:** a stranger with a link can watch Samaritan think during a live match.
@@ -137,5 +150,6 @@ The mandatory study before any real-money trading. Deliverable is a written repo
 ## Locked and pending from Deborah
 
 - **Locked:** Match Result + dynamic main full-time O/U only; Claude $200 target/$300 hard ceiling; $50 total bankroll; $15 maximum initial aggregate live exposure; daily lesson review; concurrency 3; nightly batch post-mortems.
-- **Pending at Phase 3:** per-trade cap and drawdown halts; approval of any real-money edge.
+- **Suspended July 14:** the v1 totals-only paper protocol is preserved but cannot admit new cases after its upstream selector was found to use future information. The `$3` stake, `$15` aggregate exposure, `$20` drawdown rejection stop, and separate ledgers remain historical v1 configuration only until a corrected protocol is signed.
+- **Pending after paper ACCEPT:** separate approval of any real-money edge and its real-money caps; paper approval does not carry over.
 - **Pending per live mapping:** human confirmation of teams, kickoff, market period, and full Polymarket rules text.

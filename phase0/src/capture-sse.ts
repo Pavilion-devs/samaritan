@@ -1,5 +1,7 @@
+import { once } from "node:events";
 import { createWriteStream } from "node:fs";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import {
   appendJsonl,
   authHeaders,
@@ -42,93 +44,117 @@ function parseSseBlock(block: string): ParsedSse | null {
   return message.data || message.event || message.id ? message : null;
 }
 
-async function captureStream(options: {
+export type CaptureStreamOptions = {
   network: string;
   streamName: "odds" | "scores";
   url: string;
   headers: Record<string, string>;
   outDir: string;
   deadline: number;
-}): Promise<void> {
+  fetchImpl?: typeof fetch;
+  reconnectDelayMs?: number;
+};
+
+export async function captureStream(options: CaptureStreamOptions): Promise<void> {
   let lastEventId = "";
   let reconnect = 0;
+  const fetchImpl = options.fetchImpl ?? fetch;
+  const reconnectDelayMs = options.reconnectDelayMs ?? 2_000;
   const raw = createWriteStream(join(options.outDir, `${options.streamName}.raw.sse`), { flags: "a" });
   const framesPath = join(options.outDir, `${options.streamName}.frames.ndjson`);
   const reconnectPath = join(options.outDir, "reconnects.ndjson");
 
-  while (Date.now() < options.deadline) {
-    const headers: Record<string, string> = {
-      ...options.headers,
-      Accept: "text/event-stream",
-      "Cache-Control": "no-cache",
-      "Accept-Encoding": "gzip"
-    };
-    if (lastEventId) headers["Last-Event-ID"] = lastEventId;
+  try {
+    while (Date.now() < options.deadline) {
+      const headers: Record<string, string> = {
+        ...options.headers,
+        Accept: "text/event-stream",
+        "Cache-Control": "no-cache",
+        "Accept-Encoding": "gzip"
+      };
+      if (lastEventId) headers["Last-Event-ID"] = lastEventId;
 
-    await appendJsonl(reconnectPath, {
-      at: new Date().toISOString(),
-      stream: options.streamName,
-      reconnect,
-      lastEventId: lastEventId || null,
-      action: "connect"
-    });
-
-    try {
-      const response = await fetch(options.url, { headers });
-      if (!response.ok || !response.body) {
-        const text = await response.text();
-        throw new Error(`${options.streamName} stream failed ${response.status}: ${text.slice(0, 300)}`);
-      }
-
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-      while (Date.now() < options.deadline) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        const chunk = decoder.decode(value, { stream: true });
-        raw.write(chunk);
-        buffer += chunk;
-        let separator = buffer.match(/\r?\n\r?\n/);
-        while (separator?.index !== undefined) {
-          const receivedAt = new Date();
-          const receivedAtUnixNs = `${BigInt(receivedAt.getTime()) * 1_000_000n}`;
-          const receivedAtMonotonicNs = nowNs();
-          const rawFrame = buffer.slice(0, separator.index);
-          buffer = buffer.slice(separator.index + separator[0].length);
-          const parsed = parseSseBlock(rawFrame);
-          if (parsed?.id) lastEventId = parsed.id;
-          await appendJsonl(framesPath, {
-            receivedAt: receivedAt.toISOString(),
-            receivedAtUnixNs,
-            receivedAtMonotonicNs,
-            stream: options.streamName,
-            lastEventId: parsed?.id ?? null,
-            event: parsed?.event ?? null,
-            rawFrame
-          });
-          separator = buffer.match(/\r?\n\r?\n/);
-        }
-      }
-      reader.releaseLock();
-    } catch (error) {
       await appendJsonl(reconnectPath, {
         at: new Date().toISOString(),
         stream: options.streamName,
         reconnect,
         lastEventId: lastEventId || null,
-        action: "disconnect",
-        error: error instanceof Error ? error.message : String(error)
+        action: "connect"
       });
-      await new Promise((resolve) => setTimeout(resolve, 2_000));
-    }
-    reconnect += 1;
-  }
 
-  raw.end();
+      const controller = new AbortController();
+      const deadlineTimer = setTimeout(
+        () => controller.abort(new Error("capture deadline reached")),
+        Math.max(1, options.deadline - Date.now())
+      );
+      let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
+      try {
+        const response = await fetchImpl(options.url, { headers, signal: controller.signal });
+        if (!response.ok || !response.body) {
+          const text = await response.text();
+          throw new Error(`${options.streamName} stream failed ${response.status}: ${text.slice(0, 300)}`);
+        }
+
+        reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        while (Date.now() < options.deadline) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          const chunk = decoder.decode(value, { stream: true });
+          raw.write(chunk);
+          buffer += chunk;
+          let separator = buffer.match(/\r?\n\r?\n/);
+          while (separator?.index !== undefined) {
+            const receivedAt = new Date();
+            const receivedAtUnixNs = `${BigInt(receivedAt.getTime()) * 1_000_000n}`;
+            const receivedAtMonotonicNs = nowNs();
+            const rawFrame = buffer.slice(0, separator.index);
+            buffer = buffer.slice(separator.index + separator[0].length);
+            const parsed = parseSseBlock(rawFrame);
+            if (parsed?.id) lastEventId = parsed.id;
+            await appendJsonl(framesPath, {
+              receivedAt: receivedAt.toISOString(),
+              receivedAtUnixNs,
+              receivedAtMonotonicNs,
+              stream: options.streamName,
+              lastEventId: parsed?.id ?? null,
+              event: parsed?.event ?? null,
+              rawFrame
+            });
+            separator = buffer.match(/\r?\n\r?\n/);
+          }
+        }
+      } catch (error) {
+        const expectedDeadline = controller.signal.aborted && Date.now() >= options.deadline;
+        if (!expectedDeadline) {
+          await appendJsonl(reconnectPath, {
+            at: new Date().toISOString(),
+            stream: options.streamName,
+            reconnect,
+            lastEventId: lastEventId || null,
+            action: "disconnect",
+            error: error instanceof Error ? error.message : String(error)
+          });
+          const remainingMs = Math.max(0, options.deadline - Date.now());
+          await new Promise((resolve) => setTimeout(resolve, Math.min(reconnectDelayMs, remainingMs)));
+        }
+      } finally {
+        clearTimeout(deadlineTimer);
+        if (reader) {
+          await reader.cancel("capture ended").catch(() => undefined);
+          reader.releaseLock();
+        }
+      }
+      reconnect += 1;
+    }
+  } finally {
+    raw.end();
+    await once(raw, "finish");
+  }
 }
 
-async function main(): Promise<void> {
+export async function main(): Promise<void> {
   const args = parseArgs();
   const network = getNetwork(args);
   const token = await loadToken(network);
@@ -181,7 +207,10 @@ async function main(): Promise<void> {
   console.log(`SSE capture complete: ${outDir}`);
 }
 
-main().catch((error: unknown) => {
-  console.error(error instanceof Error ? error.message : error);
-  process.exit(1);
-});
+const entryPoint = process.argv[1];
+if (entryPoint && import.meta.url === pathToFileURL(entryPoint).href) {
+  main().catch((error: unknown) => {
+    console.error(error instanceof Error ? error.message : error);
+    process.exit(1);
+  });
+}

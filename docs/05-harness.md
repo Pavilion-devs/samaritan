@@ -1,6 +1,8 @@
 # 05 — The Agent Harness
 
-*v0.2 (July 10, 2026). Status: V1 HARNESS DECISIONS LOCKED. This is the machine room: deterministic context assembly, strict tools, bounded agent stages, persistent memory, and hooks that code—not the model—enforces.*
+*v0.3 (July 14, 2026). Status: target harness with the implemented bounty slice identified below.*
+
+> **Implementation boundary:** the current analyst is one bounded Opus call over the detector signal bundle and its only tool is `submit_thesis`. The multi-call investigative loop, pull-based evidence tools, episodic retrieval, risk-agent pass, debate council, learned-memory workflow, and Data Doctor are design targets, not current submission claims. The implemented path is deterministic scheduling, strict Haiku/Opus outputs, paper risk/execution, portfolio lifecycle, restart reconstruction, spend/decision ledgers, and a synthetic end-to-end proving case.
 
 ## 0. The core abstraction: the CASE
 
@@ -33,14 +35,16 @@ while case.alive:
     invariants.check(case)                               # hooks — code, unoverridable
 ```
 
-Within an agent stage (e.g. INVESTIGATING), the analyst runs a bounded tool-use loop: max `K` tool calls, max token budget, hard wall-clock deadline derived from the case TTL. Exceeding any bound ends the stage with whatever the model has — a late thesis is a dead thesis, so the deadline is real.
+The implemented INVESTIGATING stage is deliberately smaller: one bounded call, one strict exit tool, a maximum output budget, and a hard request timeout. A future multi-call loop may add a maximum `K`, but it is not part of the bounty runtime.
+
+The paper runtime splits judgment from execution. It appends `signal_received` before model I/O, measures real wall-clock time through triage and analysis, maps completion back onto event time, and appends `analysis_completed`. Only then can the first later canonical book become an execution candidate. Model-supplied timestamps are replaced by deterministic completion/expiry stamps, so an analyst cannot shorten reported latency or extend its own validity window.
 
 **Stage table:**
 
 | Stage | Executor | Bounded by | Exit |
 |---|---|---|---|
-| TRIAGE | Haiku 4.5, single turn, no tools | 1 call | drop / escalate(+priority) |
-| INVESTIGATING | Opus 4.8, tool loop | K calls, tokens, deadline | `submit_thesis` or `no_trade` |
+| TRIAGE | Haiku 4.5, single turn, submission tool only | 1 call, 512 output tokens, 60 s | drop / escalate(+priority) |
+| INVESTIGATING | Opus 4.8 adaptive thinking, bounded evidence bundle | 1 call initially, 8,192 output tokens, 180 s | `submit_thesis` carrying paper-trade or no-trade |
 | RISK_REVIEW | Rules engine (code) → Opus judgment pass | 1 call | veto / resize-down / approve |
 | EXECUTING | Adapter (code only) | price-tolerance recheck | filled / expired |
 | POST_MORTEM | Batch job (Haiku/Opus, off-peak) | daily budget | lesson entries |
@@ -59,7 +63,7 @@ The single biggest quality-and-cost lever. The model never "goes and fetches eve
    - **k nearest historical cases** (same detector, similar market/state) with their outcomes and CLV — retrieved from the ledger by feature similarity. This is episodic memory doing real work: the analyst sees how prior CONSENSUS_MOVE cases with similar magnitude/persistence behaved.
 4. **Freshness stamp:** every evidence item carries its timestamp; the thesis must reference evidence ≤ TTL-fresh, enforced at submit.
 
-Tools available during INVESTIGATING are **pull-based extensions** of the bundle, not replacements: `query_series` (ad-hoc slices of our store), `get_match_state`, `get_polymarket_book` (live re-read), `web_search` (news/lineups — the only external tool, allowlisted), `find_similar_cases` (deeper episodic search), `submit_thesis` / `no_trade` (the only exits).
+The current INVESTIGATING call receives the signal and triage output assembled by code. Its only tool is `submit_thesis`, whose recommendation is either `paper_trade` or `no_trade`. Proposed pull-based extensions—`query_series`, `get_match_state`, `get_polymarket_book`, `web_search`, and `find_similar_cases`—are not wired into the current runtime.
 
 ## 3. Deliberation design — when agents debate (the two-speed answer)
 
@@ -92,8 +96,9 @@ One mechanism, honest accounting: debate is a *governance* tool, not a *trading*
 
 - **Priority queue** over live cases: `priority = f(expected_edge × stake_capacity, ttl_remaining)`. V1 concurrency cap is **3** concurrent INVESTIGATING cases.
 - **Preemption:** a score event on a fixture instantly invalidates that fixture's in-flight cases back to TRIAGE (the world changed; the evidence is stale). This is a hook, not a model decision.
-- **Token budgets:** per-case caps (triage ~500 out; investigation ~8K out), per-day controls, **$200 operating target**, and **$300 hard project ceiling**. Degradation ladder: raise triage escalation bar → shrink K → pause lowest-CLV persona → detectors-only mode. At the hard ceiling all new model investigations stop; signals continue to be logged and no model-dependent real trade can proceed.
+- **Token budgets:** per-case caps (triage 512 out; investigation 8,192 out), per-day controls, **$200 operating target**, and **$300 hard project ceiling**. An append-only SQLite spend ledger atomically reserves worst-case request cost before network I/O, settles measured usage afterward, and conservatively charges the reservation when billing is unknown. Degradation ladder: raise triage escalation bar → shrink K → pause lowest-CLV persona → detectors-only mode. At the hard ceiling all new model investigations stop; signals continue to be logged and no model-dependent real trade can proceed.
 - **Prompt-cache discipline:** static prefix byte-stable per deploy; per-case content strictly after the cache breakpoint; cache hit rate is a monitored metric (a silent invalidator is a 10× cost bug).
+- **Clock discipline:** market/book freshness is checked in canonical event time; public fee-metadata freshness is checked in processing wall time. Neither clock is rewritten to make replay pass.
 
 ## 6. Hooks — the unoverridable layer
 

@@ -1,6 +1,8 @@
 # 02 — Architecture: The Samaritan Harness
 
-*Design doc, v0.2 (July 10, 2026). Status: LOCKED FOR V1 — updated from Phase 0/0.5 ground truth.*
+*Design doc, v0.3 (July 14, 2026). Status: target architecture plus an explicitly identified bounty slice.*
+
+> **Implementation boundary:** the bounty build currently ships the canonical live/replay data path, three deterministic detectors, single-turn Haiku triage, a single-turn Opus structured evaluator over a code-assembled signal bundle, deterministic paper risk/execution, a v2 local decision ledger, and offline-safe receipt/anchor tooling. The read-only analyst tools, risk-agent judgment pass, strategy tournament, real-money adapter, Data Doctor, and submitted Solana anchor remain roadmap work and must not be described as implemented.
 
 ## Design thesis
 
@@ -18,15 +20,15 @@ Everyone else connecting Claude to a sports API will build: `odds → prompt →
                                  │ signals (rare, structured)
                  ┌───────────────▼──────────────────────────────────────────┐
                  │ LAYER 2 — REASONING (Claude, invoked on signal only)     │
-                 │ triage agent (Haiku) → analyst agent (Opus 4.8 + tools) │
-                 │ → structured TRADE THESIS → risk manager (veto power)   │
+                 │ triage (Haiku) → analyst (Opus 4.8, bounded bundle)     │
+                 │ → structured TRADE THESIS → deterministic paper risk    │
                  └───────────────┬──────────────────────────────────────────┘
                                  │ approved tickets
                  ┌───────────────▼──────────────────────────────────────────┐
                  │ LAYER 3 — EXECUTION & SCORING                            │
                  │ strategy tournament (paper bankrolls, CLV/Brier scored) │
-                 │ execution adapters: PAPER │ POLYMARKET CLOB (real $)    │
-                 │ decision ledger → hashed → anchored on Solana           │
+                 │ bounty adapter: PAPER; real CLOB remains gated roadmap  │
+                 │ decision ledger → hashed → receipt; anchor is human-gated│
                  └──────────────────────────────────────────────────────────┘
 ```
 
@@ -60,20 +62,16 @@ Polymarket Match Result is represented as three binary conditions per match (hom
 
 **Triage agent — `claude-haiku-4-5`.** First contact for every signal: dedupe (the same move seen through multiple outcomes = one case), classify against known context, kill obvious noise. Cheap enough to run on every signal. Output: drop / escalate, with a one-line rationale.
 
-**Analyst agent — `claude-opus-4-8`, adaptive thinking, prompt-cached system context.** Gets escalated cases with the evidence bundle. Tools (strict schemas):
-- `query_series` — interrogate our own time-series store (odds history, features, comparable past cases)
-- `get_match_state` — live score/state for the fixture
-- `web_search` — team news, lineups, injury reports; the *cause* behind unexplained moves
-- `get_polymarket_book` — depth/spread on the target market (is the edge actually captureable after slippage?)
-- `submit_thesis` — the only exit: a structured trade thesis
+**Analyst agent — implemented bounty slice.** `claude-opus-4-8` receives the strict triage decision plus one code-assembled detector signal/evidence bundle and may emit only `submit_thesis`. It has adaptive thinking, fixed input/output/time bounds, schema validation, identity checks, deterministic timestamps, and append-only cost accounting. It does **not** currently expose `query_series`, `get_match_state`, `web_search`, `get_polymarket_book`, or episodic-search tools. Those remain a post-bounty extension unless implemented and demonstrated before release.
 
 **Trade thesis (strict schema — this is the API between AI and money):**
 ```
-{ market, venue, side, fair_prob, market_prob, edge_bps, confidence,
-  thesis: string, invalidation_condition: string, ttl_seconds,
-  suggested_stake_fraction, strategy_attribution }
+{ schemaVersion, signalId, fixtureId, marketKey, outcome, direction,
+  recommendation: "paper_trade" | "no_trade", fairProbability,
+  thesisSummary, evidenceFor[], steelmanAgainst, invalidationConditions[],
+  submittedAtTsMs, expiresAtTsMs, analystModel }
 ```
-No thesis, no trade. Free-text never touches the execution path.
+No thesis, no trade. The thesis contains no stake, order, venue credential, wallet, or execution field; deterministic code downstream owns the paper stake and every execution decision. Free text never becomes an order.
 
 **Risk manager — separate agent + hard-coded rule layer, veto power.** Deliberately adversarial split: the agent that wants the trade never sizes the trade. Two-stage: (1) deterministic hard rules that no LLM can override — max exposure per fixture, per strategy, per day; fractional Kelly cap; correlation limits (no stacking correlated positions across a match's markets); real-money kill switch; (2) an agent pass for judgment calls (does this thesis actually support this size? is the invalidation condition checkable?). Rejections are logged with reasons — they're training data for the playbook.
 
@@ -90,7 +88,7 @@ No thesis, no trade. Free-text never touches the execution path.
 2. `PolymarketAdapter` — real orders via CLOB **V2** SDK. Real-money flow is gated: only pre-match theses that pass both risk stages, carry `venue: polymarket`, use a human-confirmed mapping, and fit within every bankroll/exposure/minimum-order constraint. Kill switch halts it globally. If no valid order fits, no trade is the correct output.
 3. `ReplayAdapter` — used by the backtest runner; fills against historical series.
 
-**Decision ledger + on-chain anchoring.** Every thesis, veto, fill, and outcome is an append-only ledger row. Periodically (per match / per hour), the ledger segment is hashed and the hash written to Solana via a memo tx. Inbound TXLine data we acted on is spot-validated against the Merkle-proof endpoints. Result: a **provably un-cherry-picked track record** on verified data — "proof of alpha." This is the crypto-native feature that fits the judges, and post-hackathon it's the trust layer if we ever sell signals.
+**Decision ledger + on-chain anchoring.** Every thesis, veto, fill, and outcome is an append-only ledger row. The target proof path hashes a versioned canonical record and writes the verified segment head to Solana, while inbound TXLine evidence is spot-validated where the official proof endpoints permit it. Local hash-chain integrity, deterministic replay parity, and external timestamping are reported as distinct guarantees. None of them alone is called proof of alpha; profitability requires separate valid evidence.
 
 **Replay/backtest harness.** The rescued archive supplies five-minute TXLine odds/scores plus one-minute Polymarket sampled prices. The replay engine re-emits normalized records onto the same bus as live data; the stack runs unchanged. Historical Polymarket `t,p` points have no bid/ask/depth and therefore support signal/CLV research with conservative cost proxies, not claims of executable fills. Synchronized live books provide the spread/depth evidence. Outputs: per-strategy signal CLV, conservative simulated P&L, detector precision/recall, and calibration plots.
 

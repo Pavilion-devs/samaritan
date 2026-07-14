@@ -1,0 +1,37 @@
+import { fileURLToPath, URL } from "node:url";
+import react from "@vitejs/plugin-react";
+import { defineConfig, type Plugin } from "vite";
+import { handleDashboardApi, writeApiResult } from "../../src/dash/api.js";
+
+const repoRoot = fileURLToPath(new URL("../..", import.meta.url));
+
+function dashboardApi(): Plugin {
+  return {
+    name: "samaritan-dashboard-api",
+    configureServer(server) {
+      server.middlewares.use(async (request, response, next) => {
+        const url = new URL(request.url ?? "/", "http://localhost");
+        const result = await handleDashboardApi(url.pathname, repoRoot);
+        if (!result) {
+          next();
+          return;
+        }
+        writeApiResult(response, result, request.method === "HEAD");
+      });
+    }
+  };
+}
+
+export default defineConfig({
+  root: fileURLToPath(new URL(".", import.meta.url)),
+  publicDir: fileURLToPath(new URL("../../public", import.meta.url)),
+  plugins: [react(), dashboardApi()],
+  build: {
+    outDir: "dist",
+    emptyOutDir: true
+  },
+  server: {
+    host: "127.0.0.1",
+    port: 4173
+  }
+});

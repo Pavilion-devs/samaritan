@@ -16,6 +16,22 @@ export type FeatureEngineConfig = {
   freshnessMaxAgeMs: number;
 };
 
+export type FeatureEngineDiagnostics = {
+  rejectedSourceRegressions: {
+    txline: number;
+    polymarket: number;
+  };
+  rejectedObservedRegressions: {
+    txline: number;
+    polymarket: number;
+  };
+  rejectedInvalidTimestamps: number;
+  sourceObservationDeltaMs: {
+    txline: { minimum: number | null; maximum: number | null };
+    polymarket: { minimum: number | null; maximum: number | null };
+  };
+};
+
 export type VelocityFeature = EwmaObservation & {
   windowMs: number;
   velocity: number | null;
@@ -25,7 +41,10 @@ export type VelocityFeature = EwmaObservation & {
 export type FeatureSnapshot = {
   triggerEventId: string;
   triggerSource: "txline" | "polymarket";
+  /** Market/source clock for the event that caused this snapshot. */
   asOfTsMs: number;
+  /** Knowledge clock: when Samaritan actually observed the triggering event. */
+  observedAtTsMs: number;
   fixtureId: string;
   market: CanonicalMarket;
   outcome: CanonicalOutcome;
@@ -110,7 +129,17 @@ function bestAsk(levels: Array<{ price: Probability }>): Probability | null {
 export class FeatureEngine {
   readonly #states = new Map<string, OutcomeState>();
   readonly #scores = new Map<string, ScoreEvent[]>();
+  readonly #lastObservedTsMs = new Map<"txline" | "polymarket", number>();
   readonly #retentionMs: number;
+  readonly #diagnostics: FeatureEngineDiagnostics = {
+    rejectedSourceRegressions: { txline: 0, polymarket: 0 },
+    rejectedObservedRegressions: { txline: 0, polymarket: 0 },
+    rejectedInvalidTimestamps: 0,
+    sourceObservationDeltaMs: {
+      txline: { minimum: null, maximum: null },
+      polymarket: { minimum: null, maximum: null }
+    }
+  };
 
   constructor(readonly config: FeatureEngineConfig) {
     if (config.velocityWindowsMs.length === 0 || config.velocityWindowsMs.some((window) => window <= 0)) {
@@ -123,6 +152,7 @@ export class FeatureEngine {
   }
 
   ingest(event: CanonicalEvent): FeatureSnapshot[] {
+    if (!this.#acceptEventTimestamp(event)) return [];
     if (event.kind === "score.update") {
       const scores = this.#scores.get(event.fixtureId) ?? [];
       scores.push(event);
@@ -138,10 +168,12 @@ export class FeatureEngine {
       return event.outcomes.flatMap((outcome, index) => {
         if (outcome.fairProbability === null) return [];
         const state = this.#state(event.fixtureId, event.market, outcome.outcome);
+        if (!this.#updateSource(state.consensus, outcome.fairProbability, event.sourceTsMs, "txline")) {
+          return [];
+        }
         const crossCheck = rawSum > 0 ? rawImplied[index]! / rawSum : null;
         state.devigCrossCheckProbability = crossCheck;
         state.devigDiscrepancy = crossCheck === null ? null : Math.abs(outcome.fairProbability - crossCheck);
-        this.#updateSource(state.consensus, outcome.fairProbability, event.sourceTsMs);
         const previous = state.consensus.series.latest;
         if (previous && previous.tsMs === event.sourceTsMs && state.consensus.updateCount > 1) {
           const deltaPoint = state.consensus.series.valueAtOrBefore(event.sourceTsMs - 1);
@@ -151,41 +183,82 @@ export class FeatureEngine {
             state.cusumDown = cusum.down;
           }
         }
-        return [this.#snapshot(state, event.eventId, event.source, event.sourceTsMs)];
+        return [this.#snapshot(state, event.eventId, event.source, event.sourceTsMs, event.observedTsMs)];
       });
     }
     if (event.kind === "polymarket.price") {
       if (event.tokenRole !== "canonical") return [];
       const state = this.#state(event.fixtureId, event.market, event.outcome);
+      const proposedBid = event.bestBid ?? state.bestBid;
+      const proposedAsk = event.bestAsk ?? state.bestAsk;
+      const value =
+        proposedBid !== null && proposedAsk !== null
+          ? ((proposedBid + proposedAsk) / 2 as Probability)
+          : event.price;
+      if (value === null) {
+        if (this.#isSourceRegression(state.polymarket, event.sourceTsMs, "polymarket")) return [];
+      } else if (!this.#updateSource(state.polymarket, value, event.sourceTsMs, "polymarket")) {
+        return [];
+      }
       state.mappingStatus = event.mappingStatus;
       state.polymarketObservation = event.observation;
-      if (event.bestBid !== null) state.bestBid = event.bestBid;
-      if (event.bestAsk !== null) state.bestAsk = event.bestAsk;
-      const value =
-        state.bestBid !== null && state.bestAsk !== null
-          ? ((state.bestBid + state.bestAsk) / 2 as Probability)
-          : event.price;
-      if (value === null) return [this.#snapshot(state, event.eventId, event.source, event.sourceTsMs)];
-      this.#updateSource(state.polymarket, value, event.sourceTsMs);
-      return [this.#snapshot(state, event.eventId, event.source, event.sourceTsMs)];
+      state.bestBid = proposedBid;
+      state.bestAsk = proposedAsk;
+      return [this.#snapshot(state, event.eventId, event.source, event.sourceTsMs, event.observedTsMs)];
     }
     if (event.kind === "polymarket.book") {
       if (event.tokenRole !== "canonical") return [];
       const state = this.#state(event.fixtureId, event.market, event.outcome);
+      const proposedBid = bestBid(event.bids);
+      const proposedAsk = bestAsk(event.asks);
+      if (proposedBid !== null && proposedAsk !== null) {
+        if (
+          !this.#updateSource(
+            state.polymarket,
+            ((proposedBid + proposedAsk) / 2) as Probability,
+            event.sourceTsMs,
+            "polymarket"
+          )
+        ) {
+          return [];
+        }
+      } else if (this.#isSourceRegression(state.polymarket, event.sourceTsMs, "polymarket")) {
+        return [];
+      }
       state.mappingStatus = event.mappingStatus;
       state.polymarketObservation = "book";
-      state.bestBid = bestBid(event.bids);
-      state.bestAsk = bestAsk(event.asks);
-      if (state.bestBid !== null && state.bestAsk !== null) {
-        this.#updateSource(
-          state.polymarket,
-          ((state.bestBid + state.bestAsk) / 2) as Probability,
-          event.sourceTsMs
-        );
-      }
-      return [this.#snapshot(state, event.eventId, event.source, event.sourceTsMs)];
+      state.bestBid = proposedBid;
+      state.bestAsk = proposedAsk;
+      return [this.#snapshot(state, event.eventId, event.source, event.sourceTsMs, event.observedTsMs)];
     }
     return [];
+  }
+
+  diagnostics(): FeatureEngineDiagnostics {
+    return structuredClone(this.#diagnostics);
+  }
+
+  #acceptEventTimestamp(event: CanonicalEvent): boolean {
+    if (
+      !Number.isSafeInteger(event.sourceTsMs) ||
+      !Number.isSafeInteger(event.observedTsMs) ||
+      event.sourceTsMs < 0 ||
+      event.observedTsMs < 0
+    ) {
+      this.#diagnostics.rejectedInvalidTimestamps += 1;
+      return false;
+    }
+    const previous = this.#lastObservedTsMs.get(event.source);
+    if (previous !== undefined && event.observedTsMs < previous) {
+      this.#diagnostics.rejectedObservedRegressions[event.source] += 1;
+      return false;
+    }
+    this.#lastObservedTsMs.set(event.source, event.observedTsMs);
+    const delta = event.observedTsMs - event.sourceTsMs;
+    const deltas = this.#diagnostics.sourceObservationDeltaMs[event.source];
+    deltas.minimum = deltas.minimum === null ? delta : Math.min(deltas.minimum, delta);
+    deltas.maximum = deltas.maximum === null ? delta : Math.max(deltas.maximum, delta);
+    return true;
   }
 
   #sourceState(): SourceState {
@@ -237,10 +310,18 @@ export class FeatureEngine {
     return state;
   }
 
-  #updateSource(source: SourceState, value: Probability, tsMs: number): void {
+  #updateSource(
+    source: SourceState,
+    value: Probability,
+    tsMs: number,
+    sourceName: "txline" | "polymarket"
+  ): boolean {
     const previous = source.series.latest;
     const added = source.series.add({ tsMs, value });
-    if (!added.accepted) return;
+    if (!added.accepted) {
+      this.#diagnostics.rejectedSourceRegressions[sourceName] += 1;
+      return false;
+    }
     source.probability = value;
     source.sourceTsMs = tsMs;
     source.updateCount += 1;
@@ -270,13 +351,25 @@ export class FeatureEngine {
         ...source.moments.get(windowMs)!.observe(velocity, tsMs)
       };
     });
+    return true;
+  }
+
+  #isSourceRegression(
+    source: SourceState,
+    tsMs: number,
+    sourceName: "txline" | "polymarket"
+  ): boolean {
+    if (source.sourceTsMs === null || tsMs >= source.sourceTsMs) return false;
+    this.#diagnostics.rejectedSourceRegressions[sourceName] += 1;
+    return true;
   }
 
   #snapshot(
     state: OutcomeState,
     triggerEventId: string,
     triggerSource: "txline" | "polymarket",
-    asOfTsMs: number
+    asOfTsMs: number,
+    observedAtTsMs: number
   ): FeatureSnapshot {
     const txAge = state.consensus.sourceTsMs === null ? null : asOfTsMs - state.consensus.sourceTsMs;
     const pmAge = state.polymarket.sourceTsMs === null ? null : asOfTsMs - state.polymarket.sourceTsMs;
@@ -301,6 +394,7 @@ export class FeatureEngine {
       triggerEventId,
       triggerSource,
       asOfTsMs,
+      observedAtTsMs,
       fixtureId: state.fixtureId,
       market: state.market,
       outcome: state.outcome,

@@ -6,7 +6,10 @@ export type SignalDirection = "buy" | "sell";
 export type DetectorSignal = {
   signalId: string;
   kind: SignalKind;
+  /** Market/source time of the triggering evidence; retained for provenance and ordering. */
   detectedAtTsMs: number;
+  /** Knowledge time when Samaritan actually observed and could process the signal. */
+  observedAtTsMs: number;
   fixtureId: string;
   market: CanonicalMarket;
   outcome: CanonicalOutcome;
