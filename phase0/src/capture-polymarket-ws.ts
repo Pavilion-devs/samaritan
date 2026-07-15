@@ -1,7 +1,13 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import WebSocket from "ws";
+import {
+  captureStartupFailure,
+  parseAbsoluteCaptureWindow,
+  type AbsoluteCaptureWindow
+} from "./capture-window.js";
 import {
   appendJsonl,
   boolArg,
@@ -17,6 +23,7 @@ import {
 } from "./lib.js";
 import {
   type AnyRecord,
+  discoverEventsByExactSlugs,
   discoverWorldCupEvents,
   type GammaEvent,
   type GammaMarket,
@@ -29,7 +36,7 @@ import {
   writeAtomicText
 } from "./polymarket-lib.js";
 
-type AssetRecord = {
+export type AssetRecord = {
   assetId: string;
   outcome: string;
   eventId: string;
@@ -61,6 +68,9 @@ type CaptureStats = {
   reconnects: number;
   forcedReconnects: number;
   parseErrors: number;
+  transportHeartbeats: number;
+  inScopeBookEvents: number;
+  inScopeBookSnapshots: number;
   discoveredAssets: Map<string, AssetRecord>;
   subscribedAssets: Set<string>;
 };
@@ -88,20 +98,56 @@ function eventTeams(event: GammaEvent): string[] {
   return parts.length === 2 ? parts : [];
 }
 
-function activeAssetRecords(
+function marketSortKey(event: GammaEvent, market: GammaMarket): string {
+  const typePriority = market.sportsMarketType === "moneyline" ? "0" : "1";
+  const line = typeof market.line === "number" ? String(market.line + 1_000).padStart(8, "0") : "00000000";
+  return [
+    typePriority,
+    line,
+    String(event.slug ?? ""),
+    String(market.id ?? market.conditionId ?? ""),
+    String(market.question ?? "")
+  ].join("|");
+}
+
+export function selectSupportedAssetRecords(
   events: GammaEvent[],
   eventSlugs: Set<string>,
   maxAssets: number
 ): AssetRecord[] {
   const now = Date.now();
   const records: AssetRecord[] = [];
-  for (const { event, market } of relevantMarkets(events)) {
+  const supported = relevantMarkets(events)
+    .filter(({ event, market }) => {
+      if (eventSlugs.size > 0 && !eventSlugs.has(String(event.slug ?? ""))) return false;
+      return market.closed !== true && market.active !== false &&
+        market.acceptingOrders !== false && market.enableOrderBook !== false &&
+        marketKickoffMs(market, event) >= now - 6 * 60 * 60_000;
+    })
+    .sort((left, right) => marketSortKey(left.event, left.market).localeCompare(marketSortKey(right.event, right.market)));
+  if (eventSlugs.size > 0) {
+    const [matchResultSlug, totalsSlug] = [...eventSlugs];
+    const matchResultMarkets = supported.filter(({ event, market }) =>
+      event.slug === matchResultSlug && market.sportsMarketType === "moneyline"
+    );
+    const totalsMarkets = supported.filter(({ event, market }) =>
+      event.slug === totalsSlug && market.sportsMarketType === "totals"
+    );
+    if (matchResultMarkets.length !== 3) {
+      throw new Error(`Exact capture requires three active Match Result conditions; found ${matchResultMarkets.length}`);
+    }
+    if (totalsMarkets.length === 0) {
+      throw new Error("Exact capture requires at least one active full-time totals condition");
+    }
+  }
+  for (const { event, market } of supported) {
     if (eventSlugs.size > 0 && !eventSlugs.has(String(event.slug ?? ""))) continue;
-    if (market.closed === true || market.active === false || market.acceptingOrders === false || market.enableOrderBook === false) continue;
     const kickoffMs = marketKickoffMs(market, event);
-    if (kickoffMs < now - 6 * 60 * 60_000) continue;
     const tokenIds = parseStringArray(market.clobTokenIds);
     const outcomes = parseStringArray(market.outcomes);
+    if (tokenIds.length !== 2 || outcomes.length !== 2) {
+      throw new Error(`Supported market ${String(market.id ?? market.conditionId ?? "<unknown>")} lacks its required outcome pair`);
+    }
     for (const [index, assetId] of tokenIds.entries()) {
       records.push({
         assetId,
@@ -117,8 +163,19 @@ function activeAssetRecords(
         sportsMarketType: String(market.sportsMarketType ?? ""),
         line: market.line ?? null
       });
-      if (records.length >= maxAssets) return records;
     }
+  }
+  records.sort((left, right) => {
+    const type = (left.sportsMarketType === "moneyline" ? 0 : 1) - (right.sportsMarketType === "moneyline" ? 0 : 1);
+    if (type !== 0) return type;
+    const line = Number(left.line ?? -1) - Number(right.line ?? -1);
+    if (line !== 0) return line;
+    const market = left.marketId.localeCompare(right.marketId);
+    if (market !== 0) return market;
+    return left.assetId.localeCompare(right.assetId);
+  });
+  if (records.length > maxAssets) {
+    throw new Error(`Required supported strategy assets (${records.length}) exceed --max-assets ${maxAssets}`);
   }
   return records;
 }
@@ -162,13 +219,31 @@ async function discoverAssets(options: {
   runLogPath: string;
   eventSlugs: Set<string>;
   maxAssets: number;
+  deadlineTsMs?: number;
 }): Promise<AssetRecord[]> {
-  const discovery = await discoverWorldCupEvents({
-    outDir: join(options.outDir, "discovery"),
-    manifestLogPath: options.runLogPath,
-    openOnly: true
-  });
-  return activeAssetRecords(discovery.matchEvents, options.eventSlugs, options.maxAssets);
+  const discoveryOutDir = join(options.outDir, "discovery");
+  const events = options.eventSlugs.size > 0
+    ? (await discoverEventsByExactSlugs({
+        outDir: discoveryOutDir,
+        eventSlugs: options.eventSlugs,
+        manifestLogPath: options.runLogPath,
+        deadlineTsMs: options.deadlineTsMs
+      })).events
+    : (await discoverWorldCupEvents({
+        outDir: discoveryOutDir,
+        manifestLogPath: options.runLogPath,
+        openOnly: true
+      })).matchEvents;
+  return selectSupportedAssetRecords(events, options.eventSlugs, options.maxAssets);
+}
+
+const REAL_BOOK_EVENT_TYPES = new Set(["book", "price_change", "best_bid_ask"]);
+
+export function isInScopeRealBookItem(item: AnyRecord, subscribedAssets: ReadonlySet<string>): boolean {
+  const eventType = String(item.event_type ?? "");
+  if (!REAL_BOOK_EVENT_TYPES.has(eventType)) return false;
+  const assets = itemAssetIds(item);
+  return assets.length > 0 && assets.some((assetId) => subscribedAssets.has(assetId));
 }
 
 function subscribe(socket: WebSocket, assetIds: string[], operation?: "subscribe"): void {
@@ -209,6 +284,7 @@ async function connectionCycle(options: {
   let forcedTimer: ReturnType<typeof setTimeout> | undefined;
   let heartbeatTimer: ReturnType<typeof setInterval> | undefined;
   let discoveryTimer: ReturnType<typeof setInterval> | undefined;
+  let discoveryTask: Promise<void> | undefined;
   let deadlineTimer: ReturnType<typeof setTimeout> | undefined;
 
   await new Promise<void>((resolve) => {
@@ -230,7 +306,10 @@ async function connectionCycle(options: {
       discoveryTimer = setInterval(() => {
         if (discoveryBusy || options.stopState.stopped || Date.now() >= options.deadline) return;
         discoveryBusy = true;
-        void discoverAssets(options)
+        discoveryTask = discoverAssets({
+          ...options,
+          deadlineTsMs: Math.min(options.deadline, Date.now() + 60_000)
+        })
           .then(async (records) => {
             const additions: string[] = [];
             for (const record of records) {
@@ -295,7 +374,16 @@ async function connectionCycle(options: {
           }
         }
         const eventTypes = items.map((item) => String(item.event_type ?? "unknown"));
-        if (items.length === 0) eventTypes.push(rawPayload.toLocaleLowerCase() === "pong" ? "heartbeat_pong" : "unparsed");
+        if (items.length === 0) {
+          const heartbeat = rawPayload.toLocaleLowerCase() === "pong";
+          eventTypes.push(heartbeat ? "heartbeat_pong" : "unparsed");
+          if (heartbeat) options.stats.transportHeartbeats += 1;
+        }
+        const inScopeBookItems = items.filter((item) =>
+          isInScopeRealBookItem(item, options.stats.subscribedAssets)
+        );
+        options.stats.inScopeBookEvents += inScopeBookItems.length;
+        options.stats.inScopeBookSnapshots += inScopeBookItems.filter((item) => item.event_type === "book").length;
         const assetIds = [...new Set(items.flatMap(itemAssetIds))];
         for (const eventType of eventTypes) increment(options.stats.eventTypes, eventType);
         options.stats.parsedItems += items.length;
@@ -333,8 +421,10 @@ async function connectionCycle(options: {
       finish();
     });
     deadlineTimer = setTimeout(() => {
-      if (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING) {
+      if (socket.readyState === WebSocket.OPEN) {
         socket.close(1000, "capture deadline");
+      } else if (socket.readyState === WebSocket.CONNECTING) {
+        socket.terminate();
       } else finish();
     }, Math.max(1, options.deadline - Date.now()));
   });
@@ -343,6 +433,7 @@ async function connectionCycle(options: {
   if (heartbeatTimer) clearInterval(heartbeatTimer);
   if (discoveryTimer) clearInterval(discoveryTimer);
   if (deadlineTimer) clearTimeout(deadlineTimer);
+  if (discoveryTask) await discoveryTask;
   await writeQueue;
 }
 
@@ -377,9 +468,20 @@ async function runCapture(options: {
 function spawnTxlineCapture(options: {
   network: string;
   fixtureId: string;
-  durationMinutes: number;
   runLabel: string;
+  durationMinutes?: number;
+  captureWindow?: AbsoluteCaptureWindow;
 }): ChildProcess {
+  const timingArgs = options.captureWindow
+    ? [
+        "--capture-start-utc",
+        options.captureWindow.startUtc,
+        "--capture-end-utc",
+        options.captureWindow.endUtc,
+        "--max-startup-skew-seconds",
+        String(options.captureWindow.maxStartupSkewSeconds)
+      ]
+    : ["--duration-minutes", String(options.durationMinutes)];
   return spawn(
     "pnpm",
     [
@@ -390,13 +492,68 @@ function spawnTxlineCapture(options: {
       options.network,
       "--fixture-id",
       options.fixtureId,
-      "--duration-minutes",
-      String(options.durationMinutes),
+      ...timingArgs,
       "--run-label",
       options.runLabel
     ],
     { cwd: PHASE0_DIR, stdio: "inherit" }
   );
+}
+
+export type PairedChildExit = {
+  code: number | null;
+  signal: NodeJS.Signals | null;
+  atMs: number;
+  spawnError?: string;
+};
+
+export const PAIRED_CHILD_DEADLINE_GRACE_MS = 15_000;
+
+export function pairedChildExitFailure(options: {
+  exit: PairedChildExit;
+  deadline: number;
+  nearDeadlineGraceMs?: number;
+}): string | undefined {
+  if (options.exit.spawnError) return `TXLine capture failed to spawn: ${options.exit.spawnError}`;
+  if (options.exit.code !== 0) {
+    const detail = options.exit.signal ? `signal ${options.exit.signal}` : `code ${String(options.exit.code)}`;
+    return `TXLine capture exited with ${detail}`;
+  }
+  const remainingMs = options.deadline - options.exit.atMs;
+  const graceMs = options.nearDeadlineGraceMs ?? PAIRED_CHILD_DEADLINE_GRACE_MS;
+  if (remainingMs > graceMs) {
+    return `TXLine capture exited ${remainingMs}ms before the shared deadline`;
+  }
+  return undefined;
+}
+
+function waitForChildExit(child: ChildProcess): Promise<PairedChildExit> {
+  if (child.exitCode !== null || child.signalCode !== null) {
+    return Promise.resolve({ code: child.exitCode, signal: child.signalCode, atMs: Date.now() });
+  }
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (exit: PairedChildExit) => {
+      if (settled) return;
+      settled = true;
+      child.off("error", onError);
+      child.off("exit", onExit);
+      resolve(exit);
+    };
+    const onError = (error: Error) => finish({
+      code: child.exitCode,
+      signal: child.signalCode,
+      atMs: Date.now(),
+      spawnError: error.message
+    });
+    const onExit = (code: number | null, signal: NodeJS.Signals | null) => finish({
+      code,
+      signal,
+      atMs: Date.now()
+    });
+    child.once("error", onError);
+    child.once("exit", onExit);
+  });
 }
 
 function fixtureStartMs(fixture: TxFixture): number {
@@ -445,14 +602,21 @@ async function writeLiveReport(options: {
   startedAt: string;
   endedAt: string;
   stats: CaptureStats;
+  status: "completed" | "failed";
+  error?: string;
+  eventSlugs: Set<string>;
+  pairedChildExit?: PairedChildExit;
   nextFixture?: TxFixture;
 }): Promise<void> {
   const nextTeams = options.nextFixture
     ? `${options.nextFixture.Participant1 ?? ""}-${options.nextFixture.Participant2 ?? ""}`.toLocaleLowerCase().replace(/[^a-z0-9]+/g, "-")
     : "next-world-cup-match";
   const nextDate = options.nextFixture ? new Date(fixtureStartMs(options.nextFixture)).toISOString().slice(0, 10) : "date";
+  const exactSlugArgument = options.eventSlugs.size > 0
+    ? ` --event-slugs ${[...options.eventSlugs].join(",")}`
+    : "";
   const fullCommand = options.nextFixture
-    ? `cd phase0 && pnpm capture:paired -- --network mainnet --txline-fixture-id ${options.nextFixture.FixtureId} --duration-minutes 300 --run-label paired-${nextTeams}-${nextDate}`
+    ? `cd phase0 && pnpm capture:paired -- --network mainnet --txline-fixture-id ${options.nextFixture.FixtureId} --duration-minutes 300 --run-label paired-${nextTeams}-${nextDate}${exactSlugArgument}`
     : "No exact TXLine↔Polymarket candidate is currently available; rerun discovery and human-confirm a fixture before a paired capture.";
   const expectedEventTypes = [
     "book",
@@ -478,8 +642,11 @@ async function writeLiveReport(options: {
     "## Smoke capture",
     "",
     `Run label: ${options.runLabel}`,
+    `Terminal status: ${options.status}`,
+    ...(options.error ? [`Failure: ${options.error}`] : []),
     `Started: ${options.startedAt}`,
     `Ended: ${options.endedAt}`,
+    `Paired TXLine exit: ${options.pairedChildExit ? JSON.stringify(options.pairedChildExit) : "not paired / not observed"}`,
     `Raw output: ${options.outDir}`,
     `Raw socket messages: ${options.stats.messages}`,
     `Parsed event items: ${options.stats.parsedItems}`,
@@ -512,7 +679,9 @@ async function writeLiveReport(options: {
     options.stats.forcedReconnects > 0
       ? `The smoke run intentionally closed one socket and observed ${options.stats.reconnects} successful reconnect/resubscription(s). Exact connect, close, backoff, and resubscription records are in \`reconnects.ndjson\`.`
       : "No reconnect was forced. Any natural disconnect and resubscription is recorded in `reconnects.ndjson`.",
-    "Rolling Gamma discovery remains enabled during capture and dynamically subscribes newly listed in-scope Match Result/full-time totals asset IDs.",
+    options.eventSlugs.size > 0
+      ? `Rolling Gamma refresh was bounded to these exact event slugs; full World Cup pagination was disabled: ${[...options.eventSlugs].join(", ")}.`
+      : "Rolling Gamma discovery remained enabled during capture and dynamically subscribed newly listed in-scope Match Result/full-time totals asset IDs.",
     "",
     "## Exact next full-match paired command",
     "",
@@ -525,7 +694,30 @@ async function writeLiveReport(options: {
   await writeAtomicText(options.reportPath, lines.join("\n"));
 }
 
-async function main(): Promise<void> {
+function captureStatsSnapshot(stats: CaptureStats): Record<string, unknown> {
+  return {
+    messages: stats.messages,
+    parsedItems: stats.parsedItems,
+    parseErrors: stats.parseErrors,
+    transportHeartbeats: stats.transportHeartbeats,
+    inScopeBookEvents: stats.inScopeBookEvents,
+    inScopeBookSnapshots: stats.inScopeBookSnapshots,
+    discoveredAssets: stats.discoveredAssets.size,
+    subscribedAssets: stats.subscribedAssets.size,
+    connects: stats.connects,
+    opens: stats.opens,
+    disconnects: stats.disconnects,
+    reconnects: stats.reconnects,
+    forcedReconnects: stats.forcedReconnects,
+    eventTypes: Object.fromEntries(stats.eventTypes)
+  };
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.stack ?? error.message : String(error);
+}
+
+export async function main(): Promise<void> {
   const args = parseArgs();
   const runLabel = (stringArg(args, "run-label", `polymarket-ws-smoke-${timestampSlug()}`) ?? timestampSlug())
     .replace(/[^a-zA-Z0-9._-]+/g, "-");
@@ -534,6 +726,11 @@ async function main(): Promise<void> {
   const maxAssets = Math.max(1, Math.floor(numberArg(args, "max-assets", 500)));
   const discoveryIntervalMs = Math.max(15_000, numberArg(args, "discovery-interval-seconds", 60) * 1000);
   const forceReconnectAfterMs = Math.max(0, numberArg(args, "force-reconnect-after-seconds", 0) * 1000);
+  const captureWindow = parseAbsoluteCaptureWindow({
+    startUtc: stringArg(args, "capture-start-utc"),
+    endUtc: stringArg(args, "capture-end-utc"),
+    maxStartupSkewSeconds: numberArg(args, "max-startup-skew-seconds", 120)
+  });
   const eventSlugs = new Set((stringArg(args, "event-slugs", "") ?? "").split(",").map((value) => value.trim()).filter(Boolean));
   const explicitAssetIds = (stringArg(args, "asset-ids", "") ?? "").split(",").map((value) => value.trim()).filter(Boolean);
   const paired = boolArg(args.paired);
@@ -542,13 +739,10 @@ async function main(): Promise<void> {
 
   const outDir = join(SAMPLES_DIR, "polymarket-live", runLabel);
   const runLogPath = join(outDir, "reconnects.ndjson");
+  const terminalManifestPath = join(outDir, "capture-manifest.json");
   await ensureDir(outDir);
-  const initialRecords = await discoverAssets({ outDir, runLogPath, eventSlugs, maxAssets });
-  const discoveredAssets = new Map(initialRecords.map((record) => [record.assetId, record]));
-  const subscribedAssets = new Set([...explicitAssetIds, ...initialRecords.map((record) => record.assetId)].slice(0, maxAssets));
-  if (subscribedAssets.size === 0) throw new Error("No active in-scope asset IDs were discovered; pass --asset-ids for an explicit smoke test");
-  await writeAtomicJson(join(outDir, "subscriptions.json"), [...discoveredAssets.values()]);
-
+  const discoveredAssets = new Map<string, AssetRecord>();
+  const subscribedAssets = new Set<string>();
   const stats: CaptureStats = {
     messages: 0,
     parsedItems: 0,
@@ -559,42 +753,128 @@ async function main(): Promise<void> {
     reconnects: 0,
     forcedReconnects: 0,
     parseErrors: 0,
+    transportHeartbeats: 0,
+    inScopeBookEvents: 0,
+    inScopeBookSnapshots: 0,
     discoveredAssets,
     subscribedAssets
   };
   const startedAt = new Date().toISOString();
-  const deadline = Date.now() + durationSeconds * 1000;
+  let captureStartedAt: string | null = null;
+  let deadline = captureWindow?.endTsMs ?? 0;
   const stopState: { stopped: boolean; socket?: WebSocket } = { stopped: false };
   let txlineChild: ChildProcess | undefined;
+  let txlineExitPromise: Promise<PairedChildExit> | undefined;
+  let pairedChildExit: PairedChildExit | undefined;
+  let pairedChildError: Error | undefined;
+  let interruptedSignal: "SIGINT" | "SIGTERM" | undefined;
   const stop = () => {
     stopState.stopped = true;
-    if (stopState.socket?.readyState === WebSocket.OPEN || stopState.socket?.readyState === WebSocket.CONNECTING) {
+    if (stopState.socket?.readyState === WebSocket.OPEN) {
       stopState.socket.close(1000, "process signal");
+    } else if (stopState.socket?.readyState === WebSocket.CONNECTING) {
+      stopState.socket.terminate();
     }
-    if (txlineChild && txlineChild.exitCode === null) txlineChild.kill("SIGTERM");
+    if (txlineChild && txlineChild.exitCode === null && txlineChild.signalCode === null) txlineChild.kill("SIGTERM");
   };
-  process.once("SIGINT", stop);
-  process.once("SIGTERM", stop);
+  const onSigint = () => {
+    interruptedSignal = "SIGINT";
+    stop();
+  };
+  const onSigterm = () => {
+    interruptedSignal = "SIGTERM";
+    stop();
+  };
+  process.once("SIGINT", onSigint);
+  process.once("SIGTERM", onSigterm);
 
-  await logManifest({
-    type: "polymarket-ws-run-start",
-    endpoint: POLYMARKET_WS_URL,
+  const writeRunManifest = async (
+    status: "running" | "completed" | "failed",
+    endedAt?: string,
+    error?: string
+  ) => writeAtomicJson(terminalManifestPath, {
+    schemaVersion: 2,
     runId: runLabel,
-    rows: subscribedAssets.size,
-    path: outDir,
+    status,
+    startedAt,
+    captureStartedAt,
+    endedAt: endedAt ?? null,
+    deadlineAt: deadline > 0 ? new Date(deadline).toISOString() : null,
+    captureWindow: captureWindow === null ? null : {
+      startUtc: captureWindow.startUtc,
+      endUtc: captureWindow.endUtc,
+      maxStartupSkewSeconds: captureWindow.maxStartupSkewSeconds
+    },
+    endpoint: POLYMARKET_WS_URL,
     paired,
-    txlineFixtureId: txlineFixtureId || undefined
+    txlineFixtureId: txlineFixtureId || null,
+    exactEventSlugs: [...eventSlugs],
+    fullWorldCupDiscovery: eventSlugs.size === 0,
+    stats: captureStatsSnapshot(stats),
+    pairedChildExit: pairedChildExit ?? null,
+    error: error ?? null
   });
-  if (paired) {
-    txlineChild = spawnTxlineCapture({
-      network: stringArg(args, "network", "mainnet") ?? "mainnet",
-      fixtureId: txlineFixtureId,
-      durationMinutes: durationSeconds / 60,
-      runLabel
-    });
-  }
-  let captureError: unknown;
+
+  await writeRunManifest("running");
   try {
+    await logManifest({
+      type: "polymarket-ws-run-start",
+      endpoint: POLYMARKET_WS_URL,
+      runId: runLabel,
+      rows: 0,
+      path: outDir,
+      paired,
+      txlineFixtureId: txlineFixtureId || undefined,
+      exactEventSlugs: [...eventSlugs]
+    });
+
+    const initialRecords = await discoverAssets({
+      outDir,
+      runLogPath,
+      eventSlugs,
+      maxAssets,
+      ...(captureWindow ? {
+        deadlineTsMs: captureWindow.startTsMs + captureWindow.maxStartupSkewSeconds * 1_000
+      } : {})
+    });
+    for (const record of initialRecords) discoveredAssets.set(record.assetId, record);
+    for (const assetId of [...explicitAssetIds, ...initialRecords.map((record) => record.assetId)].slice(0, maxAssets)) {
+      subscribedAssets.add(assetId);
+    }
+    if (subscribedAssets.size === 0) {
+      throw new Error("No active in-scope asset IDs were discovered; pass --asset-ids for an explicit smoke test");
+    }
+    await writeAtomicJson(join(outDir, "subscriptions.json"), [...discoveredAssets.values()]);
+    if (interruptedSignal) throw new Error(`Capture interrupted by ${interruptedSignal}`);
+    if (captureWindow) {
+      const waitMs = captureWindow.startTsMs - Date.now();
+      if (waitMs > 0) await sleep(waitMs);
+      const startupFailure = captureStartupFailure(captureWindow, Date.now());
+      if (startupFailure) throw new Error(startupFailure);
+      deadline = captureWindow.endTsMs;
+    } else {
+      deadline = Date.now() + durationSeconds * 1_000;
+    }
+    captureStartedAt = new Date().toISOString();
+    await writeRunManifest("running");
+
+    if (paired) {
+      txlineChild = spawnTxlineCapture({
+        network: stringArg(args, "network", "mainnet") ?? "mainnet",
+        fixtureId: txlineFixtureId,
+        runLabel,
+        ...(captureWindow ? { captureWindow } : { durationMinutes: durationSeconds / 60 })
+      });
+      txlineExitPromise = waitForChildExit(txlineChild);
+      void txlineExitPromise.then((exit) => {
+        pairedChildExit = exit;
+        const failure = pairedChildExitFailure({ exit, deadline });
+        if (!failure) return;
+        pairedChildError = new Error(failure);
+        stop();
+      });
+    }
+
     await runCapture({
       deadline,
       outDir,
@@ -606,42 +886,88 @@ async function main(): Promise<void> {
       forceReconnectAfterMs,
       stopState
     });
-  } catch (error) {
-    captureError = error;
-    stop();
-  }
-  if (txlineChild) {
-    const exitCode = await new Promise<number | null>((resolve) => {
-      if (txlineChild!.exitCode !== null) resolve(txlineChild!.exitCode);
-      else txlineChild!.once("exit", resolve);
+    if (txlineExitPromise) pairedChildExit = await txlineExitPromise;
+    if (pairedChildError) throw pairedChildError;
+    if (interruptedSignal) throw new Error(`Capture interrupted by ${interruptedSignal}`);
+
+    const endedAt = new Date().toISOString();
+    const nextFixture = await nextPairedFixture([...discoveredAssets.values()]);
+    const reportOptions = {
+      outDir,
+      runLabel,
+      startedAt,
+      endedAt,
+      stats,
+      status: "completed" as const,
+      eventSlugs,
+      pairedChildExit,
+      nextFixture
+    };
+    await writeLiveReport({ ...reportOptions, reportPath: join(outDir, "REPORT.md") });
+    await writeLiveReport({ ...reportOptions, reportPath: join(SAMPLES_DIR, "POLYMARKET-LIVE.md") });
+    await writeRunManifest("completed", endedAt);
+    await logManifest({
+      type: "polymarket-ws-run-end",
+      status: "completed",
+      endpoint: POLYMARKET_WS_URL,
+      runId: runLabel,
+      rows: stats.messages,
+      path: outDir,
+      eventTypes: Object.fromEntries(stats.eventTypes),
+      reconnects: stats.reconnects,
+      pairedChildExit: pairedChildExit ?? null
     });
-    if (exitCode !== 0 && captureError === undefined) captureError = new Error(`TXLine capture exited with code ${exitCode}`);
+    console.log(`Polymarket WebSocket capture complete: ${outDir}`);
+  } catch (error) {
+    stop();
+    if (txlineExitPromise) pairedChildExit = await txlineExitPromise;
+    const endedAt = new Date().toISOString();
+    const failure = errorMessage(error);
+    const nextFixture = await nextPairedFixture([...discoveredAssets.values()]).catch(() => undefined);
+    const reportOptions = {
+      outDir,
+      runLabel,
+      startedAt,
+      endedAt,
+      stats,
+      status: "failed" as const,
+      error: failure,
+      eventSlugs,
+      pairedChildExit,
+      nextFixture
+    };
+    let reportError = "";
+    try {
+      await writeLiveReport({ ...reportOptions, reportPath: join(outDir, "REPORT.md") });
+      await writeLiveReport({ ...reportOptions, reportPath: join(SAMPLES_DIR, "POLYMARKET-LIVE.md") });
+    } catch (writeError) {
+      reportError = errorMessage(writeError);
+    }
+    const terminalError = reportError ? `${failure}\nReport write failed: ${reportError}` : failure;
+    await writeRunManifest("failed", endedAt, terminalError);
+    await logManifest({
+      type: "polymarket-ws-run-end",
+      status: "failed",
+      endpoint: POLYMARKET_WS_URL,
+      runId: runLabel,
+      rows: stats.messages,
+      path: outDir,
+      eventTypes: Object.fromEntries(stats.eventTypes),
+      reconnects: stats.reconnects,
+      pairedChildExit: pairedChildExit ?? null,
+      error: terminalError
+    }).catch(() => undefined);
+    throw error;
+  } finally {
+    process.off("SIGINT", onSigint);
+    process.off("SIGTERM", onSigterm);
   }
-  const endedAt = new Date().toISOString();
-  const nextFixture = await nextPairedFixture([...discoveredAssets.values()]);
-  await writeLiveReport({
-    reportPath: join(SAMPLES_DIR, "POLYMARKET-LIVE.md"),
-    outDir,
-    runLabel,
-    startedAt,
-    endedAt,
-    stats,
-    nextFixture
-  });
-  await logManifest({
-    type: "polymarket-ws-run-end",
-    endpoint: POLYMARKET_WS_URL,
-    runId: runLabel,
-    rows: stats.messages,
-    path: outDir,
-    eventTypes: Object.fromEntries(stats.eventTypes),
-    reconnects: stats.reconnects
-  });
-  if (captureError) throw captureError;
-  console.log(`Polymarket WebSocket capture complete: ${outDir}`);
 }
 
-main().catch((error: unknown) => {
-  console.error(error instanceof Error ? error.stack ?? error.message : error);
-  process.exit(1);
-});
+const entryPoint = process.argv[1];
+if (entryPoint && import.meta.url === pathToFileURL(entryPoint).href) {
+  main().catch((error: unknown) => {
+    console.error(errorMessage(error));
+    process.exit(1);
+  });
+}

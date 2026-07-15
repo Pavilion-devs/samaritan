@@ -25,8 +25,14 @@ const captureConfigSchema = z.object({
   }),
   capture: z.object({
     scheduledStartUtc: z.string().datetime(),
+    scheduledEndUtc: z.string().datetime(),
     durationMinutes: z.number().int().min(300).max(720),
-    runLabel: z.string().regex(/^paired-[a-z0-9-]+$/)
+    runLabel: z.string().regex(/^paired-[a-z0-9-]+$/),
+    polymarketMaxAssets: z.number().int().min(1).max(500),
+    discoveryIntervalSeconds: z.number().int().min(15).max(3_600),
+    startupGraceSeconds: z.number().int().min(30).max(900),
+    streamStaleSeconds: z.number().int().min(30).max(900),
+    maxStartupSkewSeconds: z.number().int().min(1).max(300)
   }),
   evidence: z.object({
     txlineFixtures: z.string().min(1),
@@ -40,6 +46,22 @@ const captureConfigSchema = z.object({
   }
   if (config.status === "pending_human_confirmation" && (config.confirmedBy || config.confirmedAt)) {
     context.addIssue({ code: "custom", path: ["confirmedBy"], message: "Pending capture cannot claim confirmation" });
+  }
+  const startTsMs = Date.parse(config.capture.scheduledStartUtc);
+  const endTsMs = Date.parse(config.capture.scheduledEndUtc);
+  if (endTsMs - startTsMs !== config.capture.durationMinutes * 60_000) {
+    context.addIssue({
+      code: "custom",
+      path: ["capture", "scheduledEndUtc"],
+      message: "Absolute capture window must equal durationMinutes"
+    });
+  }
+  if (config.capture.maxStartupSkewSeconds > config.capture.startupGraceSeconds) {
+    context.addIssue({
+      code: "custom",
+      path: ["capture", "maxStartupSkewSeconds"],
+      message: "Maximum startup skew cannot exceed the artifact startup grace"
+    });
   }
 });
 
@@ -68,7 +90,7 @@ export type CaptureValidation = {
   config: CaptureConfig;
   evidenceValid: true;
   readyToSchedule: boolean;
-  reason: "ready" | "human_confirmation_required";
+  reason: "ready" | "human_confirmation_required" | "scheduled_start_passed";
   launch: {
     cwd: string;
     command: string;
@@ -126,6 +148,8 @@ export function validateCaptureConfig(input: {
   config: unknown;
   txlineFixtures: readonly TxLineFixture[];
   polymarketEvents: readonly GammaEvent[];
+  nowTsMs?: number;
+  scheduleGraceMs?: number;
 }): CaptureValidation {
   const repoRoot = resolve(input.repoRoot);
   const config = captureConfigSchema.parse(input.config);
@@ -169,15 +193,35 @@ export function validateCaptureConfig(input: {
   if (scheduledStartTsMs !== kickoffTsMs - 3 * 60 * 60_000) {
     throw new Error("Paired capture must start exactly three hours before kickoff");
   }
-  const readyToSchedule = config.status === "human_confirmed_for_capture_only";
+  const nowTsMs = input.nowTsMs ?? Date.now();
+  const scheduleGraceMs = Math.max(0, input.scheduleGraceMs ?? 0);
+  const schedulePassed = nowTsMs > scheduledStartTsMs + scheduleGraceMs;
+  const humanConfirmed = config.status === "human_confirmed_for_capture_only";
+  const readyToSchedule = humanConfirmed && !schedulePassed;
+  const reason = !humanConfirmed
+    ? "human_confirmation_required" as const
+    : schedulePassed
+      ? "scheduled_start_passed" as const
+      : "ready" as const;
   return {
     config,
     evidenceValid: true,
     readyToSchedule,
-    reason: readyToSchedule ? "ready" : "human_confirmation_required",
+    reason,
     launch: readyToSchedule ? {
       cwd: resolve(repoRoot, "phase0"),
-      command: `pnpm capture:paired -- --network mainnet --txline-fixture-id ${config.txline.fixtureId} --duration-minutes ${config.capture.durationMinutes} --run-label ${config.capture.runLabel}`,
+      command: [
+        "pnpm capture:paired --",
+        "--network mainnet",
+        `--txline-fixture-id ${config.txline.fixtureId}`,
+        `--capture-start-utc ${config.capture.scheduledStartUtc}`,
+        `--capture-end-utc ${config.capture.scheduledEndUtc}`,
+        `--max-startup-skew-seconds ${config.capture.maxStartupSkewSeconds}`,
+        `--run-label ${config.capture.runLabel}`,
+        `--event-slugs ${config.polymarket.eventSlug},${config.polymarket.totalsEventSlug}`,
+        `--max-assets ${config.capture.polymarketMaxAssets}`,
+        `--discovery-interval-seconds ${config.capture.discoveryIntervalSeconds}`
+      ].join(" "),
       logPath: resolve(repoRoot, "samples/_logs", `${config.capture.runLabel}.log`),
       pidPath: resolve(repoRoot, "samples/_logs", `${config.capture.runLabel}.pid`),
       scheduledStartTsMs

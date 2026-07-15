@@ -47,7 +47,38 @@ function fixture(input: {
       eligible: input.longRunEligible ?? false,
       reason: input.longRunEligible ? null : "predates_long_run_lane_start"
     },
-    pairedCapture: null
+    pairedCapture: input.bountyMode === "signal_research_only" ? null : {
+      runId: `paired-${input.fixtureId}`,
+      status: "verified",
+      fixtureId: input.fixtureId,
+      eventSlug: `event-${input.fixtureId}`,
+      logComplete: true,
+      mappingConfirmed: true,
+      identityParity: true,
+      replayMode: "capture-order-per-source",
+      rows: 10,
+      firstPolymarketObservedTsMs: 1,
+      lastPolymarketObservedTsMs: Math.max(4, input.kickoffTsMs - 1),
+      firstTxlineOddsObservedTsMs: 2,
+      lastTxlineOddsObservedTsMs: Math.max(4, input.kickoffTsMs - 1),
+      firstTxlineScoresObservedTsMs: 3,
+      lastTxlineScoresObservedTsMs: Math.max(4, input.kickoffTsMs - 1),
+      selectedTotal: {
+        eventSlug: `event-${input.fixtureId}`,
+        marketId: `market-${input.fixtureId}`,
+        conditionId: `condition-${input.fixtureId}`,
+        lineMilli: 2_500,
+        assetIds: [`over-${input.fixtureId}`, `under-${input.fixtureId}`]
+      },
+      selectedBookDepthComplete: true,
+      exactFixtureTxlineOddsAvailable: true,
+      exactFixtureTxlineScoresAvailable: true,
+      exactFixtureScoreCompleted: true,
+      proofCommitment: "a".repeat(64),
+      kickoffCloseAvailable: true,
+      publicResolutionAvailable: true,
+      publicMarketResolvedNormalized: true
+    }
   };
 }
 

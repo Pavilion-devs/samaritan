@@ -2,11 +2,29 @@
 
 Confirmed by Deborah on July 12, 2026 for public-data capture only. Both mappings remain `tradeable: false`; confirmation does not authorize orders or money movement.
 
-| Match | TXLine fixture | Polymarket events | Launch | Duration | Verification | Automation IDs |
-|---|---:|---|---:|---:|---:|---|
-| France vs Spain | `18237038` | `691040`, `691131` | 2026-07-14 16:00 UTC / 17:00 Lagos | 360 min | 2026-07-14 23:15 UTC / 2026-07-15 00:15 Lagos | `start-france-spain-paired-capture`, `verify-france-spain-paired-capture` |
-| England vs Argentina | `18241006` | `694581`, `694786` | 2026-07-15 16:00 UTC / 17:00 Lagos | 360 min | 2026-07-15 23:15 UTC / 2026-07-16 00:15 Lagos | `start-england-argentina-paired-capture`, `verify-england-argentina-paired-capture` |
+| Match | TXLine fixture | Polymarket events | Absolute capture window | Verification | Current status |
+|---|---:|---|---:|---:|---|
+| France vs Spain | `18237038` | `691040`, `691131` | `2026-07-14T16:00:00Z`–`2026-07-14T22:00:00Z` | 2026-07-14 23:15 UTC / 2026-07-15 00:15 Lagos | **Failed closed** before kickoff; inadmissible |
+| England vs Argentina | `18241006` | `694581`, `694786` | `2026-07-15T16:00:00Z`–`2026-07-15T22:00:00Z` | 2026-07-15 23:15 UTC / 2026-07-16 00:15 Lagos | **Scheduled, capture-only**; no outcome or admission claim yet |
 
-Each launch task reruns strict config validation, refuses duplicate processes, loads Node 22 through nvm, enables Corepack, records logs/PID, and verifies file growth. Each verification task checks capture completeness, canonical replay parity, source-timestamp diagnostics, kickoff close/resolution evidence, and sealed long-run handling. After verification it regenerates the fixture universe, runs persistent Claude readiness, and rewrites the ledger-derived paper report. Candidate mappings are never promoted automatically; a missing paper-verification gate produces zero Claude calls and unchanged decision ledgers.
+The England-Argentina one-shot supervisor reruns strict config and credential-scope validation, refuses duplicate/output-colliding processes, records status/log/PID evidence, and enforces the configured absolute window. It allows 180 seconds of startup grace, rejects launch skew beyond 120 seconds, and marks the run failed if any required stream stops advancing for 300 seconds. Terminal verification requires the capture manifest and required artifacts to agree with the configured fixture, slugs, and window; nonempty files alone do not prove successful coverage.
 
-The tasks may use existing TXLine data access and the public Polymarket market channel. If and only if a fixture is already paper-verified and admitted, the verification task may use the bounded Claude runtime through its capped spend ledger. It may not initiate Polymarket authentication, refresh or activate market tokens, access a wallet, approve, deposit, trade, place orders, or move money.
+Capture and verification are evidence-only. They may use Deborah's existing TXLine data access and the public Polymarket market channel, but they cannot initialize or modify a study, admit a mapping, run persistent Claude readiness, spend Anthropic budget, or rewrite a decision ledger while v2 remains `engineering_candidate_unregistered`. They may not initiate Polymarket authentication, refresh or activate market tokens, access a wallet, approve, deposit, trade, place orders, or move money.
+
+A successful England-Argentina capture would still be only a candidate input. Post-run admission requires verified paired timing, synchronized pre-cutoff overlap, explicit lifecycle evidence, exact mapping/rules review, and Deborah's prior registration of a corrected v2 protocol. Candidate mappings are never promoted automatically.
+
+Verified July 15, 2026 00:23 UTC: the France-Spain capture failed closed. The recorded artifacts stop at `2026-07-14T18:18:03Z`, before the `2026-07-14T19:00:00Z` kickoff, the run log has no completion marker, the PID file remained behind, no public `market_resolved` event was captured, and `data/live/gamma-discovery/candidate-mappings.json` still contains zero evidence-bearing records for fixture `18237038`. The capture is not admissible for study or lifecycle replay, and any study admission still awaits Deborah's corrected v2 registration.
+
+## Deterministic post-capture bridge
+
+Run this only after the one-shot supervisor has written and verified all terminal artifacts; it is deliberately not part of the armed supervisor:
+
+```sh
+pnpm capture:analyze -- --capture-config config/captures/england-argentina-2026-07-15.json
+```
+
+The command atomically writes `data/live/paired-england-argentina-2026-07-15/analysis-manifest.json`. It hashes every input and derives only licensed-safe metadata: the exact fixture and causally selected full-time total, sorted outcome assets, selected-condition book depth, exact TXLine odds and completed score evidence, kickoff close, public resolution, and the bounded canonical ingress profile. `checkedAt` is excluded from the deterministic proof commitments.
+
+The status layers are intentional. `verified_capture` proves completed capture/microstructure only and carries no admission authority. Only a schema-v2 `verified` record has an exact causal selected-total binding, and its `admission` still remains `failed_closed` until the mapping has Deborah's settlement review plus selected close/resolution and pre-cutoff overlap. Missing or tampered inputs produce a durable `failed_closed` manifest; capture-only confirmation never promotes a mapping.
+
+If the protocol is later registered and all admission gates are satisfied, the real-Claude replay command must explicitly name both `--run-label` and `--fixture`. It defaults to finite causal speed `1`; speeds above `1` and `Infinity` are refused. Before environment or ledger mutation, preflight hashes the exact replay bytes while parsing them, freezes only the admitted canonical events under hard count and byte limits, and sizes a bounded queue for that finite selected-market snapshot (plus 25% headroom), failing closed above the in-process ceiling. The model-facing runtime replays that frozen snapshot without reopening mutable capture files. The allowlist passes only exact selected-market odds/books/prices/resolution, exact-fixture scores, and feed-health events.

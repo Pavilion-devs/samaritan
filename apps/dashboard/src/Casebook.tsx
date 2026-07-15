@@ -1,7 +1,7 @@
 import { startTransition, useDeferredValue, useEffect, useState } from "react";
 import type { CasebookCaseSummary, CasebookSnapshot } from "../../../src/dash/public-contract";
 import { loadCasebook } from "./api";
-import { BrandMark, Icon, MobileNavigation, Navigation, Topbar } from "./Shell";
+import { BrandMark, Icon, MobileNavigation, Navigation, ProvenanceBadge, Topbar } from "./Shell";
 
 type Filters = {
   fixture: string;
@@ -75,16 +75,17 @@ function CasebookHero({ snapshot }: { snapshot: CasebookSnapshot }) {
   return (
     <section className="casebook-hero reveal r1" aria-labelledby="casebook-heading">
       <div className="casebook-hero-copy">
-        <span className="casebook-kicker"><i />Append-only decision record</span>
-        <h2 id="casebook-heading">Every decision.<br /><em>Especially the pass.</em></h2>
-        <p>Inspect what Samaritan saw, why it refused the opportunity, and the proof that no money moved. Unfavorable and incomplete cases stay visible by default.</p>
+        <ProvenanceBadge tone="capture" label="Real capture · retrospective" />
+        <h2 id="casebook-heading">Every measured observation.<br /><em>One honest exemplar.</em></h2>
+        <p>The index contains all {snapshot.corpus.marketEventCases} goal×market observations reported by this one verified capture replay. The detail pane is a deterministic exemplar, not the whole corpus or a performance sample.</p>
       </div>
       <div className="casebook-stat-deck" aria-label="Casebook totals">
-        <div className="casebook-primary-stat"><span>Verified record</span><b>{snapshot.statistics.totalCases.toString().padStart(2, "0")}</b><small>complete case</small></div>
-        <div><span>No trade</span><b>{snapshot.statistics.noTradeCases}</b><small>capital-preserving pass</small></div>
-        <div><span>Executed</span><b>{snapshot.statistics.executedCases}</b><small>no orders constructed</small></div>
-        <div><span>Capital moved</span><b>$0.00</b><small>paper observer state</small></div>
-        <div className="casebook-verified-stat"><Icon name="proof" /><span><b>100% verified</b><small>Replay identity parity</small></span></div>
+        <div className="casebook-primary-stat"><span>Goal×market observations</span><b>{snapshot.statistics.totalCases.toString().padStart(2, "0")}</b><small>{snapshot.corpus.goalEvents} goals · one captured fixture</small></div>
+        <div><span>Moved before TXLine</span><b>{snapshot.corpus.movedBeforeTxlineCases}</b><small>pre-trigger repricing observed</small></div>
+        <div><span>No material reprice</span><b>{snapshot.corpus.noMaterialRepriceCases}</b><small>inside the 30-second window</small></div>
+        <div><span>Executed</span><b>{snapshot.statistics.executedCases}</b><small>operational execution not reached</small></div>
+        <div><span>Execution runtime</span><b>Not entered</b><small>retrospective research only</small></div>
+        <div className="casebook-verified-stat"><Icon name="proof" /><span><b>Full reported corpus projected</b><small>{snapshot.statistics.reconciledCases} observations internally reconciled · capture identity checked separately</small></span></div>
       </div>
     </section>
   );
@@ -98,7 +99,7 @@ function CaseFilters({ snapshot, search, onSearch, filters, onFilter, onClear }:
   onFilter: (key: keyof Filters, value: string) => void;
   onClear: () => void;
 }) {
-  const dateOption = snapshot.cases[0]?.occurredAt.slice(0, 10) ?? "";
+  const dateOptions = [...new Set(snapshot.cases.map((item) => item.occurredAt.slice(0, 10)))].sort();
   const hasFilters = Boolean(search || Object.values(filters).some(Boolean));
   return (
     <section className="casebook-filters surface reveal r2" aria-label="Casebook filters">
@@ -116,42 +117,44 @@ function CaseFilters({ snapshot, search, onSearch, filters, onFilter, onClear }:
         <SelectFilter label="Outcome" value={filters.outcome} options={snapshot.filterOptions.executionOutcomes} onChange={(value) => onFilter("outcome", value)} />
         <SelectFilter label="Lane" value={filters.lane} options={snapshot.filterOptions.evidenceLanes} onChange={(value) => onFilter("lane", value)} />
         <SelectFilter label="Source" value={filters.source} options={snapshot.filterOptions.sources} onChange={(value) => onFilter("source", value)} />
-        <SelectFilter label="Date" value={filters.date} options={dateOption ? [dateOption] : []} onChange={(value) => onFilter("date", value)} />
+        <SelectFilter label="Date" value={filters.date} options={dateOptions} onChange={(value) => onFilter("date", value)} />
       </div>
       <button className="casebook-clear" type="button" disabled={!hasFilters} onClick={onClear}>Clear filters</button>
     </section>
   );
 }
 
-function CaseIndex({ cases, total, nextEvidence }: {
+function CaseIndex({ cases, total, nextEvidence, selectedCaseId }: {
   cases: CasebookCaseSummary[];
   total: number;
   nextEvidence: CasebookSnapshot["nextEvidence"];
+  selectedCaseId: string;
 }) {
   return (
     <aside className="casebook-index surface reveal r3" aria-labelledby="case-index-title">
-      <header className="casebook-panel-head"><div><span>Case index</span><h2 id="case-index-title">Decision history</h2></div><em>{cases.length} of {total}</em></header>
+      <header className="casebook-panel-head"><div><span>Complete captured corpus</span><h2 id="case-index-title">Goal×market observations</h2></div><em>{cases.length} of {total}</em></header>
       {cases.length > 0 ? cases.map((item) => (
-        <article className="casebook-index-row selected" key={item.caseId} aria-label={`${item.caseId} ${item.fixtureLabel}`}>
-          <div className="casebook-index-time"><time dateTime={item.occurredAt}>{caseDate(item.occurredAt)}</time><span><i />{item.verificationStatus}</span></div>
-          <div className="casebook-index-match"><span className="casebook-pair"><i className="command-crest esp">{item.homeCode}</i><i className="command-crest bel">{item.awayCode}</i></span><span><b>{item.fixtureLabel}</b><small>{item.marketLabel}</small></span></div>
+        <article className={`casebook-index-row${item.caseId === selectedCaseId ? " selected" : ""}`} key={item.caseId} aria-label={`${item.caseId} ${item.fixtureLabel}`}>
+          <div className="casebook-index-time"><time dateTime={item.occurredAt}>{caseDate(item.occurredAt)}</time><span><i />{item.selectedExemplar ? "Detail exemplar" : "Corpus row"}</span></div>
+          <div className="casebook-index-match"><span className="casebook-pair"><i className={`command-crest ${item.homeCode.toLowerCase()}`}>{item.homeCode}</i><i className={`command-crest ${item.awayCode.toLowerCase()}`}>{item.awayCode}</i></span><span><b>{item.fixtureLabel}</b><small>{item.marketLabel}</small></span></div>
           <div className="casebook-index-tags"><span>{item.detector}</span><span>{item.evidenceLane}</span></div>
           <div className="casebook-index-outcome"><span><Icon name="minus" /></span><span><b>{item.disposition}</b><small>{item.reason}</small></span><Icon name="arrow" /></div>
         </article>
       )) : (
-        <div className="casebook-no-results"><span><Icon name="case" /></span><b>No verified case matches</b><small>Clear one or more filters. Casebook will not fabricate a result.</small></div>
+        <div className="casebook-no-results"><span><Icon name="case" /></span><b>No captured case matches</b><small>Clear one or more filters. Casebook will not fabricate a result.</small></div>
       )}
       <div className="casebook-index-foot"><Icon name="clock" /><span><b>{nextEvidence.label}</b><small>{nextEvidence.detail}</small></span></div>
     </aside>
   );
 }
 
-function DecisionRail({ lifecycle }: { lifecycle: CasebookSnapshot["selectedCase"]["lifecycle"] }) {
+function DecisionRail({ selected }: { selected: CasebookSnapshot["selectedCase"] }) {
+  const finalState = selected.decision.ordersPlaced === 0 ? "Execution not entered" : `${selected.decision.ordersPlaced} orders placed`;
   return (
     <section className="casebook-decision-rail" aria-labelledby="decision-rail-title">
-      <header className="casebook-section-head"><div><span>Lifecycle audit</span><h3 id="decision-rail-title">Decision rail</h3></div><span className="casebook-final-state"><Icon name="shield" />No trade</span></header>
+      <header className="casebook-section-head"><div><span>Retrospective lifecycle</span><h3 id="decision-rail-title">Feasibility rail</h3></div><span className="casebook-final-state"><Icon name="shield" />{finalState}</span></header>
       <div className="casebook-rail-stages">
-        {lifecycle.map((stage, index) => (
+        {selected.lifecycle.map((stage, index) => (
           <div className={`casebook-rail-stage ${stage.status}`} key={stage.id}>
             <span className="rail-index">{String(index + 1).padStart(2, "0")}</span>
             <i><Icon name={stage.status === "locked" ? "lock" : "check"} /></i>
@@ -168,7 +171,7 @@ function EvidenceReadout({ selected }: { selected: CasebookSnapshot["selectedCas
   const readout = selected.evidenceReadout;
   return (
     <section className="casebook-readout" aria-labelledby="market-readout-title">
-      <header className="casebook-section-head"><div><span>Executable market evidence</span><h3 id="market-readout-title">What Samaritan actually saw</h3></div><span className="casebook-move-label"><i />Moved first</span></header>
+      <header className="casebook-section-head"><div><span>Captured executable-book evidence</span><h3 id="market-readout-title">What the capture contained</h3></div><span className="casebook-move-label"><i />Moved first</span></header>
       <div className="casebook-readout-grid">
         <div><span>TXLine movement</span><b>{movementBps(readout.consensusMoveFromBaselineBps)}</b><small>25-bps bucket · level withheld</small></div>
         <div><span>Best bid</span><b>{percentage(readout.bestBid)}</b><small>Executable book</small></div>
@@ -187,11 +190,11 @@ function AnalysisBoundary({ selected }: { selected: CasebookSnapshot["selectedCa
     <div className="casebook-analysis-grid">
       <section className="casebook-analysis-card">
         <span className="analysis-icon"><Icon name="spark" /></span>
-        <div><span>Analyst boundary</span><h3>Thesis not requested</h3><p>{selected.analysis.thesisReason}</p><small><b>Invalidation:</b> {selected.analysis.invalidation}</small></div>
+        <div><span>Analyst boundary</span><h3>No operational thesis requested</h3><p>Retrospective feasibility ended before the analyst stage; no Claude thesis ran for this captured case.</p><small><b>Invalidation:</b> {selected.analysis.invalidation}</small></div>
       </section>
       <section className="casebook-analysis-card execution">
         <span className="analysis-icon"><Icon name="lock" /></span>
-        <div><span>Execution boundary</span><h3>$0.00 total cost</h3><p>{selected.analysis.costReason}</p><small><b>{selected.decision.ordersPlaced}</b> orders · wallet untouched · gate closed</small></div>
+        <div><span>Execution boundary</span><h3>Operational cost not applicable</h3><p>{selected.analysis.costReason}</p><small>Research-only path · execution and wallet layers were not entered</small></div>
       </section>
     </div>
   );
@@ -200,7 +203,7 @@ function AnalysisBoundary({ selected }: { selected: CasebookSnapshot["selectedCa
 function EvidenceSequence({ selected }: { selected: CasebookSnapshot["selectedCase"] }) {
   return (
     <section className="casebook-evidence-sequence" aria-labelledby="case-evidence-title">
-      <header className="casebook-section-head"><div><span>Derived observation sequence</span><h3 id="case-evidence-title">Evidence ledger</h3></div><span>{selected.evidence.length} observations</span></header>
+      <header className="casebook-section-head"><div><span>Derived captured sequence</span><h3 id="case-evidence-title">Captured evidence timeline</h3></div><span>{selected.evidence.length} observations</span></header>
       <div className="casebook-evidence-head"><span>Moment</span><span>Source</span><span>Observation</span><span>Best ask</span><span>Assessment</span></div>
       {selected.evidence.map((row) => (
         <div className="casebook-evidence-row" key={row.replayStateId}>
@@ -220,23 +223,23 @@ function CaseDetail({ snapshot }: { snapshot: CasebookSnapshot }) {
   return (
     <article className="casebook-detail surface reveal r4" aria-labelledby="selected-case-title">
       <header className="casebook-detail-masthead">
-        <div className="casebook-detail-id"><span>Selected case</span><b>{selected.summary.caseId}</b><small>{caseDate(selected.summary.occurredAt)}</small></div>
+        <div className="casebook-detail-id"><span>Deterministic detail exemplar</span><b>{selected.summary.caseId}</b><small>{caseDate(selected.summary.occurredAt)}</small></div>
         <div className="casebook-detail-match">
-          <span><i className="command-crest esp">ESP</i><b>Spain</b></span>
-          <em><small>{selected.match.clockLabel}</small><strong>{selected.match.scoreAtCursor.home}–{selected.match.scoreAtCursor.away}</strong><i>first goal seen</i></em>
-          <span className="away"><b>Belgium</b><i className="command-crest bel">BEL</i></span>
+          <span><i className={`command-crest ${selected.match.home.code.toLowerCase()}`}>{selected.match.home.code}</i><b>{selected.match.home.name}</b></span>
+          <em><small>{selected.match.clockLabel}</small><strong>{selected.match.scoreAtCursor.home}–{selected.match.scoreAtCursor.away}</strong><i>goal {selected.summary.goalOrdinal} first seen</i></em>
+          <span className="away"><b>{selected.match.away.name}</b><i className={`command-crest ${selected.match.away.code.toLowerCase()}`}>{selected.match.away.code}</i></span>
         </div>
-        <div className="casebook-detail-verdict"><span><Icon name="shield" /></span><span><small>Authoritative disposition</small><h2 id="selected-case-title">Market moved before signal.</h2><p>{selected.decision.explanation}</p></span></div>
-        <a className="casebook-matchroom-link" href="/matchroom"><Icon name="play" /><span>Open full Matchroom replay</span><Icon name="arrow" /></a>
+        <div className="casebook-detail-verdict"><span><Icon name="shield" /></span><span><small>Retrospective feasibility verdict</small><h2 id="selected-case-title">{selected.summary.reason}.</h2><p>{selected.decision.explanation}</p></span></div>
+        <a className="casebook-matchroom-link" href="/matchroom"><Icon name="play" /><span>Open captured Matchroom replay</span><Icon name="arrow" /></a>
       </header>
-      <DecisionRail lifecycle={selected.lifecycle} />
+      <DecisionRail selected={selected} />
       <EvidenceReadout selected={selected} />
       <AnalysisBoundary selected={selected} />
       <EvidenceSequence selected={selected} />
       <footer className="casebook-proof-line">
-        <span className="casebook-proof-status"><Icon name="proof" /><span><b>Replay identity verified</b><small>{selected.proof.canonicalEvents.toLocaleString("en-US")} canonical events</small></span></span>
+        <span className="casebook-proof-status"><Icon name="proof" /><span><b>Underlying capture identity checked</b><small>Corpus is locally committed, not a member of the replay identity hash</small></span></span>
         <span><small>Identity hash</small><code title={selected.proof.identityHash}>{compactHash(selected.proof.identityHash)}</code></span>
-        <span><small>Replay journal head</small><code title={selected.proof.headHash}>{compactHash(selected.proof.headHash)}</code></span>
+        <span><small>Corpus SHA-256</small><code title={selected.proof.corpusCommitment}>{compactHash(selected.proof.corpusCommitment)}</code></span>
         <span className="casebook-policy"><Icon name="lock" />Derived evidence only</span>
       </footer>
     </article>
@@ -261,19 +264,20 @@ function CasebookView({ snapshot }: { snapshot: CasebookSnapshot }) {
   const deferredSearch = useDeferredValue(search.trim());
   const [filters, setFilters] = useState<Filters>(emptyFilters);
   const visibleCases = snapshot.cases.filter((item) => matchesFilters(item, deferredSearch, filters));
+  const selectedExemplarVisible = visibleCases.some((item) => item.caseId === snapshot.corpus.selectedExemplar.caseId);
   const updateFilter = (key: keyof Filters, value: string) => setFilters((current) => ({ ...current, [key]: value }));
   const clear = () => { setSearch(""); setFilters(emptyFilters); };
   return (
     <div className="app-shell casebook-shell">
       <Navigation active="casebook" caseCount={snapshot.statistics.totalCases} />
       <main className="workspace" id="casebook">
-        <Topbar title="Casebook" modeLabel="Offline artifact" modeClass="offline" />
+        <Topbar title="Casebook" modeLabel="Offline snapshot" modeClass="offline" />
         <div className="casebook-content">
           <CasebookHero snapshot={snapshot} />
           <CaseFilters snapshot={snapshot} search={search} onSearch={setSearch} filters={filters} onFilter={updateFilter} onClear={clear} />
           <div className="casebook-workbench">
-            <CaseIndex cases={visibleCases} total={snapshot.cases.length} nextEvidence={snapshot.nextEvidence} />
-            {visibleCases.length > 0 ? <CaseDetail snapshot={snapshot} /> : <section className="casebook-detail-empty surface"><span><Icon name="case" /></span><h2>No verified case selected</h2><p>The current filters exclude every recorded case. Clear filters to reopen the complete Spain–Belgium refusal record.</p><button type="button" onClick={clear}>Clear all filters</button></section>}
+            <CaseIndex cases={visibleCases} total={snapshot.cases.length} nextEvidence={snapshot.nextEvidence} selectedCaseId={snapshot.corpus.selectedExemplar.caseId} />
+            {selectedExemplarVisible ? <CaseDetail snapshot={snapshot} /> : <section className="casebook-detail-empty surface"><span><Icon name="case" /></span><h2>{visibleCases.length === 0 ? "No observation matches" : "Detail exemplar filtered out"}</h2><p>{visibleCases.length === 0 ? "The current filters exclude every reported observation." : "The visible rows remain part of the complete corpus, but only the explicitly marked exemplar has the three-state Matchroom detail."} Clear filters to reopen the selected exemplar.</p><button type="button" onClick={clear}>Clear all filters</button></section>}
           </div>
         </div>
         <MobileNavigation active="casebook" />
@@ -283,11 +287,11 @@ function CasebookView({ snapshot }: { snapshot: CasebookSnapshot }) {
 }
 
 function CasebookLoading() {
-  return <main className="load-screen"><BrandMark /><span className="load-kicker">Samaritan / Casebook</span><h1>Verifying the decision record</h1><div className="load-line"><i /></div><p>Rebuilding the public case index from replay proof and append-only decision evidence.</p></main>;
+  return <main className="load-screen"><BrandMark /><span className="load-kicker">Samaritan / Casebook</span><h1>Checking the captured corpus</h1><div className="load-line"><i /></div><p>Projecting every reported goal×market observation and reconciling it with the local replay evidence.</p></main>;
 }
 
 function CasebookError({ retry }: { retry: () => void }) {
-  return <main className="load-screen error-screen"><span className="error-mark"><Icon name="shield" /></span><span className="load-kicker">Fail-closed boundary</span><h1>Casebook evidence unavailable</h1><p>The verified replay record changed or could not be reconstructed. Samaritan will not display a partial or fabricated case.</p><button type="button" onClick={retry}>Retry verified load</button></main>;
+  return <main className="load-screen error-screen"><span className="error-mark"><Icon name="shield" /></span><span className="load-kicker">Fail-closed boundary</span><h1>Casebook evidence unavailable</h1><p>The captured replay record changed or could not be reconstructed. Samaritan will not display a partial or fabricated case.</p><button type="button" onClick={retry}>Retry captured record</button></main>;
 }
 
 export function CasebookApp() {

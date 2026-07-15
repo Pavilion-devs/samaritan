@@ -1,15 +1,17 @@
-import { createReadStream } from "node:fs";
 import { access, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
-import { createInterface } from "node:readline";
 import { dirname, join, resolve } from "node:path";
 import { PAPER_STUDY_TOTAL_SELECTOR_CONFIG } from "../config/paper-study.js";
-import type { MappingRecord } from "../mapping/registry.js";
+import { MappingRegistry } from "../mapping/registry.js";
 import type { TotalLineEvidence } from "../research/main-total-selector.js";
 import {
   buildPaperFixtureUniverse,
   renderPaperFixtureUniverseMarkdown,
   type PairedCaptureEvidence
 } from "./paper-fixture-universe.js";
+import {
+  pairedCaptureEvidenceFromManifest,
+  parseVerifiedPairedAnalysisManifest
+} from "./paired-capture-manifest.js";
 
 function argument(name: string, fallback: string): string {
   const index = process.argv.indexOf(`--${name}`);
@@ -31,40 +33,9 @@ async function pairedCaptures(root: string): Promise<PairedCaptureEvidence[]> {
     } catch {
       continue;
     }
-    const manifest = JSON.parse(await readFile(path, "utf8")) as {
-      runId: string;
-      status: string;
-      fixtureId: string;
-      eventSlug: string;
-      capture: { logComplete: boolean; mappingConfirmed: boolean; polymarketDir: string };
-      verification: { identityParity: boolean; replayMode: string; rows: number };
-    };
-    if (manifest.status !== "verified") continue;
-    const messagesPath = resolve(manifest.capture.polymarketDir, "messages.ndjson");
-    const lines = createInterface({ input: createReadStream(messagesPath, { encoding: "utf8" }), crlfDelay: Infinity });
-    let firstObservedTsMs: number | null = null;
-    for await (const line of lines) {
-      if (line.trim() === "") continue;
-      const first = JSON.parse(line) as { receivedAt?: string };
-      firstObservedTsMs = Date.parse(first.receivedAt ?? "");
-      break;
-    }
-    lines.close();
-    if (firstObservedTsMs === null || !Number.isFinite(firstObservedTsMs)) {
-      throw new Error(`Paired capture ${manifest.runId} lacks a valid first observation timestamp`);
-    }
-    captures.push({
-      runId: manifest.runId,
-      status: "verified",
-      fixtureId: manifest.fixtureId,
-      eventSlug: manifest.eventSlug,
-      logComplete: manifest.capture.logComplete,
-      mappingConfirmed: manifest.capture.mappingConfirmed,
-      identityParity: manifest.verification.identityParity,
-      replayMode: manifest.verification.replayMode,
-      rows: manifest.verification.rows,
-      firstObservedTsMs
-    });
+    const manifest = parseVerifiedPairedAnalysisManifest(JSON.parse(await readFile(path, "utf8")));
+    if (manifest === null) continue;
+    captures.push(pairedCaptureEvidenceFromManifest(manifest));
   }
   return captures;
 }
@@ -82,15 +53,16 @@ const laneStartTsMs = laneStartArgument === null
   : Date.parse(laneStartArgument);
 const generatedAt = new Date().toISOString();
 const [mappingFile, evidenceFile, historyFiles, captures] = await Promise.all([
-  readFile(mappingsPath, "utf8").then((value) => JSON.parse(value) as { records?: MappingRecord[] }),
+  readFile(mappingsPath, "utf8").then((value) => JSON.parse(value) as { records?: unknown[] }),
   readFile(evidencePath, "utf8").then((value) => JSON.parse(value) as { evidence?: TotalLineEvidence[] }),
   readdir(historiesDir),
   pairedCaptures(liveRoot)
 ]);
+const mappings = new MappingRegistry(mappingFile.records ?? []).records();
 const universe = buildPaperFixtureUniverse({
   generatedAt,
   laneStartTsMs,
-  mappings: mappingFile.records ?? [],
+  mappings,
   totalEvidence: evidenceFile.evidence ?? [],
   pairedCaptures: captures,
   sampledHistoryAssetIds: new Set(historyFiles.filter((name) => name.endsWith(".json")).map((name) => name.slice(0, -5))),

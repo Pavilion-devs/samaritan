@@ -56,7 +56,11 @@ export class PolymarketClobFeeResolver {
     }
   }
 
-  async resolve(book: PolymarketBookEvent): Promise<PolymarketFeeParameters> {
+  async resolve(
+    book: PolymarketBookEvent,
+    haltSignal?: AbortSignal
+  ): Promise<PolymarketFeeParameters> {
+    haltSignal?.throwIfAborted();
     const now = this.#now();
     const cached = this.#cache.get(book.conditionId);
     if (cached && now - cached.fetchedAtTsMs <= this.#cacheTtlMs) {
@@ -64,11 +68,15 @@ export class PolymarketClobFeeResolver {
       return cached.fees;
     }
 
+    const timeoutSignal = AbortSignal.timeout(this.#requestTimeoutMs);
+    const requestSignal = haltSignal === undefined
+      ? timeoutSignal
+      : AbortSignal.any([timeoutSignal, haltSignal]);
     const response = await this.#fetchImpl(
       `${this.#origin}/clob-markets/${encodeURIComponent(book.conditionId)}`,
       {
         headers: { Accept: "application/json" },
-        signal: AbortSignal.timeout(this.#requestTimeoutMs)
+        signal: requestSignal
       }
     );
     const text = await response.text();

@@ -75,10 +75,15 @@ export async function exportPublicDashboardBundle(
   const repoRoot = resolve(options.repoRoot);
   const outputDir = resolve(options.outputDir ?? resolve(repoRoot, PUBLIC_DASHBOARD_BUNDLE_RELATIVE_DIR));
 
-  // The corrected v4 artifact supplies a stable as-of time. Building Command
-  // with that timestamp makes identical private inputs produce identical bytes.
+  // The corrected study and local capture-outcome artifacts supply a stable as-of
+  // time. This preserves deterministic bytes without hiding a terminal capture
+  // outcome merely because it was recorded after the historical study report.
   const study = await buildStudyDashboardResponse(repoRoot);
-  const generatedAt = study.data.correctedHistoricalCandidate.generatedAt;
+  const outcomeProbe = await buildCommandDashboardResponse(repoRoot, Date.parse("2100-01-01T00:00:00.000Z"));
+  const generatedAt = [
+    study.data.correctedHistoricalCandidate.generatedAt,
+    ...outcomeProbe.data.fixtureSchedule.map((fixture) => fixture.statusUpdatedAt).filter((value): value is string => value !== null)
+  ].sort((left, right) => Date.parse(left) - Date.parse(right)).at(-1)!;
   const asOfTsMs = Date.parse(generatedAt);
   if (!Number.isSafeInteger(asOfTsMs)) throw new Error("Corrected historical candidate has an invalid export timestamp");
 

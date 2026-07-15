@@ -60,7 +60,7 @@ Polymarket Match Result is represented as three binary conditions per match (hom
 
 ## Layer 2 — Claude reasoning
 
-**Triage agent — `claude-haiku-4-5`.** First contact for every signal: dedupe (the same move seen through multiple outcomes = one case), classify against known context, kill obvious noise. Cheap enough to run on every signal. Output: drop / escalate, with a one-line rationale.
+**Triage agent — `claude-haiku-4-5` target runtime.** First contact for every admitted signal: dedupe (the same move seen through multiple outcomes = one case), classify against known context, kill obvious noise. Output: drop / escalate, with a one-line rationale. The public complete-lifecycle case uses a deterministic Haiku-shaped stub; current real Anthropic admission is blocked while v2 is unregistered.
 
 **Analyst agent — implemented bounty slice.** `claude-opus-4-8` receives the strict triage decision plus one code-assembled detector signal/evidence bundle and may emit only `submit_thesis`. It has adaptive thinking, fixed input/output/time bounds, schema validation, identity checks, deterministic timestamps, and append-only cost accounting. It does **not** currently expose `query_series`, `get_match_state`, `web_search`, `get_polymarket_book`, or episodic-search tools. Those remain a post-bounty extension unless implemented and demonstrated before release.
 
@@ -81,20 +81,17 @@ No thesis, no trade. The thesis contains no stake, order, venue credential, wall
 
 ## Layer 3 — Execution, tournament, ledger
 
-**Strategy tournament (agent-vs-agent).** Strategy personas run in parallel on the same signal stream, each with an isolated paper bankroll: `Momentum` (follow confirmed StablePrice regime moves into lagging Polymarket prices), `Fader` (fade Polymarket moves StablePrice did not confirm), `Arb` (persistent cross-market divergence capture), `Modeler` (in-play model-vs-market). Personas differ in signal consumption and analyst instructions — same harness, different priors. Continuous scoring: **CLV**, **Brier score**, realized paper P&L, and drawdown. A head-trader loop reallocates virtual capital toward what's working; paper capital only in v1.
+**Strategy tournament — target architecture, not bounty-release functionality.** The intended personas would run in parallel on the same signal stream with isolated paper bankrolls: `Momentum`, `Fader`, `Arb`, and `Modeler`. The current evidence accepts only a narrow totals candidate; it does not ship or claim a four-persona tournament or head-trader allocation loop.
 
-**Execution adapters — one interface, three implementations:**
-1. `PaperAdapter` — fills at observed market price + modeled slippage; always available; the replay-mode default.
-2. `PolymarketAdapter` — real orders via CLOB **V2** SDK. Real-money flow is gated: only pre-match theses that pass both risk stages, carry `venue: polymarket`, use a human-confirmed mapping, and fit within every bankroll/exposure/minimum-order constraint. Kill switch halts it globally. If no valid order fits, no trade is the correct output.
-3. `ReplayAdapter` — used by the backtest runner; fills against historical series.
+**Execution adapter boundary.** The bounty release implements only the deterministic `PaperAdapter`, including depth-aware fill/no-fill behavior. Captured replay feeds that same paper adapter rather than a separate strategy path. A Polymarket CLOB **V2** real-order adapter and any distinct historical-fill adapter remain gated roadmap work; no trading credential or real-order route is connected.
 
 **Decision ledger + on-chain anchoring.** Every thesis, veto, fill, and outcome is an append-only ledger row. The target proof path hashes a versioned canonical record and writes the verified segment head to Solana, while inbound TXLine evidence is spot-validated where the official proof endpoints permit it. Local hash-chain integrity, deterministic replay parity, and external timestamping are reported as distinct guarantees. None of them alone is called proof of alpha; profitability requires separate valid evidence.
 
 **Replay/backtest harness.** The rescued archive supplies five-minute TXLine odds/scores plus one-minute Polymarket sampled prices. The replay engine re-emits normalized records onto the same bus as live data; the stack runs unchanged. Historical Polymarket `t,p` points have no bid/ask/depth and therefore support signal/CLV research with conservative cost proxies, not claims of executable fills. Synchronized live books provide the spread/depth evidence. Outputs: per-strategy signal CLV, conservative simulated P&L, detector precision/recall, and calibration plots.
 
-**Ops watchdog ("Data Doctor" — credit: rival memo).** A cheap scheduled agent pass over feed health: SSE gap detection, schema drift vs the OpenAPI spec, latency measurements (event `Ts` vs receive time), missing-fixture checks. Trading halts automatically on feed degradation — a trading system that doesn't know its data is bad is a donation machine.
+**Ops watchdog ("Data Doctor") — target architecture.** A future scheduled agent pass would inspect SSE gaps, schema drift, latency, and missing fixtures. The current capture supervisor has deterministic preflight, stale-stream, process, and deadline guards; it does not claim the Data Doctor agent exists.
 
-**Demo constraint (binding, from verified hackathon terms):** judges must be able to evaluate with **zero cost and zero wallets** — so the submission surface is a hosted dashboard with our TXLine credentials server-side, a bundled replay dataset, and read-only access to the live board. The Solana anchoring runs on OUR wallet; judges just see the explorer links.
+**Demo constraint (binding, from verified hackathon terms):** judges must be able to evaluate with **zero cost and zero wallets**. The current release is a derived-only static/read-only dashboard plus frozen public artifacts and requires no credentials. Hosting remains an open release task. There is no submitted Solana transaction or explorer link; anchoring stays optional and human-gated.
 
 ---
 
@@ -106,8 +103,8 @@ No thesis, no trade. The thesis contains no stake, order, venue credential, wall
 | AI | `@anthropic-ai/sdk` — Opus 4.8 (adaptive thinking) + Haiku 4.5; strict tools; structured outputs; prompt caching | Custom loop, purpose-built for the triage→analyst→risk pipeline. Not the coding-agent SDK — this harness IS the product |
 | Storage | SQLite (better-sqlite3) or DuckDB | Append-only time series at modest volume; zero infra |
 | Bus | In-process typed EventEmitter → upgrade path to Redis streams later | One process is plenty for the World Cup; don't build Kafka for 15 matches |
-| Dashboard | Lightweight web UI (live signals, agent reasoning feed, tournament leaderboard, CLV curves) | The demo surface for judges |
-| Chain | Solana mainnet (TXLine SL12 subscription + ledger anchoring), devnet for integration tests | Decision locked |
+| Dashboard | Read-only derived evidence UI; broader live/tournament views are roadmap | The current judge surface separates real research from the synthetic lifecycle |
+| Chain | Solana mainnet for the existing TXLine SL12 subscription; optional devnet receipt anchoring remains unsubmitted | Current decision receipts are local and visibly unanchored |
 
 ## Post-hackathon path
 

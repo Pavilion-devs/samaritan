@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { loadEnvFile } from "node:process";
+import { ClaudeInvocationEvidenceLedger } from "../agents/claude-evidence-ledger.js";
 import { ClaudeSpendLedger } from "../agents/claude-spend-ledger.js";
 import { PolymarketClobFeeResolver } from "../ingest/polymarket/fees.js";
 import { createPersistentClaudePaperStudy } from "./claude-paper-study.js";
@@ -39,8 +40,12 @@ const longRun = initializePaperStudyLedger({
   startedAtTsMs: manifest.longRun.startedAtTsMs
 });
 const spendLedger = new ClaudeSpendLedger(resolve("data/agents/claude-spend.sqlite"));
+const evidenceLedger = new ClaudeInvocationEvidenceLedger(
+  resolve("data/agents/claude-invocation-evidence.sqlite")
+);
 try {
   const spendBefore = spendLedger.verifyChain();
+  const evidenceBefore = evidenceLedger.verifyChain();
   const feeResolver = new PolymarketClobFeeResolver();
   const study = createPersistentClaudePaperStudy({
     apiKey,
@@ -49,11 +54,20 @@ try {
     longRun,
     universe,
     feeResolver: (book) => feeResolver.resolve(book),
+    evidenceLedger,
     maximumPendingMs: 5 * 60_000
   });
   const spendAfter = spendLedger.verifyChain();
   if (spendAfter.rows !== spendBefore.rows || spendAfter.headHash !== spendBefore.headHash) {
     throw new Error("Claude runtime readiness unexpectedly changed the spend ledger");
+  }
+  const evidenceAfter = study.invocationEvidence?.verifyChain();
+  if (!evidenceAfter) throw new Error("Claude runtime readiness lacks persistent invocation evidence");
+  if (
+    evidenceAfter.rows !== evidenceBefore.rows ||
+    evidenceAfter.headHash !== evidenceBefore.headHash
+  ) {
+    throw new Error("Claude runtime readiness unexpectedly changed the invocation-evidence ledger");
   }
   process.stdout.write(`${JSON.stringify({
     ok: true,
@@ -61,6 +75,7 @@ try {
     apiKeyConfigured: true,
     apiRequestsPerformed: 0,
     spendChain: spendAfter,
+    invocationEvidenceChain: evidenceAfter,
     bounty: {
       decisionChain: bounty.ledger.verifyChain(),
       eligibleFixtures: study.bounty.fixtures.map((fixture) => fixture.fixtureId)
@@ -71,7 +86,12 @@ try {
     }
   }, null, 2)}\n`);
 } finally {
-  bounty.ledger.close();
-  longRun.ledger.close();
-  spendLedger.close();
+  try {
+    evidenceLedger.verifyChain();
+  } finally {
+    evidenceLedger.close();
+    bounty.ledger.close();
+    longRun.ledger.close();
+    spendLedger.close();
+  }
 }

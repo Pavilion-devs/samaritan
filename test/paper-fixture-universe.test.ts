@@ -3,7 +3,10 @@ import {
   PAPER_STUDY_REPLAY_WINDOW_BEFORE_KICKOFF_MS,
   PAPER_STUDY_TOTAL_SELECTOR_CONFIG
 } from "../src/config/paper-study.js";
-import { buildPaperFixtureUniverse } from "../src/harness/paper-fixture-universe.js";
+import {
+  buildPaperFixtureUniverse,
+  type PairedCaptureEvidence
+} from "../src/harness/paper-fixture-universe.js";
 import { sha256, type MappingRecord } from "../src/mapping/registry.js";
 import type { TotalLineEvidence } from "../src/research/main-total-selector.js";
 
@@ -56,6 +59,49 @@ function evidence(fixtureId: string, kickoffTsMs: number): TotalLineEvidence {
   };
 }
 
+function pairedCapture(
+  fixtureId: string,
+  eventSlug: string,
+  kickoffTsMs: number,
+  overrides: Partial<PairedCaptureEvidence> = {}
+): PairedCaptureEvidence {
+  const firstTsMs = Math.max(1, kickoffTsMs - 1_000_000);
+  const lastTsMs = kickoffTsMs - 100_000;
+  return {
+    runId: `${fixtureId}-run`,
+    status: "verified",
+    fixtureId,
+    eventSlug,
+    logComplete: true,
+    mappingConfirmed: false,
+    identityParity: true,
+    replayMode: "capture-order-per-source",
+    rows: 100,
+    firstPolymarketObservedTsMs: firstTsMs,
+    lastPolymarketObservedTsMs: lastTsMs,
+    firstTxlineOddsObservedTsMs: firstTsMs + 1,
+    lastTxlineOddsObservedTsMs: lastTsMs,
+    firstTxlineScoresObservedTsMs: firstTsMs + 2,
+    lastTxlineScoresObservedTsMs: lastTsMs,
+    selectedTotal: {
+      eventSlug,
+      marketId: `market-${fixtureId}`,
+      conditionId: `condition-${fixtureId}`,
+      lineMilli: 2_500,
+      assetIds: [`over-${fixtureId}`, `under-${fixtureId}`]
+    },
+    selectedBookDepthComplete: true,
+    exactFixtureTxlineOddsAvailable: true,
+    exactFixtureTxlineScoresAvailable: true,
+    exactFixtureScoreCompleted: true,
+    proofCommitment: "a".repeat(64),
+    kickoffCloseAvailable: true,
+    publicResolutionAvailable: true,
+    publicMarketResolvedNormalized: true,
+    ...overrides
+  };
+}
+
 describe("paper fixture evidence universe", () => {
   it("separates executable paired capture from sampled-history-only fixtures", () => {
     const paired = mapping("paired", "paired-slug", 2_000_000);
@@ -65,18 +111,14 @@ describe("paper fixture evidence universe", () => {
       laneStartTsMs: 4_000_000,
       mappings: [paired, sampled],
       totalEvidence: [evidence("paired", 2_000_000), evidence("sampled", 3_000_000)],
-      pairedCaptures: [{
-        runId: "paired-run",
-        status: "verified",
-        fixtureId: "paired",
-        eventSlug: "paired-slug",
-        logComplete: true,
-        mappingConfirmed: true,
-        identityParity: true,
-        replayMode: "capture-order-per-source",
-        rows: 100,
-        firstObservedTsMs: 1_000
-      }],
+      pairedCaptures: [pairedCapture("paired", "paired-slug", 2_000_000, {
+        firstPolymarketObservedTsMs: 1_000,
+        lastPolymarketObservedTsMs: 1_900_000,
+        firstTxlineOddsObservedTsMs: 2_000,
+        lastTxlineOddsObservedTsMs: 1_900_000,
+        firstTxlineScoresObservedTsMs: 3_000,
+        lastTxlineScoresObservedTsMs: 1_900_000
+      })],
       sampledHistoryAssetIds: new Set(["over-paired", "under-paired", "over-sampled", "under-sampled"]),
       selectorConfig: PAPER_STUDY_TOTAL_SELECTOR_CONFIG
     });
@@ -108,18 +150,15 @@ describe("paper fixture evidence universe", () => {
       laneStartTsMs: 4_000_000,
       mappings: [mapping("fixture", "expected-slug", 2_000_000)],
       totalEvidence: [evidence("fixture", 2_000_000)],
-      pairedCaptures: [{
+      pairedCaptures: [pairedCapture("fixture", "wrong-slug", 2_000_000, {
         runId: "bad-run",
-        status: "verified",
-        fixtureId: "fixture",
-        eventSlug: "wrong-slug",
-        logComplete: true,
-        mappingConfirmed: true,
-        identityParity: true,
-        replayMode: "capture-order-per-source",
-        rows: 100,
-        firstObservedTsMs: 1_000
-      }],
+        firstPolymarketObservedTsMs: 1_000,
+        lastPolymarketObservedTsMs: 1_900_000,
+        firstTxlineOddsObservedTsMs: 2_000,
+        lastTxlineOddsObservedTsMs: 1_900_000,
+        firstTxlineScoresObservedTsMs: 3_000,
+        lastTxlineScoresObservedTsMs: 1_900_000
+      })],
       sampledHistoryAssetIds: new Set(["over-fixture", "under-fixture"]),
       selectorConfig: PAPER_STUDY_TOTAL_SELECTOR_CONFIG
     })).toThrow(/slug/);
@@ -142,30 +181,137 @@ describe("paper fixture evidence universe", () => {
     })).toThrow(/no eligible frozen total selection/);
   });
 
+  it("rejects a forged verified mapping without Deborah's settlement review", () => {
+    const forged = mapping("forged", "forged-slug", 2_000_000) as MappingRecord;
+    forged.status = "verified";
+    expect(() => buildPaperFixtureUniverse({
+      generatedAt: "2026-07-12T00:00:00.000Z",
+      laneStartTsMs: 1_000_000,
+      mappings: [forged],
+      totalEvidence: [evidence("forged", 2_000_000)],
+      pairedCaptures: [],
+      sampledHistoryAssetIds: new Set(["over-forged", "under-forged"]),
+      selectorConfig: PAPER_STUDY_TOTAL_SELECTOR_CONFIG
+    })).toThrow(/human settlement review/);
+  });
+
+  it("rejects mapping rules whose stored hash does not match the reviewed text", () => {
+    const forged = mapping("bad-rules", "bad-rules-slug", 2_000_000);
+    forged.conditions[0]!.rulesSha256 = "0".repeat(64);
+    expect(() => buildPaperFixtureUniverse({
+      generatedAt: "2026-07-12T00:00:00.000Z",
+      laneStartTsMs: 1_000_000,
+      mappings: [forged],
+      totalEvidence: [evidence("bad-rules", 2_000_000)],
+      pairedCaptures: [],
+      sampledHistoryAssetIds: new Set(["over-bad-rules", "under-bad-rules"]),
+      selectorConfig: PAPER_STUDY_TOTAL_SELECTOR_CONFIG
+    })).toThrow(/rulesSha256/);
+  });
+
   it("requires post-start timing, verified mapping, and pre-match paired books for long-run admission", () => {
     const record = mapping("future", "future-slug", 2_000_000);
     record.status = "verified";
+    record.review = {
+      settlementVerified: true,
+      reviewedBy: "Deborah",
+      reviewedAt: "2026-07-11T00:00:00.000Z"
+    };
     const universe = buildPaperFixtureUniverse({
       generatedAt: "2026-07-12T00:00:00.000Z",
       laneStartTsMs: 1_000_000,
       mappings: [record],
       totalEvidence: [evidence("future", 2_000_000)],
-      pairedCaptures: [{
+      pairedCaptures: [pairedCapture("future", "future-slug", 2_000_000, {
         runId: "future-run",
-        status: "verified",
-        fixtureId: "future",
-        eventSlug: "future-slug",
-        logComplete: true,
         mappingConfirmed: true,
-        identityParity: true,
-        replayMode: "capture-order-per-source",
-        rows: 100,
-        firstObservedTsMs: 1_000_000
-      }],
+        firstPolymarketObservedTsMs: 1_000_000,
+        lastPolymarketObservedTsMs: 1_900_000,
+        firstTxlineOddsObservedTsMs: 1_000_001,
+        lastTxlineOddsObservedTsMs: 1_900_000,
+        firstTxlineScoresObservedTsMs: 1_000_002,
+        lastTxlineScoresObservedTsMs: 1_900_000
+      })],
       sampledHistoryAssetIds: new Set(),
       selectorConfig: PAPER_STUDY_TOTAL_SELECTOR_CONFIG
     });
     expect(universe.fixtures[0]?.longRunLane).toEqual({ eligible: true, reason: null });
     expect(universe.summary.longRunEligible).toBe(1);
+  });
+
+  it("uses the later source start and rejects a capture whose TXLine overlap begins after cutoff", () => {
+    const kickoffTsMs = 20_000_000;
+    const record = mapping("late-txline", "late-txline-slug", kickoffTsMs);
+    record.status = "verified";
+    record.review = {
+      settlementVerified: true,
+      reviewedBy: "Deborah",
+      reviewedAt: "2026-07-11T00:00:00.000Z"
+    };
+    const universe = buildPaperFixtureUniverse({
+      generatedAt: "2026-07-12T00:00:00.000Z",
+      laneStartTsMs: 1_000_000,
+      mappings: [record],
+      totalEvidence: [evidence("late-txline", kickoffTsMs)],
+      pairedCaptures: [pairedCapture("late-txline", "late-txline-slug", kickoffTsMs, {
+        runId: "late-txline-run",
+        mappingConfirmed: true,
+        firstPolymarketObservedTsMs: 1_000_000,
+        lastPolymarketObservedTsMs: 19_800_000,
+        firstTxlineOddsObservedTsMs: 19_200_000,
+        lastTxlineOddsObservedTsMs: 19_800_000,
+        firstTxlineScoresObservedTsMs: 1_000_002,
+        lastTxlineScoresObservedTsMs: 19_800_000
+      })],
+      sampledHistoryAssetIds: new Set(),
+      selectorConfig: PAPER_STUDY_TOTAL_SELECTOR_CONFIG
+    });
+    expect(universe.fixtures[0]).toMatchObject({
+      capabilities: { executablePaperReplay: false },
+      bountyLane: { mode: "book_lifecycle_replay" },
+      longRunLane: { eligible: false, reason: "executable_capture_required" }
+    });
+  });
+
+  it("does not admit paired books without explicit close and normalized resolution proof", () => {
+    const kickoffTsMs = 20_000_000;
+    const record = mapping("no-lifecycle", "no-lifecycle-slug", kickoffTsMs);
+    record.status = "verified";
+    record.review = {
+      settlementVerified: true,
+      reviewedBy: "Deborah",
+      reviewedAt: "2026-07-11T00:00:00.000Z"
+    };
+    const universe = buildPaperFixtureUniverse({
+      generatedAt: "2026-07-12T00:00:00.000Z",
+      laneStartTsMs: 1_000_000,
+      mappings: [record],
+      totalEvidence: [evidence("no-lifecycle", kickoffTsMs)],
+      pairedCaptures: [pairedCapture("no-lifecycle", "no-lifecycle-slug", kickoffTsMs, {
+        runId: "no-lifecycle-run",
+        mappingConfirmed: true,
+        firstPolymarketObservedTsMs: 1_000_000,
+        lastPolymarketObservedTsMs: 19_800_000,
+        firstTxlineOddsObservedTsMs: 1_000_001,
+        lastTxlineOddsObservedTsMs: 19_800_000,
+        firstTxlineScoresObservedTsMs: 1_000_002,
+        lastTxlineScoresObservedTsMs: 19_800_000,
+        kickoffCloseAvailable: false,
+        publicResolutionAvailable: false,
+        publicMarketResolvedNormalized: false
+      })],
+      sampledHistoryAssetIds: new Set(),
+      selectorConfig: PAPER_STUDY_TOTAL_SELECTOR_CONFIG
+    });
+    expect(universe.fixtures[0]).toMatchObject({
+      evidenceGrade: "paired_order_books",
+      capabilities: {
+        executablePaperReplay: true,
+        kickoffCloseReplay: false,
+        publicResolutionReplay: false
+      },
+      bountyLane: { mode: "signal_research_only" },
+      longRunLane: { eligible: false, reason: "lifecycle_evidence_required" }
+    });
   });
 });

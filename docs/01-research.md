@@ -140,7 +140,7 @@ SSE notes: standard `id`/`event`/`data`/`retry` format; heartbeat events; resuma
 2. **Market fields verified but constrained.** Phase 0 confirmed Match Result / Over-Under / Handicap coverage in the free World Cup capture, but also confirmed the free tier exposes consensus `TXLineStablePriceDemargined` rows rather than multiple bookmaker feeds. SSE score payloads are richer than the original docs summary; keep parsers open around actions and state fields.
 3. **Thin remaining schedule.** Live demo material is scarce. The rescued TXLine + Polymarket archive carries the pre-match study; remaining fixtures supply synchronized live microstructure evidence. Fixture/market discovery must roll because later matches are published over time.
 4. **Polymarket V2 is already live, but market metadata still needs per-market verification.** Mitigation: isolate execution behind an adapter interface; paper adapter is the fallback that always works; fetch tick size/fees/rules per token before any mapping is tradeable.
-5. **Real-money risk.** We ARE wiring real execution (decision locked), so bankroll limits, kill switches, and the risk-manager veto are not optional features — they're the difference between a trading system and a donation.
+5. **Real-money risk.** The bounty build is paper-only and has no connected production trading adapter or credential. Any later real-money work remains behind the Phase 3 gate, Deborah's explicit authority, bankroll limits, kill switches, and the deterministic risk-manager boundary.
 6. **World Cup ends July 19.** Post-hackathon, the system must retarget to club football (TXLine paid tiers, USDT-priced) — architecture must be competition-agnostic from day one.
 
 ---

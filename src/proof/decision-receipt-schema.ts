@@ -67,7 +67,18 @@ export const receiptAgentRunSchema = z.object({
   status: z.literal("success"),
   usage: usageSchema,
   pricing: pricingSchema,
-  actualCostNanoUsd: nonnegativeIntegerSchema
+  actualCostNanoUsd: nonnegativeIntegerSchema,
+  localInvocationAudit: z.object({
+    assurance: z.literal(
+      "local_hash_chain_reference_generated_after_verification_not_offline_membership_or_provider_attestation"
+    ),
+    sequence: z.number().int().positive().safe(),
+    insertedAtTsMs: timestampSchema,
+    previousHash: sha256Schema,
+    entryHash: sha256Schema,
+    ledgerRowsAtGeneration: z.number().int().positive().safe(),
+    ledgerHeadHash: sha256Schema
+  }).strict().optional()
 }).strict();
 
 const signalEvidenceSchema = z.object({
@@ -516,6 +527,34 @@ export function assertDecisionReceiptSemantics(receipt: DecisionReceipt): void {
     if (run.actualCostNanoUsd !== cost(run)) fail(`Agent cost does not match embedded usage for ${run.stage}`);
     if (receipt.provenance.synthetic && run.actualCostNanoUsd !== 0) {
       fail("Synthetic stubs must have zero cost");
+    }
+    if (receipt.provenance.synthetic && run.localInvocationAudit !== undefined) {
+      fail("Synthetic stubs cannot claim a local invocation-ledger reference");
+    }
+    if (!receipt.provenance.synthetic && run.localInvocationAudit === undefined) {
+      fail("Captured Claude runs require a generation-time local invocation-ledger reference");
+    }
+  }
+  const localAudits = receipt.agents.runs
+    .map((run) => run.localInvocationAudit)
+    .filter((audit): audit is NonNullable<typeof audit> => audit !== undefined);
+  if (localAudits.length > 0) {
+    const [first] = localAudits;
+    if (localAudits.some((audit) =>
+      audit.ledgerRowsAtGeneration !== first!.ledgerRowsAtGeneration ||
+      audit.ledgerHeadHash !== first!.ledgerHeadHash
+    )) fail("Claude runs do not share one invocation-evidence chain boundary");
+    if (new Set(localAudits.map((audit) => audit.sequence)).size !== localAudits.length) {
+      fail("Claude invocation-evidence sequences must be unique");
+    }
+    if (localAudits.some((audit) => audit.sequence > audit.ledgerRowsAtGeneration)) {
+      fail("Claude invocation-evidence sequence exceeds its chain boundary");
+    }
+    for (const audit of localAudits) {
+      if (
+        audit.sequence === audit.ledgerRowsAtGeneration &&
+        audit.entryHash !== audit.ledgerHeadHash
+      ) fail("Final Claude invocation-evidence row does not match its disclosed head");
     }
   }
   const totalCost = receipt.agents.runs.reduce((sum, run) => sum + run.actualCostNanoUsd, 0);

@@ -1,6 +1,6 @@
 # Spain-Belgium Paired Live-Lane Evidence
 
-Generated: 2026-07-11T06:35:38.499Z
+Generated: 2026-07-14T23:13:44.692Z
 
 > Research evidence only. The mapping is capture-confirmed but not settlement-verified, every in-play result remains paper-only, and the material-move threshold is exploratory rather than an approved detector threshold.
 

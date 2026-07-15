@@ -1,6 +1,5 @@
 import { CLAUDE_MODEL, CLAUDE_PRICING } from "../agents/claude-pricing.js";
 import type { AnalystAgent, TriageAgent } from "../agents/contracts.js";
-import { CanonicalEventBus } from "../bus/event-bus.js";
 import {
   CANONICAL_SCHEMA_VERSION,
   type CanonicalEvent,
@@ -9,16 +8,14 @@ import {
   type PolymarketBookEvent,
   type PolymarketResolutionEvent
 } from "../bus/events.js";
-import { PAPER_STUDY_MINIMUM_SIGNAL_TO_KICKOFF_MS } from "../config/paper-study.js";
+import { PAPER_STUDY_TOTAL_SELECTOR_CONFIG } from "../config/paper-study.js";
 import { probability } from "../domain/probability.js";
-import { OrderBookPaperExecutor, type PolymarketFeeParameters } from "../exec/paper.js";
-import { PaperCasePipeline } from "../harness/paper-pipeline.js";
-import { createFrozenPaperStudyRuntime, type PaperRuntimeBatch } from "../harness/paper-runtime.js";
-import { PaperCaseScheduler } from "../harness/paper-scheduler.js";
+import type { PolymarketFeeParameters } from "../exec/paper.js";
+import { createPersistentPaperLaneRuntime } from "../harness/paper-lane-runtime.js";
+import type { PaperFixtureUniverse } from "../harness/paper-fixture-universe.js";
+import type { PaperRuntimeBatch } from "../harness/paper-runtime.js";
+import { runPaperSession } from "../harness/paper-session.js";
 import { initializePaperStudyLedger } from "../harness/paper-study-ledger.js";
-import { PaperCloseScheduler } from "../portfolio/paper-close-scheduler.js";
-import { PaperSettlementScheduler } from "../portfolio/paper-settlement-scheduler.js";
-import { PaperPortfolio } from "../portfolio/paper.js";
 import {
   generateDecisionReceipt,
   hashJsonEvidence,
@@ -32,7 +29,6 @@ import {
   type DecisionReceiptVerification,
   type ReceiptAgentRun
 } from "../proof/decision-receipt-schema.js";
-import { APPROVED_PAPER_RISK_CONFIG } from "../risk/paper.js";
 
 const BASE_TS_MS = Date.UTC(2026, 6, 1, 0, 0, 0);
 const FIXTURE_ID = "synthetic-judge-fixture-v1";
@@ -214,6 +210,93 @@ function requiredBatch<T>(value: T | undefined, message: string): T {
   return value;
 }
 
+function syntheticUniverse(laneStartTsMs: number): PaperFixtureUniverse {
+  return {
+    generatedAt: new Date(laneStartTsMs).toISOString(),
+    laneStartTsMs,
+    selectorConfig: structuredClone(PAPER_STUDY_TOTAL_SELECTOR_CONFIG),
+    fixtures: [{
+      fixtureId: FIXTURE_ID,
+      home: "Synthetic Home",
+      away: "Synthetic Away",
+      kickoffTsMs: KICKOFF_TS_MS,
+      eventSlugs: ["synthetic-judge-event-v1"],
+      mappingStatus: "verified",
+      selectedTotal: {
+        marketId: "synthetic-judge-market-v1",
+        marketKey: MARKET.key,
+        conditionId: CONDITION_ID,
+        lineMilli: LINE_MILLI,
+        preKickoffOverProbability: 0.5,
+        preKickoffPointTsMs: BASE_TS_MS,
+        coveragePoints: 1_000,
+        assetIds: [OVER_ASSET_ID, UNDER_ASSET_ID]
+      },
+      evidenceGrade: "paired_order_books",
+      capabilities: {
+        signalResearchReplay: true,
+        executablePaperReplay: true,
+        kickoffCloseReplay: true,
+        publicResolutionReplay: true
+      },
+      bountyLane: {
+        mode: "executable_book_replay",
+        exploratory: true,
+        reason: "Synthetic conductor proof only; permanently excluded from performance."
+      },
+      longRunLane: {
+        eligible: false,
+        reason: "predates_long_run_lane_start"
+      },
+      pairedCapture: {
+        runId: "synthetic-judge-capture-v1",
+        status: "verified",
+        fixtureId: FIXTURE_ID,
+        eventSlug: "synthetic-judge-event-v1",
+        logComplete: true,
+        mappingConfirmed: true,
+        identityParity: true,
+        replayMode: "capture-order-per-source",
+        rows: 20,
+        firstPolymarketObservedTsMs: BASE_TS_MS + 110,
+        lastPolymarketObservedTsMs: KICKOFF_TS_MS + 2 * 60 * 60_000 + 10,
+        firstTxlineOddsObservedTsMs: BASE_TS_MS + 10,
+        lastTxlineOddsObservedTsMs: BASE_TS_MS + 8 * 60_000 + 10,
+        firstTxlineScoresObservedTsMs: BASE_TS_MS + 210,
+        lastTxlineScoresObservedTsMs: KICKOFF_TS_MS + 2 * 60 * 60_000 + 10,
+        selectedTotal: {
+          eventSlug: "synthetic-judge-event-v1",
+          marketId: "synthetic-judge-market-v1",
+          conditionId: CONDITION_ID,
+          lineMilli: LINE_MILLI,
+          assetIds: [OVER_ASSET_ID, UNDER_ASSET_ID]
+        },
+        selectedBookDepthComplete: true,
+        exactFixtureTxlineOddsAvailable: true,
+        exactFixtureTxlineScoresAvailable: true,
+        exactFixtureScoreCompleted: true,
+        proofCommitment: "0".repeat(64),
+        kickoffCloseAvailable: true,
+        publicResolutionAvailable: true,
+        publicMarketResolvedNormalized: true
+      }
+    }],
+    summary: {
+      fixtures: 1,
+      pairedBookReplays: 1,
+      executableBookReplays: 1,
+      bookLifecycleReplays: 0,
+      signalResearchOnly: 0,
+      unavailable: 0,
+      longRunEligible: 0
+    }
+  };
+}
+
+async function* canonicalSequence(events: CanonicalEvent[]): AsyncGenerator<CanonicalEvent> {
+  for (const event of events) yield event;
+}
+
 /**
  * Runs a closed-world proving case through the production paper components.
  * All canonical records are invented inside this module and carry synthetic
@@ -272,31 +355,15 @@ export async function runSyntheticJudgeCase(): Promise<SyntheticJudgeCaseReport>
         };
       }
     };
-    const pipeline = new PaperCasePipeline({
+    const persistentRuntime = createPersistentPaperLaneRuntime({
+      lane: "bounty",
+      initialization: handle.initialization,
+      universe: syntheticUniverse(handle.initialization.startedAtTsMs),
+      ledger: handle.ledger,
       triageAgent,
       analystAgent,
-      riskConfig: APPROVED_PAPER_RISK_CONFIG,
-      executor: new OrderBookPaperExecutor(),
-      ledger: handle.ledger,
-      now: () => 0
-    });
-    const portfolio = new PaperPortfolio({
-      lane: "bounty",
-      bankrollMicroUsd: APPROVED_PAPER_RISK_CONFIG.bankrollMicroUsd,
-      drawdownStopMicroUsd: APPROVED_PAPER_RISK_CONFIG.drawdownStopMicroUsd,
-      ledger: handle.ledger
-    });
-    const scheduler = new PaperCaseScheduler({
-      config: {
-        lane: "bounty",
-        executionLatencyMs: DECISION_LATENCY_MS,
-        maximumPendingMs: MAXIMUM_PENDING_MS,
-        minimumSignalToKickoffMs: PAPER_STUDY_MINIMUM_SIGNAL_TO_KICKOFF_MS,
-        eligibleMarketKeys: new Set([MARKET.key]),
-        kickoffByFixtureId: new Map([[FIXTURE_ID, KICKOFF_TS_MS]])
-      },
-      pipeline,
-      portfolio,
+      executionLatencyMs: DECISION_LATENCY_MS,
+      maximumPendingMs: MAXIMUM_PENDING_MS,
       feeResolver: async (executionBook, asOfTsMs): Promise<PolymarketFeeParameters> => ({
         source: "polymarket_clob_market_info",
         conditionId: executionBook.conditionId,
@@ -309,23 +376,13 @@ export async function runSyntheticJudgeCase(): Promise<SyntheticJudgeCaseReport>
         fetchedAtTsMs: asOfTsMs
       })
     });
-    const closeScheduler = new PaperCloseScheduler({
-      portfolio,
-      kickoffByFixtureId: new Map([[FIXTURE_ID, KICKOFF_TS_MS]])
-    });
-    const settlementScheduler = new PaperSettlementScheduler(portfolio);
-    const runtime = createFrozenPaperStudyRuntime(scheduler, { closeScheduler, settlementScheduler });
-    const bus = new CanonicalEventBus();
     const batches: Array<{ event: CanonicalEvent; batch: PaperRuntimeBatch }> = [];
-    bus.subscribe(async (event) => {
-      batches.push({ event, batch: await runtime.ingest(event) });
-    });
-
+    const events: CanonicalEvent[] = [];
     const baselineProbabilities = [0.5, 0.5002, 0.4999, 0.5001, 0.5, 0.5002, 0.4999, 0.5001];
     for (const [index, fair] of baselineProbabilities.entries()) {
       const tsMs = BASE_TS_MS + index * 60_000;
-      await bus.publish(oddsQuote(index, tsMs, fair));
-      await bus.publish(book({
+      events.push(oddsQuote(index, tsMs, fair));
+      events.push(book({
         id: `synthetic-baseline-book-${index}`,
         sourceTsMs: tsMs + 100,
         observedTsMs: tsMs + 110,
@@ -335,7 +392,33 @@ export async function runSyntheticJudgeCase(): Promise<SyntheticJudgeCaseReport>
     }
 
     const triggerQuote = oddsQuote(8, BASE_TS_MS + 8 * 60_000, 0.55);
-    await bus.publish(triggerQuote);
+    events.push(triggerQuote);
+
+    const executionBook = book({
+      id: "synthetic-execution-book",
+      sourceTsMs: triggerQuote.sourceTsMs + 2_000,
+      observedTsMs: triggerQuote.observedTsMs + 2_000,
+      bid: 0.5,
+      ask: 0.52,
+      secondAsk: 0.53
+    });
+    events.push(executionBook);
+    const closeBook = book({
+      id: "synthetic-closing-book",
+      sourceTsMs: KICKOFF_TS_MS - 1_000,
+      observedTsMs: KICKOFF_TS_MS - 990,
+      bid: 0.57,
+      ask: 0.59
+    });
+    events.push(closeBook);
+    const settlementEvent = resolution();
+    events.push(settlementEvent);
+
+    const session = await runPaperSession({
+      source: canonicalSequence(events),
+      runtime: persistentRuntime,
+      onBatch: ({ event, batch }) => { batches.push({ event, batch }); }
+    });
     requiredBatch(
       batches.find(({ batch }) => batch.routedSignalIds.length === 1),
       "Frozen synthetic detector path did not route exactly one signal"
@@ -347,16 +430,6 @@ export async function runSyntheticJudgeCase(): Promise<SyntheticJudgeCaseReport>
     if (signalBook.kind !== "polymarket.book") {
       throw new Error("Synthetic signal-side evidence is not a canonical Polymarket book");
     }
-
-    const executionBook = book({
-      id: "synthetic-execution-book",
-      sourceTsMs: triggerQuote.sourceTsMs + 2_000,
-      observedTsMs: triggerQuote.observedTsMs + 2_000,
-      bid: 0.5,
-      ask: 0.52,
-      secondAsk: 0.53
-    });
-    await bus.publish(executionBook);
     const executionBatch = requiredBatch(
       batches.find(({ batch }) => batch.caseResults.length === 1),
       "Synthetic scheduler did not produce one paper execution result"
@@ -368,17 +441,6 @@ export async function runSyntheticJudgeCase(): Promise<SyntheticJudgeCaseReport>
     if (executionResult.status !== "filled" && executionResult.status !== "partial") {
       throw new Error(`Synthetic paper execution failed closed with status ${executionResult.status}`);
     }
-
-    const closeBook = book({
-      id: "synthetic-closing-book",
-      sourceTsMs: KICKOFF_TS_MS - 1_000,
-      observedTsMs: KICKOFF_TS_MS - 990,
-      bid: 0.57,
-      ask: 0.59
-    });
-    await bus.publish(closeBook);
-    const settlementEvent = resolution();
-    await bus.publish(settlementEvent);
     const lifecycleBatch = requiredBatch(
       batches.find(({ batch }) => batch.settlementResults.length === 1),
       "Synthetic lifecycle did not settle exactly one paper position"
@@ -462,7 +524,7 @@ export async function runSyntheticJudgeCase(): Promise<SyntheticJudgeCaseReport>
     });
     const receiptVerification = verifyDecisionReceipt(receipt);
     const ledgerVerification = handle.ledger.verifyChain();
-    const summary = portfolio.summary();
+    const summary = persistentRuntime.portfolio.summary();
     if (
       boundaryAudit.triageStubCalls !== 1 ||
       boundaryAudit.analystStubCalls !== 1 ||
@@ -488,7 +550,7 @@ export async function runSyntheticJudgeCase(): Promise<SyntheticJudgeCaseReport>
       realMoneyGate: handle.initialization.realMoneyGate,
       boundaries: boundaryAudit,
       runtime: {
-        canonicalEventsPublished: batches.length,
+        canonicalEventsPublished: session.events,
         rawSignals: batches.reduce((sum, item) => sum + item.batch.rawSignals.length, 0),
         normalizedSignals: batches.reduce((sum, item) => sum + item.batch.signals.length, 0),
         routedSignals: batches.reduce((sum, item) => sum + item.batch.routedSignalIds.length, 0),

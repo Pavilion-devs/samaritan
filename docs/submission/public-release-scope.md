@@ -22,7 +22,7 @@ This is an inclusion allowlist, not a claim that the current dirty working tree 
 
 The following are enforced by `.gitignore` and must remain absent from both Git history and the deployed image:
 
-- `.env`, `.env.*`, wallet/keypair directories, session tokens, JWTs, and credentials;
+- `.env` and credential-bearing `.env.*` files (the placeholder-only tracked `phase0/.env.example` is permitted), wallet/keypair directories, session tokens, JWTs, and credentials;
 - `data/`, SQLite/DuckDB files, `samples/`, raw SSE frames, captured replay archives, logs, and PID files;
 - `content/` social-video projects and renders, which are not part of the judge runtime or final bounty video;
 - `design/` explorations and screenshots, some of which predate the derived-only public data contract;
@@ -50,7 +50,7 @@ corepack enable
 pnpm install --frozen-lockfile
 pnpm security:audit
 pnpm judge:check
-pnpm --dir phase0 install --frozen-lockfile --ignore-workspace
+pnpm --dir phase0 install --frozen-lockfile
 pnpm --dir phase0 exec tsc -p tsconfig.json --noEmit
 pnpm --dir phase0 test
 ```

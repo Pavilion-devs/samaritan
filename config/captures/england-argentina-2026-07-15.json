@@ -22,8 +22,14 @@
   },
   "capture": {
     "scheduledStartUtc": "2026-07-15T16:00:00.000Z",
+    "scheduledEndUtc": "2026-07-15T22:00:00.000Z",
     "durationMinutes": 360,
-    "runLabel": "paired-england-argentina-2026-07-15"
+    "runLabel": "paired-england-argentina-2026-07-15",
+    "polymarketMaxAssets": 50,
+    "discoveryIntervalSeconds": 900,
+    "startupGraceSeconds": 180,
+    "streamStaleSeconds": 300,
+    "maxStartupSkewSeconds": 120
   },
   "evidence": {
     "txlineFixtures": "samples/fixtures/mainnet-world-cup-fixtures.json",

@@ -274,6 +274,8 @@ Mobile composition:
 
 **Purpose:** prove that Samaritan records unfavorable, rejected, and incomplete cases as faithfully as successful ones.
 
+**Current evidence boundary:** the shipped offline Casebook is not yet the future operational decision ledger described below. It projects all 18 goal×market feasibility observations reported by the one verified Spain-Belgium capture replay (12 pre-trigger moves, 6 without a material 30-second move, 0 clean stale windows). A deterministic Match Result observation is the only expanded three-state detail exemplar; the UI labels that selection and does not present it as the whole corpus or as performance evidence.
+
 Filters:
 
 - fixture;
@@ -520,19 +522,16 @@ The demo sequence must use real captured or ledger-derived artifacts. A case may
 
 Golden demo flow:
 
-1. Command establishes mode, feed health, and closed real-money gate.
-2. Matchroom shows the match and selected exact market.
-3. A detector emits a real signal.
-4. Haiku triage and Opus thesis appear on the Decision Rail.
-5. Deterministic risk approves, shrinks, or vetoes the case.
-6. Paper execution records fill, partial fill, no fill, or expiry.
-7. Study and Proof show the measured result and integrity chain.
+1. Command establishes paper mode, evidence class, feed health, and the closed real-money gate.
+2. Matchroom shows the real Spain–Belgium capture and its justified no-trade result; it does not claim Claude or execution ran for that case.
+3. The separate, unmistakably synthetic proof panel emits one invented detector signal through deterministic Haiku-shaped and Opus-shaped stubs.
+4. Deterministic risk authorizes the paper-only synthetic intent after its ledger records are written.
+5. The paper adapter records the synthetic fill, close, settlement, and receipt; the case remains excluded from performance evidence.
+6. Study and Proof distinguish the real research result from the synthetic integrity demonstration.
 
 ## 16. Design and implementation sequence
 
-The v1 comparison baseline remains at [`design/matchroom-high-fidelity/`](../design/matchroom-high-fidelity/). It must not be overwritten while v2 is under review.
-
-The approved second checkpoint is [`design/matchroom-v2/`](../design/matchroom-v2/), with a [dark desktop](../design/matchroom-v2/matchroom-v2-desktop.jpg), [dark mobile](../design/matchroom-v2/matchroom-v2-mobile.jpg), [mobile Decision Rail](../design/matchroom-v2/matchroom-v2-mobile-evidence.jpg), [375 px QA](../design/matchroom-v2/matchroom-v2-mobile-375.jpg), [light style frame](../design/matchroom-v2/matchroom-v2-light.jpg), [v1/v2 comparison](../design/matchroom-v2/matchroom-v1-v2-comparison.jpg), and [design decision report](../design/matchroom-v2/DESIGN-DECISION.md).
+The v1 and v2 comparison checkpoints remain in the private, gitignored `design/` workspace and are intentionally excluded from the public repository. Their approved dark-hybrid direction is implemented in the production dashboard; this public document does not link to unavailable private assets.
 
 The dark hybrid is the launch direction. Light mode is a deferred, non-blocking enhancement; the light style frame is its visual reference and must retain information-architecture and semantic-state parity when implemented.
 
@@ -540,7 +539,7 @@ Both checkpoints use the verified Spain-Belgium capture and deliberately end in 
 
 ### Production implementation status
 
-The first four production vertical slices are implemented in [`apps/dashboard/`](../apps/dashboard/) and served by the read-only projection layer in [`src/dash/`](../src/dash/). Matchroom renders the verified Spain-Belgium replay, Command derives the operating posture and capture schedule, Casebook reconstructs the complete verified refusal record, and Study presents the suspended v1 audit without prototype fallback data.
+The first four production vertical slices are implemented in [`apps/dashboard/`](../apps/dashboard/) and served by the read-only projection layer in [`src/dash/`](../src/dash/). Matchroom renders one deterministic exemplar from the verified Spain-Belgium replay, Command derives the operating posture and capture schedule, Casebook projects all 18 reported goal×market feasibility observations from that replay, and Study presents the suspended v1 audit without prototype fallback data.
 
 Implemented in this slice:
 
@@ -551,13 +550,13 @@ Implemented in this slice:
 - explicit captured-replay, paper, no-trade, and real-money-gate-closed states;
 - root-level Command surface with current system state, exact confirmed capture fixtures, the strongest verified case, and direct Matchroom entry;
 - fail-closed Command fixture admission against exact TXLine fixture and Polymarket event evidence;
-- searchable Casebook index with fixture, market, detector, disposition, execution, lane, source, and date filters;
-- complete Casebook detail with lifecycle, executable evidence, analyst/execution boundaries, observation sequence, and replay hashes;
+- searchable Casebook index over the complete current 18-observation feasibility corpus, with fixture, market, detector, disposition, execution, lane, source, and date filters;
+- explicitly selected Casebook exemplar detail with lifecycle, executable evidence, analyst/execution boundaries, observation sequence, and replay hashes;
 - honest no-result behavior and verified-capture admission that prevents scheduled fixtures or empty ledgers from appearing as cases;
-- sealed long-run study progress and compact integrity proof without exposing preregistered profitability endpoints;
+- sealed long-run study progress and compact integrity proof without exposing frozen-protocol profitability endpoints;
 - standalone Study with dual-lane separation, frozen candidate, sample clock, CLV decision rule, guardrails, risk caps, evidence admission, and ledger proof;
 - fail-closed Study result opening that requires the stopping rule, per-match rows, and reconciled guardrails before any long-run endpoint can enter the public contract;
-- deterministic `ACCEPT` validation against the registered positive-CI, baseline, settlement, and guardrail requirements while the real-money gate remains closed;
+- deterministic validation against the frozen positive-CI, baseline, settlement, and guardrail requirements, while any unregistered candidate remains visibly non-admissible and the real-money gate remains closed;
 - packaged Manrope and IBM Plex Mono fonts, reduced-motion behavior, keyboard focus, and mobile evidence cards;
 - honest loading and fail-closed error surfaces.
 

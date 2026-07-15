@@ -7,15 +7,17 @@
 
 ## Status
 
-**PHASE: PHASE 4 PAPER REASONING RUNTIME IMPLEMENTED — LIVE EVIDENCE COLLECTION ACTIVE.** The strict Node 22 workspace, canonical event contracts, evidence-bearing mapping registry, TXLine SSE clients, Gamma-refreshed Polymarket WebSocket source, streaming replay adapters, append-only SQLite/DuckDB stores, feature engine, detectors, chronological research harness, bounded Claude layer, deterministic paper risk, and paper portfolio are implemented. The local research database holds 9,025,361 normalized TXLine outcomes and 85,249,582 mapped Polymarket points. The synchronized Spain-Belgium study found no supporting post-TXLine STALE_QUOTE case, so that detector remains disabled.
+**PHASE: PHASE 4 PAPER REASONING RUNTIME IMPLEMENTED — BOUNDED EVIDENCE COLLECTION IN PROGRESS.** The strict Node 22 workspace, canonical event contracts, evidence-bearing mapping registry, TXLine SSE clients, Gamma-refreshed Polymarket WebSocket source, streaming replay adapters, append-only SQLite/DuckDB stores, feature engine, detectors, chronological research harness, bounded Claude layer, deterministic paper risk, and paper portfolio are implemented. Live and captured-replay source adapters feed the same `runPaperSession` conductor; the strategy runtime receives canonical events rather than a live/replay mode flag. This is an implemented orchestration boundary, not a claim that Samaritan is already a deployed 24/7 autonomous service. The local research database holds 9,025,361 normalized TXLine outcomes and 85,249,582 mapped Polymarket points. The synchronized Spain-Belgium study found no supporting post-TXLine STALE_QUOTE case, so that detector remains disabled.
 
 **Evidence correction, July 14:** Samaritan invalidated its original dynamic-total result after finding a future-informed selector and inflated emission semantics, preserved the artifact, repaired both defects, and reran the unchanged chronological boundary. The corrected Total Goals–only `CONSENSUS_MOVE` family has 38 held-out normalized buy cases across 18 fixtures, mean `+132.7` probability bps after the 100 bps historical proxy, and a fixture-clustered 95% interval of `+14.3` to `+243.9` bps. This is sampled-price historical signal evidence for a fresh forward paper review—not alpha, profitability, or executable fills. Paper v2 remains unregistered and the real-money gate remains closed. See [the corrected v4 report](docs/research/historical-gate-study-causal-economic-v4.md) and [v1 invalidation record](docs/research/historical-gate-study-v1-invalidation.md).
 
-The Phase-4 paper spine runs canonical events through deterministic detection, ledgers signals before model I/O, measures Haiku/Opus wall-clock decision latency from local observation time, and waits for both that latency and the current sports-order placement delay before deterministic risk and depth-aware simulation. Haiku and Opus can submit only strict structured judgments; neither can size or place an order. The July 12 paper-study registration and its empty ledgers are preserved but suspended after the July 14 selector audit. The corrected v2 protocol is an unregistered engineering candidate: its operational Claude-readiness command is disabled until Deborah signs a replacement protocol. No trading credential is connected and the real-money gate remains closed.
+The Phase-4 paper spine runs canonical events through deterministic detection, ledgers signals before model I/O, measures Haiku/Opus wall-clock decision latency from local observation time, and waits for both that latency and the current sports-order placement delay before deterministic risk and depth-aware simulation. Haiku and Opus can submit only strict structured judgments; neither can size or place an order. Real invocation metadata can be appended to a separate local hash chain. Receipt generation accepts a reference only after that local chain and exact record verify; the portable offline receipt does not independently prove membership. This is a local integrity audit—not Anthropic/provider attestation, independently signed billing proof, or proof of model quality. The July 12 paper-study registration and its empty ledgers are preserved but suspended after the July 14 selector audit. The corrected v2 protocol is an unregistered engineering candidate: real Anthropic/runtime admission and its operational readiness command remain blocked until Deborah signs a replacement protocol and fresh ledgers are initialized. No trading credential is connected and the real-money gate remains closed.
+
+The scheduled France–Spain paired capture failed closed before kickoff and is inadmissible. England–Argentina remains capture-only and is scheduled for the absolute `2026-07-15T16:00:00Z`–`2026-07-15T22:00:00Z` window under startup, stream-freshness, and terminal-artifact watchdogs. A successful capture would still require explicit evidence verification and Deborah's v2 registration before any study admission or Claude spend.
 
 ## Judge quickstart
 
-Requirements: Node `22.23.1` and pnpm `10.32.1`.
+Requirements: Node `22.23.1` and pnpm `11.13.0`.
 
 ```bash
 corepack enable
@@ -28,7 +30,7 @@ Then open `http://127.0.0.1:4173`. `pnpm judge` first runs the complete clean-cl
 The verification gate proves:
 
 - all TypeScript checks and 200+ tests pass;
-- a deterministic synthetic case traverses the production paper components from canonical events through settlement;
+- a deterministic synthetic case traverses the shared `runPaperSession` conductor from canonical events through settlement, using deterministic model stubs;
 - the public Decision Receipt verifies offline;
 - the frozen dashboard bundle contains only allowlisted, derived artifacts; and
 - the production dashboard builds from that clean-clone bundle.
@@ -36,7 +38,7 @@ The verification gate proves:
 The public experience deliberately separates two evidence classes:
 
 1. **Captured refusal:** the Spain–Belgium replay is real synchronized evidence and correctly ends in no trade. Only bucketed TXLine movement is public.
-2. **Synthetic full lifecycle:** `pnpm demo` exercises signal → triage → thesis → deterministic risk → intent → paper fill → close → settlement → receipt with zero external calls. It is visibly synthetic and permanently excluded from performance evidence.
+2. **Synthetic full lifecycle:** `pnpm demo` sends 20 invented canonical events through the same `runPaperSession` conductor used by the source adapters, then exercises signal → triage → thesis → deterministic risk → intent → paper fill → close → settlement → receipt. Its two model boundaries are deterministic stubs, it makes zero external calls, and it is visibly synthetic and permanently excluded from performance evidence.
 
 Useful standalone commands:
 

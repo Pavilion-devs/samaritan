@@ -11,7 +11,7 @@ import type {
   ReplayStepId
 } from "../../../src/dash/public-contract";
 import { loadMatchroom } from "./api";
-import { BrandMark, Icon, MobileNavigation, Navigation, Topbar } from "./Shell";
+import { BrandMark, Icon, MobileNavigation, Navigation, ProvenanceBadge, Topbar } from "./Shell";
 
 const replayOrder: ReplayStepId[] = ["pre", "goal", "post"];
 
@@ -75,21 +75,21 @@ function MatchMasthead({ snapshot }: { snapshot: MatchroomSnapshot }) {
   return (
     <section className="match-masthead surface reveal r1" aria-labelledby="fixture-heading">
       <div className="match-meta">
-        <span className="live-label"><i />Captured at first goal</span>
+        <ProvenanceBadge tone="capture" label="Real capture · retrospective" />
         <span className="fixture-number">Fixture {snapshot.match.fixtureId}</span>
       </div>
       <div className="team home-team">
-        <span className="crest spain">{snapshot.match.home.code}</span>
+        <span className={`crest ${snapshot.match.home.code.toLowerCase()}`}>{snapshot.match.home.code}</span>
         <span><small>{snapshot.match.home.name}</small><b>{snapshot.match.home.code}</b></span>
       </div>
       <div className="score-block">
         <span className="clock">{snapshot.match.clockLabel}</span>
         <div><strong>{snapshot.match.scoreAtCursor.home}</strong><i>:</i><strong>{snapshot.match.scoreAtCursor.away}</strong></div>
-        <small>First goal seen</small>
+        <small>Goal {snapshot.match.goalOrdinal} first seen</small>
       </div>
       <div className="team away-team">
         <span><small>{snapshot.match.away.name}</small><b>{snapshot.match.away.code}</b></span>
-        <span className="crest belgium">{snapshot.match.away.code}</span>
+        <span className={`crest ${snapshot.match.away.code.toLowerCase()}`}>{snapshot.match.away.code}</span>
       </div>
       <div className="market-meta">
         <small>Exact market</small>
@@ -148,7 +148,7 @@ function ProbabilityChart({ snapshot, state }: { snapshot: MatchroomSnapshot; st
   return (
     <figure className="chart-wrap">
       <svg viewBox="0 0 860 320" role="img" aria-labelledby="chart-title chart-description">
-        <title id="chart-title">Public draw order book around Spain&apos;s first goal</title>
+        <title id="chart-title">Public {snapshot.market.outcome} order book around selected goal {snapshot.match.goalOrdinal}</title>
         <desc id="chart-description">The public executable bid and ask repriced before the goal reached Samaritan. Exact TXLine probability levels are withheld.</desc>
         <defs><linearGradient id="spread-fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#8779d9" stopOpacity=".22" /><stop offset="1" stopColor="#8779d9" stopOpacity=".02" /></linearGradient></defs>
         <g className="chart-grid" aria-hidden="true">
@@ -195,7 +195,7 @@ function ProbabilityPanel({ snapshot, state, activeId, playing, onSelect, onTogg
       <div className="plain-conclusion">
         <span className="conclusion-mark"><Icon name="minus" /></span>
         <p><strong>{state.conclusionTitle}</strong> <span>{state.conclusionBody}</span></p>
-        <span className="discipline-chip">Disciplined pass</span>
+        <span className="discipline-chip">Retrospective pass</span>
       </div>
       <ProbabilityChart snapshot={snapshot} state={state} />
       <div className="replay-bar">
@@ -213,14 +213,15 @@ function ProbabilityPanel({ snapshot, state, activeId, playing, onSelect, onTogg
 }
 
 function DecisionRail({ snapshot, state }: { snapshot: MatchroomSnapshot; state: ReplayState }) {
+  const executionLabel = snapshot.decision.ordersPlaced === 0 ? "Execution not entered" : `${snapshot.decision.ordersPlaced} orders placed`;
   return (
     <aside className="decision-rail surface reveal r3" id="decision" aria-labelledby="decision-title">
-      <header className="panel-heading rail-heading"><div><span>Authoritative outcome</span><h2 id="decision-title">Decision Rail</h2></div><span className="paper-label">Paper</span></header>
+      <header className="panel-heading rail-heading"><div><span>Retrospective feasibility</span><h2 id="decision-title">Decision Rail</h2></div><ProvenanceBadge tone="capture" label={executionLabel} /></header>
       <div className="decision-outcome">
         <span className="outcome-icon"><Icon name="proof" /></span>
-        <span>Correct system outcome</span><strong>{snapshot.decision.label}</strong><p>{state.decisionExplanation}</p>
+        <span>Feasibility verdict</span><strong>{snapshot.decision.label}</strong><p>{state.decisionExplanation}</p>
       </div>
-      <div className="reason-block"><span>Primary reason</span><b>{snapshot.decision.primaryReason}</b><p>Pre-trigger draw repricing: <strong>{movementBps(snapshot.replay.preTriggerMarketMoveBps)}</strong></p></div>
+      <div className="reason-block"><span>Primary reason</span><b>{snapshot.decision.primaryReason}</b><p>Pre-trigger {snapshot.market.outcome} repricing: <strong>{movementBps(snapshot.replay.preTriggerMarketMoveBps)}</strong></p></div>
       <ol className="decision-stages">
         {snapshot.decision.stages.map((stage) => (
           <li key={stage.id} className={stage.status}>
@@ -230,11 +231,11 @@ function DecisionRail({ snapshot, state }: { snapshot: MatchroomSnapshot; state:
         ))}
       </ol>
       <div className="boundary-grid">
-        <div><span>Capital moved</span><b>${(snapshot.decision.capitalMovedMicros / 1_000_000).toFixed(2)}</b></div>
-        <div><span>Orders placed</span><b>{snapshot.decision.ordersPlaced}</b></div>
-        <div><span>Wallet access</span><b>{snapshot.decision.walletAccessed ? "Yes" : "None"}</b></div>
+        <div><span>Execution runtime</span><b>Not entered</b></div>
+        <div><span>Order result</span><b>Not applicable</b></div>
+        <div><span>Wallet path</span><b>Unavailable to this research lane</b></div>
       </div>
-      <div className="protective-gate"><span className="shield-lock"><Icon name="shield" /></span><span><b>Real-money gate closed</b><small>Protective boundary · manual approval required</small></span></div>
+      <div className="protective-gate"><span className="shield-lock"><Icon name="shield" /></span><span><b>Real money disabled in bounty build</b><small>Paper-only architecture · no order credential connected</small></span></div>
     </aside>
   );
 }
@@ -244,10 +245,10 @@ function EvidencePanel({ snapshot, activeId }: { snapshot: MatchroomSnapshot; ac
   const sourceMark = { Polymarket: "P", TXLine: "TX", Samaritan: "S" } as const;
   return (
     <section className="evidence-panel surface reveal r4" id="evidence" aria-labelledby="evidence-title">
-      <header className="panel-heading"><div><span>Evidence provenance</span><h2 id="evidence-title">Sequence around the goal</h2></div><span className="case-id">Case · ESP-BEL-01</span></header>
+      <header className="panel-heading"><div><span>Evidence provenance</span><h2 id="evidence-title">Sequence around the goal</h2></div><span className="case-id">Case · {snapshot.caseId}</span></header>
       <div className="evidence-table-wrap">
         <table className="evidence-table">
-          <thead><tr><th>Moment</th><th>Source</th><th>Verified observation</th><th>Executable ask</th><th>Assessment</th></tr></thead>
+          <thead><tr><th>Moment</th><th>Source</th><th>Captured observation</th><th>Executable ask</th><th>Assessment</th></tr></thead>
           <tbody>
             {snapshot.evidence.map((row) => (
               <tr key={row.replayStateId} className={row.replayStateId === activeId ? "active" : undefined}>
@@ -268,8 +269,8 @@ function EvidencePanel({ snapshot, activeId }: { snapshot: MatchroomSnapshot; ac
 function ProofPanel({ snapshot }: { snapshot: MatchroomSnapshot }) {
   return (
     <aside className="proof-panel surface reveal r5" id="proof" aria-labelledby="proof-title">
-      <header className="panel-heading"><div><span>Capture integrity</span><h2 id="proof-title">Replay proof</h2></div><span className="verified-label"><i />Verified</span></header>
-      <div className="proof-primary"><span className="proof-ring">100<small>%</small></span><span><b>Identity parity</b><small>{snapshot.proof.identityParity ? "Replay matched twice" : "Verification failed"}</small></span></div>
+      <header className="panel-heading"><div><span>Capture integrity</span><h2 id="proof-title">Offline replay integrity</h2></div><ProvenanceBadge tone="offline" label="Local check" /></header>
+      <div className="proof-primary"><span className="proof-ring">{snapshot.proof.identityParity ? "PASS" : "FAIL"}</span><span><b>Replay identity parity</b><small>{snapshot.proof.identityParity ? "Replay matched twice" : "Verification failed"}</small></span></div>
       <dl className="proof-stats">
         <div><dt>Canonical events</dt><dd>{snapshot.proof.canonicalEvents.toLocaleString("en-US")}</dd></div>
         <div><dt>First-seen latency</dt><dd>{snapshot.replay.firstSeenLatencyMs} ms</dd></div>
@@ -282,11 +283,11 @@ function ProofPanel({ snapshot }: { snapshot: MatchroomSnapshot }) {
 }
 
 function LoadingScreen() {
-  return <main className="load-screen"><BrandMark /><span className="load-kicker">Samaritan / Matchroom</span><h1>Loading verified replay</h1><div className="load-line"><i /></div><p>Assembling derived evidence. No market data is shown until verification succeeds.</p></main>;
+  return <main className="load-screen"><BrandMark /><span className="load-kicker">Samaritan / Matchroom</span><h1>Loading captured replay</h1><div className="load-line"><i /></div><p>Assembling licence-safe derived evidence. The retrospective case is shown only after local replay checks pass.</p></main>;
 }
 
 function ErrorScreen({ retry }: { retry: () => void }) {
-  return <main className="load-screen error-screen"><span className="error-mark"><Icon name="shield" /></span><span className="load-kicker">Fail-closed boundary</span><h1>Evidence unavailable</h1><p>The verified replay could not be loaded, so Samaritan is not presenting partial or fabricated match evidence.</p><button type="button" onClick={retry}>Retry verified load</button></main>;
+  return <main className="load-screen error-screen"><span className="error-mark"><Icon name="shield" /></span><span className="load-kicker">Fail-closed boundary</span><h1>Evidence unavailable</h1><p>The captured replay could not be checked, so Samaritan is not presenting partial or fabricated match evidence.</p><button type="button" onClick={retry}>Retry captured replay</button></main>;
 }
 
 function Matchroom({ snapshot }: { snapshot: MatchroomSnapshot }) {
@@ -325,9 +326,9 @@ function Matchroom({ snapshot }: { snapshot: MatchroomSnapshot }) {
 
   return (
     <div className="app-shell">
-      <Navigation active="matchroom" />
+      <Navigation active="matchroom" caseCount={snapshot.casebookCaseCount} />
       <main className="workspace" id="matchroom">
-        <Topbar title="Matchroom" modeLabel="Captured replay" modeClass="replay" />
+        <Topbar title="Matchroom" modeLabel="Retrospective replay" modeClass="replay" />
         <ContextBar snapshot={snapshot} />
         <div className="content" id="overview">
           <MatchMasthead snapshot={snapshot} />

@@ -13,7 +13,8 @@ import {
 
 export type PolymarketFeeResolver = (
   book: PolymarketBookEvent,
-  asOfTsMs: number
+  asOfTsMs: number,
+  haltSignal?: AbortSignal
 ) => Promise<PolymarketFeeParameters>;
 
 export type PaperSchedulerConfig = {
@@ -36,6 +37,14 @@ export type PaperSchedulerInitialState = {
   pending: readonly PaperPendingSignalState[];
   lastObservedTsMs: number | null;
 };
+
+export type PaperSchedulerOperationOptions = {
+  haltSignal?: AbortSignal;
+};
+
+function isHalted(signal: AbortSignal | undefined): boolean {
+  return signal?.aborted === true;
+}
 
 export class PaperCaseScheduler {
   readonly #pending = new Map<string, PaperPendingSignalState>();
@@ -80,7 +89,10 @@ export class PaperCaseScheduler {
     if (dependencies.initialState) this.#restore(dependencies.initialState);
   }
 
-  async enqueue(signal: DetectorSignal): Promise<boolean> {
+  async enqueue(
+    signal: DetectorSignal,
+    options: PaperSchedulerOperationOptions = {}
+  ): Promise<boolean> {
     const kickoffTsMs = this.dependencies.config.kickoffByFixtureId.get(signal.fixtureId);
     if (
       !Number.isSafeInteger(signal.detectedAtTsMs) ||
@@ -105,8 +117,22 @@ export class PaperCaseScheduler {
     const prepared = await this.dependencies.pipeline.prepare({
       lane: this.dependencies.config.lane,
       signal,
-      minimumDecisionLatencyMs: this.dependencies.config.executionLatencyMs
+      minimumDecisionLatencyMs: this.dependencies.config.executionLatencyMs,
+      ...(options.haltSignal === undefined ? {} : { haltSignal: options.haltSignal })
     });
+    if (isHalted(options.haltSignal)) {
+      const haltedAtTsMs = signal.observedAtTsMs + prepared.decisionLatencyMs;
+      if (prepared.status === "ready") {
+        this.dependencies.pipeline.terminateRecordedSignal({
+          lane: this.dependencies.config.lane,
+          signal,
+          atTsMs: haltedAtTsMs,
+          reason: "session_halted:after_analysis_before_pending"
+        });
+      }
+      this.haltPending(haltedAtTsMs, "session_halted:analysis_queue");
+      return true;
+    }
     if (prepared.status !== "ready") return true;
     if (prepared.orderEligibleAtTsMs >= kickoffTsMs) {
       this.dependencies.pipeline.terminateRecordedSignal({
@@ -135,7 +161,16 @@ export class PaperCaseScheduler {
     return true;
   }
 
-  async ingest(event: CanonicalEvent): Promise<PaperPipelineResult[]> {
+  async ingest(
+    event: CanonicalEvent,
+    options: PaperSchedulerOperationOptions = {}
+  ): Promise<PaperPipelineResult[]> {
+    if (isHalted(options.haltSignal)) {
+      const atTsMs = Number.isSafeInteger(event.observedTsMs) && event.observedTsMs >= 0
+        ? event.observedTsMs
+        : 0;
+      return this.haltPending(atTsMs, "session_halted:before_scheduler_ingest");
+    }
     if (!this.#acceptEventTimestamp(event)) return [];
     this.#expire(event.observedTsMs);
     if (event.kind !== "polymarket.book" || event.tokenRole !== "canonical") return [];
@@ -156,8 +191,25 @@ export class PaperCaseScheduler {
       this.#pending.delete(pending.signal.signalId);
       let fees: PolymarketFeeParameters;
       try {
-        fees = await this.dependencies.feeResolver(event, event.observedTsMs);
+        fees = await this.dependencies.feeResolver(
+          event,
+          event.observedTsMs,
+          options.haltSignal
+        );
       } catch (error) {
+        if (isHalted(options.haltSignal)) {
+          results.push(this.dependencies.pipeline.terminateRecordedSignal({
+            lane: this.dependencies.config.lane,
+            signal: pending.signal,
+            atTsMs: event.observedTsMs,
+            reason: "session_halted:after_fee_resolution"
+          }));
+          results.push(...this.haltPending(
+            event.observedTsMs,
+            "session_halted:fee_resolution_queue"
+          ));
+          return results;
+        }
         this.dependencies.pipeline.terminateRecordedSignal({
           lane: this.dependencies.config.lane,
           signal: pending.signal,
@@ -165,6 +217,19 @@ export class PaperCaseScheduler {
           reason: `fee_resolution_failed:${error instanceof Error ? error.message : String(error)}`
         });
         continue;
+      }
+      if (isHalted(options.haltSignal)) {
+        results.push(this.dependencies.pipeline.terminateRecordedSignal({
+          lane: this.dependencies.config.lane,
+          signal: pending.signal,
+          atTsMs: event.observedTsMs,
+          reason: "session_halted:after_fee_resolution"
+        }));
+        results.push(...this.haltPending(
+          event.observedTsMs,
+          "session_halted:fee_resolution_queue"
+        ));
+        return results;
       }
       const result = await this.dependencies.pipeline.executePrepared({
         lane: this.dependencies.config.lane,
@@ -174,7 +239,8 @@ export class PaperCaseScheduler {
         riskState: this.dependencies.portfolio?.riskState() ?? this.#riskState,
         asOfTsMs: event.observedTsMs,
         feeValidationTsMs: this.dependencies.processingNow?.() ?? event.observedTsMs,
-        prepared: pending.prepared
+        prepared: pending.prepared,
+        ...(options.haltSignal === undefined ? {} : { haltSignal: options.haltSignal })
       });
       results.push(result);
       if (result.fill && result.fill.direction === "buy" && result.fill.status !== "no_fill") {
@@ -193,6 +259,31 @@ export class PaperCaseScheduler {
           )
         };
       }
+      if (isHalted(options.haltSignal)) {
+        results.push(...this.haltPending(
+          event.observedTsMs,
+          "session_halted:after_started_execution_queue"
+        ));
+        return results;
+      }
+    }
+    return results;
+  }
+
+  /** Durably terminal every not-yet-executing prepared case and clear memory. */
+  haltPending(atTsMs: number, reason: string): PaperPipelineResult[] {
+    if (!Number.isSafeInteger(atTsMs) || atTsMs < 0) {
+      throw new RangeError("Pending halt timestamp must be a non-negative safe integer");
+    }
+    const results: PaperPipelineResult[] = [];
+    for (const [signalId, pending] of this.#pending) {
+      results.push(this.dependencies.pipeline.terminateRecordedSignal({
+        lane: this.dependencies.config.lane,
+        signal: pending.signal,
+        atTsMs: Math.max(atTsMs, pending.signal.observedAtTsMs),
+        reason
+      }));
+      this.#pending.delete(signalId);
     }
     return results;
   }

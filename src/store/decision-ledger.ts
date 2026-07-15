@@ -62,6 +62,19 @@ export type DecisionLedgerVerification = {
   v2Rows: number;
 };
 
+type DecisionLedgerRow = {
+  sequence: number;
+  entry_id: string;
+  case_id: string;
+  kind: DecisionEventKind;
+  at_ts_ms: number;
+  payload_json: string;
+  previous_hash: string;
+  entry_hash: string;
+  inserted_at_ms: number;
+  hash_schema_version: number | null;
+};
+
 function sha256(value: string): string {
   return createHash("sha256").update(value).digest("hex");
 }
@@ -105,6 +118,21 @@ function assertTimestamp(value: number, label: string): void {
   if (!Number.isSafeInteger(value) || value < 0) {
     throw new Error(`${label} must be a non-negative safe integer`);
   }
+}
+
+function mapDecisionLedgerRow(row: DecisionLedgerRow): DecisionLedgerEntry {
+  return {
+    sequence: row.sequence,
+    entryId: row.entry_id,
+    caseId: row.case_id,
+    kind: row.kind,
+    atTsMs: row.at_ts_ms,
+    insertedAtMs: row.inserted_at_ms,
+    payload: JSON.parse(row.payload_json) as JsonValue,
+    previousHash: row.previous_hash,
+    entryHash: row.entry_hash,
+    hashSchemaVersion: readHashSchemaVersion(row.hash_schema_version)
+  };
 }
 
 export class DecisionLedger {
@@ -252,30 +280,23 @@ export class DecisionLedger {
     const rows = (caseId === undefined
       ? this.#db.prepare("SELECT * FROM decision_events ORDER BY sequence").all()
       : this.#db.prepare("SELECT * FROM decision_events WHERE case_id = ? ORDER BY sequence").all(caseId)
-    ) as Array<{
-      sequence: number;
-      entry_id: string;
-      case_id: string;
-      kind: DecisionEventKind;
-      at_ts_ms: number;
-      payload_json: string;
-      previous_hash: string;
-      entry_hash: string;
-      inserted_at_ms: number;
-      hash_schema_version: number | null;
-    }>;
-    return rows.map((row) => ({
-      sequence: row.sequence,
-      entryId: row.entry_id,
-      caseId: row.case_id,
-      kind: row.kind,
-      atTsMs: row.at_ts_ms,
-      insertedAtMs: row.inserted_at_ms,
-      payload: JSON.parse(row.payload_json) as JsonValue,
-      previousHash: row.previous_hash,
-      entryHash: row.entry_hash,
-      hashSchemaVersion: readHashSchemaVersion(row.hash_schema_version)
-    }));
+    ) as DecisionLedgerRow[];
+    return rows.map(mapDecisionLedgerRow);
+  }
+
+  /**
+   * Read only the append-only suffix after a previously observed sequence.
+   * Long-running conductors use this indexed query instead of re-reading and
+   * reparsing the complete ledger after every canonical event.
+   */
+  entriesAfter(sequence: number): DecisionLedgerEntry[] {
+    if (!Number.isSafeInteger(sequence) || sequence < 0) {
+      throw new Error("Decision ledger cursor must be a non-negative safe integer");
+    }
+    const rows = this.#db.prepare(
+      "SELECT * FROM decision_events WHERE sequence > ? ORDER BY sequence"
+    ).all(sequence) as DecisionLedgerRow[];
+    return rows.map(mapDecisionLedgerRow);
   }
 
   verifyChain(): DecisionLedgerVerification {

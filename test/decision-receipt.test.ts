@@ -62,6 +62,36 @@ describe("decision receipt v1", () => {
     )).toBe(true);
   });
 
+  it("requires captured Claude claims to disclose one local audit-chain boundary", () => {
+    const receipt = clone();
+    receipt.provenance = {
+      evidenceClass: "captured_paper_case",
+      synthetic: false,
+      performanceUse: "excluded_unregistered",
+      label: "Captured structural test; not provider attestation."
+    };
+    const entryHashes = ["a".repeat(64), "b".repeat(64)];
+    for (const [index, run] of receipt.agents.runs.entries()) {
+      run.invocationClass = "anthropic_api";
+      run.localInvocationAudit = {
+        assurance:
+          "local_hash_chain_reference_generated_after_verification_not_offline_membership_or_provider_attestation",
+        sequence: index + 1,
+        insertedAtTsMs: 1_700_000_000_100 + index,
+        previousHash: index === 0 ? "0".repeat(64) : entryHashes[index - 1]!,
+        entryHash: entryHashes[index]!,
+        ledgerRowsAtGeneration: 2,
+        ledgerHeadHash: entryHashes[1]!
+      };
+    }
+    rehash(receipt);
+    expect(verifyDecisionReceipt(receipt)).toMatchObject({ valid: true, synthetic: false });
+
+    delete receipt.agents.runs[0]!.localInvocationAudit;
+    rehash(receipt);
+    expect(() => verifyDecisionReceipt(receipt)).toThrow(/local invocation-ledger reference/);
+  });
+
   it("recursively excludes exact TXLine levels, reconstructive gaps, and raw fields", () => {
     const receipt = buildSyntheticDecisionReceipt();
     const receiptJson = JSON.stringify(receipt);

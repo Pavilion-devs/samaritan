@@ -4,7 +4,9 @@
 
 ## What Samaritan is
 
-Samaritan is an auditable, risk-gated sports-market decision system built around live TXLine World Cup odds and scores. Deterministic TypeScript code watches the feed, computes probability-space features, and raises typed market signals. Claude is invoked only at a judgment boundary to return a strict thesis; it cannot size a position, access a wallet, or place an order. Code-owned risk checks make the final decision, a depth-aware simulator executes **paper orders only**, and an append-only hash chain records the lifecycle before each action.
+Samaritan is an auditable, risk-gated sports-market decision system built around TXLine World Cup odds and scores. Live and captured-replay adapters feed the same canonical conductor; deterministic TypeScript computes probability-space features and raises typed market signals. For an eligible registered session, Claude can be invoked only at a judgment boundary to return a strict thesis; it cannot size a position, access a wallet, or place an order. Code-owned risk checks make the final decision, a depth-aware simulator executes **paper orders only**, and an append-only hash chain records the lifecycle before each action.
+
+The evidence boundary is explicit: the real Spain–Belgium capture is a retrospective no-trade feasibility corpus and never entered the Claude/execution runtime. The complete lifecycle fixture uses deterministic stubs at both model boundaries. Real Anthropic admission remains disabled while corrected v2 is `engineering_candidate_unregistered`.
 
 This directly targets the bounty's five published criteria: working TXLine ingestion, autonomous operation once started, defensible deterministic logic, a novel agent/risk separation, and a deployable evidence surface. The current bounty build is deliberately **paper-only**: the real-money gate is closed, the corrected v2 paper protocol is `engineering_candidate_unregistered`, and no profitability claim is made.
 
@@ -75,7 +77,7 @@ The live evidence case in the public dashboard is a synchronized, read-only Spai
 
 ## Run the judge path locally
 
-Requirements: Node 22, pnpm 10, and a clean clone of the final public repository.
+Requirements: Node 22, pnpm 11, and a clean clone of the final public repository.
 
 ```bash
 corepack enable

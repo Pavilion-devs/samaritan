@@ -1,9 +1,10 @@
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { CASEBOOK_API_PATH, COMMAND_API_PATH, SPAIN_BELGIUM_API_PATH, STUDY_API_PATH, handleDashboardApi } from "../src/dash/api.js";
 import { buildCasebookSnapshot } from "../src/dash/casebook-projection.js";
-import { buildCommandSnapshot } from "../src/dash/command-projection.js";
+import { buildCommandSnapshot, resolveCaptureOutcome } from "../src/dash/command-projection.js";
+import { casebookApiResponseSchema } from "../src/dash/public-bundle.js";
 import { buildSpainBelgiumMatchroomSnapshot } from "../src/dash/projection.js";
 import { buildStudySnapshot } from "../src/dash/study-projection.js";
 
@@ -16,12 +17,168 @@ const privateProjectionEvidenceAvailable = process.env.SAMARITAN_TEST_NO_PRIVATE
   "data/live/paired-spain-belgium-2026-07-10/analysis-manifest.json",
   "samples/fixtures/mainnet-world-cup-fixtures.json"
 ].every((path) => existsSync(resolve(repoRoot, path)));
+const franceAnalysisAvailable = process.env.SAMARITAN_TEST_NO_PRIVATE_DATA !== "1" && existsSync(resolve(
+  repoRoot,
+  "data/live/paired-france-spain-2026-07-14/analysis-manifest.json"
+));
 
 function publicKeys(value: unknown): string[] {
   if (Array.isArray(value)) return value.flatMap(publicKeys);
   if (value === null || typeof value !== "object") return [];
   return Object.entries(value).flatMap(([key, nested]) => [key, ...publicKeys(nested)]);
 }
+
+const franceCaptureIdentity = {
+  captureId: "paired-france-spain-2026-07-14",
+  runLabel: "paired-france-spain-2026-07-14",
+  fixtureId: "18237038",
+  eventSlug: "fifwc-fra-esp-2026-07-14",
+  captureStartUtc: "2026-07-14T16:00:00.000Z",
+  captureEndUtc: "2026-07-14T22:00:00.000Z"
+};
+
+function supervisorTerminalEvidence() {
+  const windowStartTsMs = Date.parse(franceCaptureIdentity.captureStartUtc);
+  const windowEndTsMs = Date.parse(franceCaptureIdentity.captureEndUtc);
+  const rows = ([
+    ["polymarket", 10_000],
+    ["txline_odds", 20_000],
+    ["txline_scores", 30_000]
+  ] as const).map(([name, offset]) => ({
+    name,
+    path: `/private/${name}.ndjson`,
+    bytes: 100,
+    firstReceivedAt: new Date(windowStartTsMs + offset).toISOString(),
+    lastReceivedAt: new Date(windowEndTsMs - offset).toISOString(),
+    firstReceivedTsMs: windowStartTsMs + offset,
+    lastReceivedTsMs: windowEndTsMs - offset
+  }));
+  return {
+    manifestPath: "/private/capture-manifest.json",
+    windowStartUtc: franceCaptureIdentity.captureStartUtc,
+    windowEndUtc: franceCaptureIdentity.captureEndUtc,
+    synchronizedStartUtc: rows[2]!.firstReceivedAt,
+    synchronizedEndUtc: rows[2]!.lastReceivedAt,
+    streams: rows
+  };
+}
+
+describe("Command capture outcome projection", () => {
+  it.runIf(franceAnalysisAvailable)("surfaces the reviewed France-Spain analysis as explicitly failed closed", () => {
+    const manifest = JSON.parse(readFileSync(resolve(
+      repoRoot,
+      "data/live/paired-france-spain-2026-07-14/analysis-manifest.json"
+    ), "utf8")) as unknown;
+    expect(resolveCaptureOutcome({
+      ...franceCaptureIdentity,
+      nowTsMs: Date.parse("2026-07-15T01:00:00.000Z"),
+      analysisManifest: { present: true, value: manifest },
+      supervisorStatus: { present: false, value: null }
+    })).toMatchObject({
+      phase: "failed",
+      statusLabel: "Failed closed",
+      statusSource: "analysis_manifest",
+      statusUpdatedAt: "2026-07-15T00:23:23.588Z"
+    });
+  });
+
+  it("reports unknown after launch time when no local outcome artifact exists", () => {
+    expect(resolveCaptureOutcome({
+      ...franceCaptureIdentity,
+      nowTsMs: Date.parse("2026-07-14T17:00:00.000Z"),
+      analysisManifest: { present: false, value: null },
+      supervisorStatus: { present: false, value: null }
+    })).toEqual({
+      phase: "unknown",
+      statusLabel: "Outcome unknown",
+      statusDetail: "No terminal analysis or current supervisor outcome is available",
+      statusSource: "none",
+      statusUpdatedAt: null,
+      terminalEvidence: null
+    });
+  });
+
+  it("uses explicit supervisor completion but keeps analysis verification separate", () => {
+    const outcome = resolveCaptureOutcome({
+      ...franceCaptureIdentity,
+      nowTsMs: Date.parse("2026-07-14T22:10:00.000Z"),
+      analysisManifest: { present: false, value: null },
+      supervisorStatus: { present: true, value: {
+        schemaVersion: 1,
+        captureId: franceCaptureIdentity.captureId,
+        runLabel: franceCaptureIdentity.runLabel,
+        state: "completed",
+        updatedAt: "2026-07-14T22:05:00.000Z",
+        supervisorPid: 123,
+        scheduledStartUtc: franceCaptureIdentity.captureStartUtc,
+        scheduledEndUtc: franceCaptureIdentity.captureEndUtc,
+        childPid: 456,
+        exitCode: 0,
+        terminalEvidence: supervisorTerminalEvidence()
+      } }
+    });
+    expect(outcome).toMatchObject({
+      phase: "complete",
+      statusLabel: "Capture complete",
+      statusSource: "supervisor_status",
+      statusDetail: expect.stringContaining("verification is still separate"),
+      terminalEvidence: {
+        windowStartUtc: franceCaptureIdentity.captureStartUtc,
+        windowEndUtc: franceCaptureIdentity.captureEndUtc,
+        synchronizedStartUtc: "2026-07-14T16:00:30.000Z",
+        synchronizedEndUtc: "2026-07-14T21:59:30.000Z",
+        streamCount: 3
+      }
+    });
+    expect(JSON.stringify(outcome)).not.toContain("/private/");
+    expect(outcome).not.toHaveProperty("terminalEvidence.manifestPath");
+  });
+
+  it("does not treat supervisor completion without terminal evidence as complete", () => {
+    expect(resolveCaptureOutcome({
+      ...franceCaptureIdentity,
+      nowTsMs: Date.parse("2026-07-14T22:10:00.000Z"),
+      analysisManifest: { present: false, value: null },
+      supervisorStatus: { present: true, value: {
+        schemaVersion: 1,
+        captureId: franceCaptureIdentity.captureId,
+        runLabel: franceCaptureIdentity.runLabel,
+        state: "completed",
+        updatedAt: "2026-07-14T22:05:00.000Z",
+        supervisorPid: 123,
+        scheduledStartUtc: franceCaptureIdentity.captureStartUtc,
+        scheduledEndUtc: franceCaptureIdentity.captureEndUtc,
+        childPid: 456,
+        exitCode: 0
+      } }
+    })).toMatchObject({
+      phase: "unknown",
+      statusSource: "supervisor_status",
+      terminalEvidence: null
+    });
+  });
+
+  it("does not fall back to a supervisor success when an analysis record is malformed", () => {
+    expect(resolveCaptureOutcome({
+      ...franceCaptureIdentity,
+      nowTsMs: Date.parse("2026-07-14T22:10:00.000Z"),
+      analysisManifest: { present: true, value: { status: "verified" } },
+      supervisorStatus: { present: true, value: {
+        schemaVersion: 1,
+        captureId: franceCaptureIdentity.captureId,
+        runLabel: franceCaptureIdentity.runLabel,
+        state: "completed",
+        updatedAt: "2026-07-14T22:05:00.000Z",
+        supervisorPid: 123,
+        scheduledStartUtc: franceCaptureIdentity.captureStartUtc,
+        exitCode: 0
+      } }
+    })).toMatchObject({
+      phase: "unknown",
+      statusSource: "analysis_manifest"
+    });
+  });
+});
 
 describe.runIf(privateProjectionEvidenceAvailable)("public dashboard private projection", () => {
   it("builds Command from confirmed fixtures, sealed study evidence, and the verified replay", async () => {
@@ -34,10 +191,19 @@ describe.runIf(privateProjectionEvidenceAvailable)("public dashboard private pro
       tradeable: false,
       system: { posture: "standing_by", label: "Standing by for paired capture" },
       featuredCase: {
-        caseId: "ESP-BEL-01",
+        caseId: "FX-18218149-G01-MR",
+        fixtureLabel: "Spain vs Belgium",
+        home: { name: "Spain", code: "ESP" },
+        away: { name: "Belgium", code: "BEL" },
+        marketOutcomeLabel: "draw",
         disposition: "no_trade",
         consensusMoveFromBaselineBps: 25,
         preTriggerMarketMoveBps: 775,
+        scoreAtCursor: { home: 1, away: 0 },
+        clockSeconds: 1761,
+        capitalMovedMicros: 0,
+        ordersPlaced: 0,
+        walletAccessed: false,
         identityParity: true,
         canonicalEvents: 2_470_342
       },
@@ -66,10 +232,26 @@ describe.runIf(privateProjectionEvidenceAvailable)("public dashboard private pro
     expect(snapshot.recentCases).toHaveLength(1);
   });
 
+  it("overrides clock-derived schedule state with the France-Spain failed analysis outcome", async () => {
+    const snapshot = await buildCommandSnapshot(repoRoot, Date.parse("2026-07-15T01:00:00.000Z"));
+    expect(snapshot.fixtureSchedule.find((fixture) => fixture.fixtureId === "18237038")).toMatchObject({
+      phase: "failed",
+      statusLabel: "Failed closed",
+      statusSource: "analysis_manifest",
+      statusUpdatedAt: "2026-07-15T00:23:23.588Z"
+    });
+    expect(snapshot.fixtureSchedule.find((fixture) => fixture.fixtureId === "18241006")).toMatchObject({
+      phase: "scheduled",
+      statusSource: "reviewed_config"
+    });
+  });
+
   it("projects verified Spain-Belgium evidence without inventing an executable edge", async () => {
     const snapshot = await buildSpainBelgiumMatchroomSnapshot(repoRoot);
     expect(snapshot).toMatchObject({
       schemaVersion: 2,
+      caseId: "FX-18218149-G01-MR",
+      casebookCaseCount: 18,
       mode: "captured_replay",
       executionMode: "paper",
       realMoneyGate: "closed",
@@ -96,6 +278,8 @@ describe.runIf(privateProjectionEvidenceAvailable)("public dashboard private pro
       expect.objectContaining({ id: "post", consensusMoveFromBaselineBps: 25, bestBid: 0.16, bestAsk: 0.1625 })
     ]);
     expect(snapshot.replay.preTriggerMarketMoveBps).toBe(775);
+    expect(snapshot.decision.explanation).toBe("The candidate arrived after the market had already moved. This retrospective feasibility observation never entered an execution runtime.");
+    expect(snapshot.replay.states.find((state) => state.id === "goal")?.decisionExplanation).toBe(snapshot.decision.explanation);
     expect(snapshot.replay.states.every((state) => state.consensusMoveFromBaselineBps % snapshot.publicDataPolicy.txlineMovementBucketBps === 0)).toBe(true);
     expect(snapshot.publicDataPolicy).toMatchObject({
       derivedOnly: true,
@@ -111,41 +295,79 @@ describe.runIf(privateProjectionEvidenceAvailable)("public dashboard private pro
       gateCases: 18,
       movedBeforeTxlineCases: 12,
       noMaterialRepriceCases: 6,
-      cleanStaleWindows: 0
+      cleanStaleWindows: 0,
+      corpusAssurance: "local_file_sha256_not_capture_manifest_membership"
     });
   });
 
-  it("builds Casebook from the complete verified refusal record", async () => {
+  it("projects the complete reported feasibility corpus and labels one deterministic detail exemplar", async () => {
     const snapshot = await buildCasebookSnapshot(repoRoot);
     expect(snapshot).toMatchObject({
-      schemaVersion: 2,
+      schemaVersion: 3,
       mode: "offline_artifact",
       executionMode: "paper",
       realMoneyGate: "closed",
       tradeable: false,
       statistics: {
-        totalCases: 1,
-        noTradeCases: 1,
+        totalCases: 18,
+        noTradeCases: 18,
         executedCases: 0,
-        verifiedCases: 1,
+        reconciledCases: 18,
         capitalMovedMicros: 0
+      },
+      corpus: {
+        unit: "goal_market_feasibility_observation",
+        coverage: "all_reported_goal_market_cases",
+        goalEvents: 3,
+        marketEventCases: 18,
+        movedBeforeTxlineCases: 12,
+        noMaterialRepriceCases: 6,
+        cleanStaleWindows: 0,
+        assurance: "local_file_sha256_not_capture_manifest_membership",
+        selectedExemplar: {
+          caseId: "FX-18218149-G01-MR",
+          policy: "earliest_pretrigger_match_result_then_largest_pretrigger_ask_move"
+        }
       },
       selectedCase: {
         summary: {
-          caseId: "ESP-BEL-01",
+          caseId: "FX-18218149-G01-MR",
+          fixtureLabel: "Spain vs Belgium",
+          homeCode: "ESP",
+          awayCode: "BEL",
+          marketLabel: "Match result",
+          selectedExemplar: true,
+          goalOrdinal: 1,
+          goalClockSeconds: 1761,
           detector: "STALE_QUOTE_FEASIBILITY",
           disposition: "No trade",
           executionOutcome: "Not executed",
           evidenceLane: "Research only",
           source: "Captured replay"
         },
-        decision: { ordersPlaced: 0, walletAccessed: false },
+        decision: {
+          explanation: "The candidate arrived after the market had already moved. This retrospective feasibility observation never entered an execution runtime.",
+          ordersPlaced: 0,
+          walletAccessed: false
+        },
         evidenceReadout: { consensusMoveFromBaselineBps: 25, preTriggerMarketMoveBps: 775 },
         analysis: { thesisStatus: "not_requested", costStatus: "not_applicable", costMicros: 0 },
         proof: { identityParity: true, canonicalEvents: 2_470_342 }
       }
     });
-    expect(snapshot.cases).toHaveLength(1);
+    expect(snapshot.cases).toHaveLength(18);
+    expect(snapshot.corpus.commitment).toMatch(/^[a-f0-9]{64}$/);
+    expect(snapshot.selectedCase.proof.corpusCommitment).toBe(snapshot.corpus.commitment);
+    expect(new Set(snapshot.cases.map((item) => item.caseId))).toHaveProperty("size", 18);
+    expect(snapshot.cases.filter((item) => item.marketFamily === "Match result")).toHaveLength(3);
+    expect(snapshot.cases.filter((item) => item.marketFamily === "Full-time total")).toHaveLength(15);
+    expect(snapshot.cases.filter((item) => item.classification === "polymarket_moved_before_txline")).toHaveLength(12);
+    expect(snapshot.cases.filter((item) => item.classification === "no_material_reprice_in_window")).toHaveLength(6);
+    expect(snapshot.cases.filter((item) => item.selectedExemplar)).toEqual([snapshot.selectedCase.summary]);
+    expect(casebookApiResponseSchema.parse({ data: snapshot })).toEqual({ data: snapshot });
+    const truncated = structuredClone(snapshot);
+    truncated.cases.pop();
+    expect(casebookApiResponseSchema.safeParse({ data: truncated }).success).toBe(false);
     expect(snapshot.selectedCase.lifecycle).toHaveLength(4);
     expect(snapshot.selectedCase.lifecycle[0]).toMatchObject({
       label: "Goal observed",

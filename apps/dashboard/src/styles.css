@@ -499,6 +499,39 @@ html.light .sidebar {
   white-space: nowrap;
 }
 
+.provenance-badge {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 9px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  background: color-mix(in srgb, currentColor, transparent 92%);
+  font-family: var(--mono);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  line-height: 1;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.provenance-badge i {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 6px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 0 4px color-mix(in srgb, currentColor, transparent 88%);
+}
+
+.provenance-badge.capture { color: var(--lime); }
+.provenance-badge.configured { color: var(--violet); }
+.provenance-badge.historical { color: var(--blue); }
+.provenance-badge.offline { color: var(--muted-strong); }
+.provenance-badge.synthetic { color: var(--amber); }
+
 .state-chip {
   min-height: 36px;
   padding: 0 12px;
@@ -741,11 +774,11 @@ html.light .sidebar {
   box-shadow: 0 8px 22px rgba(0, 0, 0, 0.18);
 }
 
-.crest.spain {
+.crest.esp {
   background: linear-gradient(#b91f2f 0 27%, #e9c43a 27% 73%, #b91f2f 73%);
 }
 
-.crest.belgium {
+.crest.bel {
   background: linear-gradient(90deg, #171717 0 33%, #e9c83b 33% 66%, #c92534 66%);
 }
 
@@ -1922,6 +1955,27 @@ html.light .sidebar {
   border-radius: 50%;
   background: var(--lime);
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--lime), transparent 89%);
+}
+
+.fixture-card.failed .fixture-status > span,
+.feed-state.failed > span {
+  color: var(--danger);
+}
+
+.fixture-card.failed .fixture-status > span i,
+.feed-state.failed > span i {
+  background: var(--danger);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger), transparent 88%);
+}
+
+.fixture-card.complete .fixture-status > span i,
+.feed-state.complete > span i {
+  background: var(--lime);
+}
+
+.fixture-card.unknown .fixture-status > span,
+.feed-state.unknown > span {
+  color: var(--muted);
 }
 
 .feature-eyebrow em {
@@ -3855,7 +3909,7 @@ html.light .sidebar {
   }
 }
 
-/* Casebook: verified decision record */
+/* Casebook: captured retrospective case record */
 .casebook-shell {
   background:
     radial-gradient(circle at 70% -8%, rgba(159, 248, 80, 0.055), transparent 31rem),
@@ -4233,15 +4287,23 @@ html.light .sidebar {
   position: relative;
   padding: 18px 18px 17px 20px;
   border-bottom: 1px solid var(--border);
-  background: linear-gradient(110deg, rgba(159, 248, 80, 0.08), rgba(159, 248, 80, 0.01) 72%);
+  background: rgba(255, 255, 255, 0.01);
 }
 
 .casebook-index-row::before {
   position: absolute;
   inset: 0 auto 0 0;
   width: 2px;
-  background: var(--lime);
+  background: transparent;
   content: "";
+}
+
+.casebook-index-row.selected {
+  background: linear-gradient(110deg, rgba(159, 248, 80, 0.08), rgba(159, 248, 80, 0.01) 72%);
+}
+
+.casebook-index-row.selected::before {
+  background: var(--lime);
 }
 
 .casebook-index-time,

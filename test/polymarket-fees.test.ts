@@ -46,6 +46,25 @@ function marketInfo(overrides: Record<string, unknown> = {}): Record<string, unk
 }
 
 describe("Polymarket public fee resolver", () => {
+  it("combines the request deadline with an operator halt signal", async () => {
+    const controller = new AbortController();
+    let requestSignal: AbortSignal | undefined;
+    const resolver = new PolymarketClobFeeResolver({
+      fetchImpl: async (_input, init) => {
+        requestSignal = init?.signal as AbortSignal;
+        return new Promise<Response>((_resolve, reject) => {
+          requestSignal?.addEventListener("abort", () => reject(requestSignal?.reason), { once: true });
+        });
+      }
+    });
+
+    const pending = resolver.resolve(book(), controller.signal);
+    await Promise.resolve();
+    controller.abort(new Error("operator halt"));
+    await expect(pending).rejects.toThrow(/operator halt/);
+    expect(requestSignal?.aborted).toBe(true);
+  });
+
   it("parses and caches explicit V2 fee-curve and market execution parameters", async () => {
     let requests = 0;
     let now = 2_000;

@@ -95,6 +95,26 @@ function mutate(path: string, sql: string, parameters: unknown[] = []): void {
 }
 
 describe("decision-ledger v2 proof envelope", () => {
+  it("reads only the indexed append-only suffix after a conductor cursor", () => {
+    const ledger = new DecisionLedger(":memory:");
+    for (let index = 1; index <= 3; index += 1) {
+      ledger.append({
+        entryId: `suffix-entry-${index}`,
+        caseId: "suffix-case",
+        kind: "signal_received",
+        atTsMs: 1_000 + index,
+        insertedAtMs: 2_000 + index,
+        payload: { index }
+      });
+    }
+
+    expect(ledger.entriesAfter(1).map((entry) => entry.sequence)).toEqual([2, 3]);
+    expect(ledger.entriesAfter(3)).toEqual([]);
+    expect(() => ledger.entriesAfter(-1)).toThrow(/cursor/);
+    expect(() => ledger.entriesAfter(1.5)).toThrow(/cursor/);
+    ledger.close();
+  });
+
   it("commits every proof field through a canonical, domain-separated v2 hash", () => {
     const path = ledgerPath();
     const ledger = new DecisionLedger(path);

@@ -1,7 +1,7 @@
 import { startTransition, useEffect, useState } from "react";
 import type { StudyGuardrails, StudySnapshot } from "../../../src/dash/public-contract";
 import { loadStudy } from "./api";
-import { BrandMark, Icon, MobileNavigation, Navigation, Topbar } from "./Shell";
+import { BrandMark, Icon, MobileNavigation, Navigation, ProvenanceBadge, Topbar } from "./Shell";
 
 function money(microUsd: number) {
   return `$${(microUsd / 1_000_000).toFixed(2)}`;
@@ -35,7 +35,7 @@ function StudyHero({ snapshot }: { snapshot: StudySnapshot }) {
   return (
     <section className="study-hero reveal r1" aria-labelledby="study-heading">
       <div className="study-hero-copy">
-        <span className="study-kicker"><i />Invalidated v1 audit</span>
+        <ProvenanceBadge tone="historical" label="Historical audit · invalidated v1" />
         <h2 id="study-heading">The claim<br /><em>was withdrawn.</em></h2>
         <p>A causal audit found future-informed market selection before v1 admitted a single observation. Samaritan preserved the empty ledgers, suspended the protocol, and blocked model spend.</p>
         <div className="study-primary-question"><span><Icon name="chart" /></span><span><small>Former endpoint · inactive</small><b>{evaluation.primaryEndpoint}</b></span></div>
@@ -74,7 +74,7 @@ function CorrectedHistoricalEvidence({ snapshot }: { snapshot: StudySnapshot }) 
   return (
     <section className="study-corrected-evidence surface reveal r3" aria-labelledby="corrected-evidence-title">
       <header className="study-panel-head">
-        <div><span>Corrected v4 · aggregate only</span><h2 id="corrected-evidence-title">Historical signal candidate</h2></div>
+        <div><span>Historical derived · not performance</span><h2 id="corrected-evidence-title">Historical signal candidate</h2></div>
         <span className="study-unregistered-chip"><Icon name="lock" />V2 unregistered</span>
       </header>
       <div className="corrected-evidence-grid">
@@ -95,8 +95,8 @@ function SyntheticReceiptProof({ snapshot }: { snapshot: StudySnapshot }) {
   return (
     <section className="study-synthetic-proof surface reveal r4" aria-labelledby="synthetic-proof-title">
       <header className="study-panel-head">
-        <div><span>Separate evidence class · synthetic</span><h2 id="synthetic-proof-title">One case. Every boundary. Verifiable.</h2></div>
-        <span className="synthetic-verified-chip"><Icon name="proof" />Offline verified</span>
+        <div><span>Synthetic · engineering proof</span><h2 id="synthetic-proof-title">One case. Every boundary. Verifiable offline.</h2></div>
+        <ProvenanceBadge tone="synthetic" label="Synthetic · zero external calls" />
       </header>
       <div className="synthetic-proof-body">
         <div className="synthetic-proof-story">
@@ -113,7 +113,7 @@ function SyntheticReceiptProof({ snapshot }: { snapshot: StudySnapshot }) {
       <div className="synthetic-proof-flow" aria-label="Synthetic proving lifecycle">
         {steps.map((step, index) => <span key={step}><b>{step}</b>{index < steps.length - 1 ? <i><Icon name="arrow" /></i> : null}</span>)}
       </div>
-      <footer><span><Icon name="lock" /><b>Synthetic and permanently excluded from historical, paper, and profitability claims.</b></span><a href={proof.path}>Open verified receipt · JSON <Icon name="arrow" /></a></footer>
+      <footer><span><Icon name="lock" /><b>Synthetic and permanently excluded from historical, paper, and profitability claims.</b></span><a href={proof.path}>Open synthetic receipt · JSON <Icon name="arrow" /></a></footer>
     </section>
   );
 }
@@ -164,7 +164,7 @@ function GuardrailsPanel({ snapshot }: { snapshot: StudySnapshot }) {
   const items = [
     { label: "Fill rate", threshold: `≥ ${percentage(thresholds.minimumFillRate)}`, value: observed ? percentage(observed.fillRate, 1) : "Awaiting fills", state: guardrailState(observed, "fillRatePassed") },
     { label: "Mean slippage", threshold: `≤ ${thresholds.maximumMeanSlippageBps} bps`, value: observed ? bps(observed.meanSlippageBps) : "Awaiting fills", state: guardrailState(observed, "slippagePassed") },
-    { label: "Max drawdown", threshold: `≤ ${money(thresholds.maximumDrawdownMicroUsd)}`, value: observed ? money(observed.maxDrawdownMicroUsd) : "$0.00 observed", state: guardrailState(observed, "drawdownPassed") },
+    { label: "Max drawdown", threshold: `≤ ${money(thresholds.maximumDrawdownMicroUsd)}`, value: observed ? money(observed.maxDrawdownMicroUsd) : "No observations", state: guardrailState(observed, "drawdownPassed") },
     { label: "Selected depth", threshold: "Every trade", value: observed ? (observed.selectedDepthComplete ? "Complete" : "Incomplete") : "Awaiting fills", state: guardrailState(observed, "selectedDepthComplete") }
   ];
   return (
@@ -268,7 +268,7 @@ function StudyView({ snapshot }: { snapshot: StudySnapshot }) {
     <div className="app-shell study-shell">
       <Navigation active="study" />
       <main className="workspace" id="study">
-        <Topbar title="Study" modeLabel="Offline artifact" modeClass="offline" />
+        <Topbar title="Study" modeLabel="Offline snapshot" modeClass="offline" />
         <div className="study-content">
           <StudyHero snapshot={snapshot} />
           <LaneStrip snapshot={snapshot} />

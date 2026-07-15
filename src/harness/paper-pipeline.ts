@@ -47,6 +47,8 @@ export type PaperPipelineInput = {
   feeValidationTsMs?: number;
   executionLatencyMs: number;
   availableShares?: number;
+  /** Generic operation halt; carries no live/replay identity or money authority. */
+  haltSignal?: AbortSignal;
 };
 
 export type PreparedPaperCase = {
@@ -95,6 +97,14 @@ function timestampAfter(baseTsMs: number, elapsedMs: number, label: string): num
   return result;
 }
 
+function isHalted(signal: AbortSignal | undefined): boolean {
+  return signal?.aborted === true;
+}
+
+function haltReason(stage: string): string {
+  return `session_halted:${stage}`;
+}
+
 export class PaperCasePipeline {
   constructor(readonly dependencies: {
     triageAgent: TriageAgent;
@@ -123,7 +133,7 @@ export class PaperCasePipeline {
     signal: DetectorSignal;
     atTsMs: number;
     reason: string;
-  }): void {
+  }): PaperPipelineResult {
     assertSignalTiming(input.signal);
     if (!Number.isSafeInteger(input.atTsMs) || input.atTsMs < input.signal.observedAtTsMs) {
       throw new RangeError("Paper terminal timestamp precedes signal knowledge time");
@@ -137,12 +147,14 @@ export class PaperCasePipeline {
       atTsMs: input.atTsMs,
       payload: json({ status: "failed", reason: input.reason })
     });
+    return { caseId: id, status: "failed", reason: input.reason };
   }
 
   async prepare(input: {
     lane: PaperStudyLane;
     signal: DetectorSignal;
     minimumDecisionLatencyMs: number;
+    haltSignal?: AbortSignal;
   }): Promise<PaperAnalysisResult> {
     if (!Number.isSafeInteger(input.minimumDecisionLatencyMs) || input.minimumDecisionLatencyMs <= 0) {
       throw new Error("Minimum decision latency must be a positive integer number of milliseconds");
@@ -182,19 +194,50 @@ export class PaperCasePipeline {
       });
     };
 
-    let triage: TriageDecision;
-    try {
-      triage = triageDecisionSchema.parse(await this.dependencies.triageAgent.triage({
+    const halted = (
+      stage: string,
+      decisionLatencyMs: number,
+      triage?: TriageDecision
+    ): PaperAnalysisResult => {
+      const reason = haltReason(stage);
+      terminal("failed", reason, decisionLatencyMs);
+      return {
         caseId: id,
-        signal: input.signal
-      }));
+        status: "failed",
+        ...(triage === undefined ? {} : { triage }),
+        reason,
+        decisionLatencyMs
+      };
+    };
+
+    if (isHalted(input.haltSignal)) {
+      return halted("before_triage", elapsed());
+    }
+
+    let triage: TriageDecision;
+    let rawTriage: unknown;
+    try {
+      rawTriage = await this.dependencies.triageAgent.triage({
+        caseId: id,
+        signal: input.signal,
+        ...(input.haltSignal === undefined ? {} : { haltSignal: input.haltSignal })
+      });
     } catch (error) {
       const decisionLatencyMs = elapsed();
+      if (isHalted(input.haltSignal)) return halted("after_triage", decisionLatencyMs);
       const reason = `triage_failed:${error instanceof Error ? error.message : String(error)}`;
       terminal("failed", reason, decisionLatencyMs);
       return { caseId: id, status: "failed", reason, decisionLatencyMs };
     }
     const triageLatencyMs = elapsed();
+    if (isHalted(input.haltSignal)) return halted("after_triage", triageLatencyMs);
+    try {
+      triage = triageDecisionSchema.parse(rawTriage);
+    } catch (error) {
+      const reason = `triage_failed:${error instanceof Error ? error.message : String(error)}`;
+      terminal("failed", reason, triageLatencyMs);
+      return { caseId: id, status: "failed", reason, decisionLatencyMs: triageLatencyMs };
+    }
     append("triage_decision", timestampAfter(
       input.signal.observedAtTsMs,
       triageLatencyMs,
@@ -210,10 +253,14 @@ export class PaperCasePipeline {
         decisionLatencyMs: triageLatencyMs
       };
     }
+    if (isHalted(input.haltSignal)) {
+      return halted("before_analysis", elapsed(), triage);
+    }
 
     let thesis: TradeThesis;
+    let rawThesis: unknown;
     try {
-      const submitted = tradeThesisSchema.parse(await this.dependencies.analystAgent.investigate({
+      rawThesis = await this.dependencies.analystAgent.investigate({
         caseId: id,
         signal: input.signal,
         triage,
@@ -221,13 +268,24 @@ export class PaperCasePipeline {
           input.signal.observedAtTsMs,
           triageLatencyMs,
           "Analyst as-of"
-        )
-      }));
-      assertThesisMatchesSignal(submitted, input.signal);
+        ),
+        ...(input.haltSignal === undefined ? {} : { haltSignal: input.haltSignal })
+      });
+    } catch (error) {
       const decisionLatencyMs = elapsed();
+      if (isHalted(input.haltSignal)) return halted("after_analysis", decisionLatencyMs, triage);
+      const reason = `analysis_failed:${error instanceof Error ? error.message : String(error)}`;
+      terminal("failed", reason, decisionLatencyMs);
+      return { caseId: id, status: "failed", triage, reason, decisionLatencyMs };
+    }
+    const analysisLatencyMs = elapsed();
+    if (isHalted(input.haltSignal)) return halted("after_analysis", analysisLatencyMs, triage);
+    try {
+      const submitted = tradeThesisSchema.parse(rawThesis);
+      assertThesisMatchesSignal(submitted, input.signal);
       const submittedAtTsMs = timestampAfter(
         input.signal.observedAtTsMs,
-        decisionLatencyMs,
+        analysisLatencyMs,
         "Thesis submission"
       );
       thesis = tradeThesisSchema.parse({
@@ -236,10 +294,9 @@ export class PaperCasePipeline {
         expiresAtTsMs: timestampAfter(submittedAtTsMs, 15 * 60_000, "Thesis expiry")
       });
     } catch (error) {
-      const decisionLatencyMs = elapsed();
       const reason = `analysis_failed:${error instanceof Error ? error.message : String(error)}`;
-      terminal("failed", reason, decisionLatencyMs);
-      return { caseId: id, status: "failed", triage, reason, decisionLatencyMs };
+      terminal("failed", reason, analysisLatencyMs);
+      return { caseId: id, status: "failed", triage, reason, decisionLatencyMs: analysisLatencyMs };
     }
     const decisionLatencyMs = thesis.submittedAtTsMs - input.signal.observedAtTsMs;
     const orderEligibleAtTsMs = timestampAfter(
@@ -319,7 +376,19 @@ export class PaperCasePipeline {
     const terminal = (status: PaperPipelineResult["status"], reason: string) => {
       append("case_terminal", input.asOfTsMs, { status, reason });
     };
+    const halted = (stage: string): PaperPipelineResult => {
+      const reason = haltReason(stage);
+      terminal("failed", reason);
+      return {
+        caseId: id,
+        status: "failed",
+        triage: prepared.triage,
+        thesis: prepared.thesis,
+        reason
+      };
+    };
 
+    if (isHalted(input.haltSignal)) return halted("before_risk_review");
     const riskVerdict = reviewPaperRisk({
       config: this.dependencies.riskConfig,
       state: input.riskState,
@@ -346,6 +415,7 @@ export class PaperCasePipeline {
       };
     }
 
+    if (isHalted(input.haltSignal)) return halted("before_execution_intent");
     const intent: PaperOrderIntent = {
       lane: input.lane,
       caseId: id,
@@ -359,8 +429,12 @@ export class PaperCasePipeline {
       availableShares: input.availableShares ?? 0
     };
     append("execution_intent", input.asOfTsMs, intent);
+    if (isHalted(input.haltSignal)) return halted("before_executor");
     let fill: PaperFill;
     try {
+      // Invocation is the atomic action boundary. If the session halts while
+      // this promise is in flight, its result/error is still ledgered before
+      // returning; only work not yet invoked is suppressed by the guards.
       fill = await this.dependencies.executor.execute(intent, input.book, input.fees);
     } catch (error) {
       const reason = `paper_execution_failed:${error instanceof Error ? error.message : String(error)}`;
@@ -390,7 +464,8 @@ export class PaperCasePipeline {
     const analysis = await this.prepare({
       lane: input.lane,
       signal: input.signal,
-      minimumDecisionLatencyMs: input.executionLatencyMs
+      minimumDecisionLatencyMs: input.executionLatencyMs,
+      ...(input.haltSignal === undefined ? {} : { haltSignal: input.haltSignal })
     });
     if (analysis.status !== "ready") return analysis;
     return this.executePrepared({
@@ -402,7 +477,8 @@ export class PaperCasePipeline {
       asOfTsMs: input.asOfTsMs,
       prepared: analysis,
       ...(input.feeValidationTsMs === undefined ? {} : { feeValidationTsMs: input.feeValidationTsMs }),
-      ...(input.availableShares === undefined ? {} : { availableShares: input.availableShares })
+      ...(input.availableShares === undefined ? {} : { availableShares: input.availableShares }),
+      ...(input.haltSignal === undefined ? {} : { haltSignal: input.haltSignal })
     });
   }
 }

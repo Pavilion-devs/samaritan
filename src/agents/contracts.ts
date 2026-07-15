@@ -38,7 +38,11 @@ export const tradeThesisSchema = z.object({
 export type TradeThesis = z.infer<typeof tradeThesisSchema>;
 
 export type TriageAgent = {
-  triage(input: { caseId: string; signal: DetectorSignal }): Promise<unknown>;
+  triage(input: {
+    caseId: string;
+    signal: DetectorSignal;
+    haltSignal?: AbortSignal;
+  }): Promise<unknown>;
 };
 
 export type AnalystAgent = {
@@ -47,6 +51,7 @@ export type AnalystAgent = {
     signal: DetectorSignal;
     triage: TriageDecision;
     asOfTsMs: number;
+    haltSignal?: AbortSignal;
   }): Promise<unknown>;
 };
 

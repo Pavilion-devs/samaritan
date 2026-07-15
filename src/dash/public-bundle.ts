@@ -89,12 +89,13 @@ const matchSchema = z.object({
   fixtureId: z.string().min(1),
   eventSlug: z.string().min(1),
   competition: z.literal("World Cup"),
-  stage: z.literal("Round of 16"),
+  stage: z.literal("Captured fixture"),
   kickoffUtc: isoSchema,
   originalMatchDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  home: z.object({ name: z.string().min(1), code: z.literal("ESP") }).strict(),
-  away: z.object({ name: z.string().min(1), code: z.literal("BEL") }).strict(),
-  scoreAtCursor: z.object({ home: z.literal(1), away: z.literal(0) }).strict(),
+  home: z.object({ name: z.string().min(1), code: z.string().regex(/^[A-Z0-9]{3}$/) }).strict(),
+  away: z.object({ name: z.string().min(1), code: z.string().regex(/^[A-Z0-9]{3}$/) }).strict(),
+  scoreAtCursor: z.object({ home: nonnegativeIntegerSchema, away: nonnegativeIntegerSchema }).strict(),
+  goalOrdinal: z.number().int().positive().safe(),
   clockSeconds: nonnegativeIntegerSchema,
   clockLabel: z.string().min(1)
 }).strict();
@@ -124,13 +125,17 @@ const proofSchema = z.object({
   gateCases: nonnegativeIntegerSchema,
   movedBeforeTxlineCases: nonnegativeIntegerSchema,
   noMaterialRepriceCases: nonnegativeIntegerSchema,
-  cleanStaleWindows: z.literal(0)
+  cleanStaleWindows: z.literal(0),
+  corpusCommitment: hashSchema,
+  corpusAssurance: z.literal("local_file_sha256_not_capture_manifest_membership")
 }).strict();
 
 export const matchroomApiResponseSchema = z.object({
   data: z.object({
     schemaVersion: z.literal(2),
     snapshotId: z.literal(SPAIN_BELGIUM_MATCHROOM_ID),
+    caseId: z.string().regex(/^FX-[A-Za-z0-9_-]+-G\d{2}-(?:MR|TG-\d+)$/),
+    casebookCaseCount: z.number().int().positive().safe(),
     generatedAt: isoSchema,
     mode: z.literal("captured_replay"),
     executionMode: z.literal("paper"),
@@ -139,8 +144,8 @@ export const matchroomApiResponseSchema = z.object({
     match: matchSchema,
     market: z.object({
       family: z.literal("match_result"),
-      outcome: z.literal("draw"),
-      label: z.literal("Match result · Draw"),
+      outcome: z.enum(["home", "draw", "away"]),
+      label: z.string().min(1),
       period: z.literal("90 minutes plus stoppage time"),
       mappingStatus: z.literal("research_only")
     }).strict(),
@@ -163,23 +168,37 @@ export const matchroomApiResponseSchema = z.object({
     proof: proofSchema,
     publicDataPolicy: publicDataPolicySchema
   }).strict()
-}).strict();
+}).strict().superRefine((value, context) => {
+  if (value.data.casebookCaseCount !== value.data.proof.gateCases) {
+    context.addIssue({
+      code: "custom",
+      message: "Matchroom case count must reconcile with the gate corpus"
+    });
+  }
+});
 
 const commandCaseSchema = z.object({
-  caseId: z.literal("ESP-BEL-01"),
+  caseId: z.string().min(1),
   matchroomId: z.literal(SPAIN_BELGIUM_MATCHROOM_ID),
   fixtureId: z.string().min(1),
-  fixtureLabel: z.literal("Spain vs Belgium"),
+  fixtureLabel: z.string().min(1),
+  home: matchSchema.shape.home,
+  away: matchSchema.shape.away,
   occurredAt: isoSchema,
-  marketLabel: z.literal("Match result · Draw"),
+  marketLabel: z.string().min(1),
+  marketOutcomeLabel: z.string().min(1),
   candidateLabel: z.literal("Live-lane gate readout"),
   disposition: z.literal("no_trade"),
-  dispositionLabel: z.literal("No trade"),
-  reason: z.literal("Market moved before signal"),
+  dispositionLabel: z.string().min(1),
+  reason: z.string().min(1),
   evidenceStatus: z.literal("verified_replay"),
   preTriggerMarketMoveBps: z.number().int(),
   consensusMoveFromBaselineBps: z.number().int().multipleOf(TXLINE_PUBLIC_MOVEMENT_BUCKET_BPS),
-  bestAsk: probabilitySchema
+  bestAsk: probabilitySchema,
+  canonicalEvents: z.number().int().positive().safe(),
+  capitalMovedMicros: z.literal(0),
+  ordersPlaced: z.literal(0),
+  walletAccessed: z.literal(false)
 }).strict();
 
 export const commandApiResponseSchema = z.object({
@@ -198,16 +217,17 @@ export const commandApiResponseSchema = z.object({
       feeds: z.array(z.object({
         id: z.enum(["txline", "polymarket", "decision_ledger", "replay_proof"]),
         label: z.string().min(1),
-        status: z.enum(["scheduled", "initialized", "verified"]),
+        status: z.enum(["scheduled", "running", "complete", "failed", "unknown", "initialized", "verified"]),
         statusLabel: z.string().min(1),
         detail: z.string().min(1)
       }).strict()).length(4)
     }).strict(),
     featuredCase: commandCaseSchema.extend({
-      scoreLabel: z.literal("1–0"),
+      scoreLabel: z.string().min(1),
+      scoreAtCursor: matchSchema.shape.scoreAtCursor,
+      clockSeconds: nonnegativeIntegerSchema,
       clockLabel: z.string().min(1),
       conclusion: z.string().min(1),
-      canonicalEvents: z.number().int().positive().safe(),
       identityParity: z.literal(true),
       chart: z.array(publicBookPointSchema).min(1)
     }).strict(),
@@ -217,10 +237,21 @@ export const commandApiResponseSchema = z.object({
       away: z.object({ name: z.string().min(1), code: z.string().min(2) }).strict(),
       kickoffUtc: isoSchema,
       captureStartUtc: isoSchema,
+      captureEndUtc: isoSchema,
       signalCutoffUtc: isoSchema,
       eventSlug: z.string().min(1),
-      phase: z.enum(["scheduled", "capture_window", "awaiting_verification"]),
+      phase: z.enum(["scheduled", "running", "complete", "failed", "unknown"]),
       statusLabel: z.string().min(1),
+      statusDetail: z.string().min(1),
+      statusSource: z.enum(["analysis_manifest", "supervisor_status", "reviewed_config", "none"]),
+      statusUpdatedAt: isoSchema.nullable(),
+      terminalEvidence: z.object({
+        windowStartUtc: isoSchema,
+        windowEndUtc: isoSchema,
+        synchronizedStartUtc: isoSchema,
+        synchronizedEndUtc: isoSchema,
+        streamCount: z.literal(3)
+      }).strict().nullable(),
       identityStatus: z.literal("exact_match_confirmed"),
       captureOnly: z.literal(true),
       tradeable: z.literal(false)
@@ -268,28 +299,33 @@ export const commandApiResponseSchema = z.object({
 }).strict();
 
 const casebookSummarySchema = z.object({
-  caseId: z.literal("ESP-BEL-01"),
-  matchroomId: z.literal(SPAIN_BELGIUM_MATCHROOM_ID),
+  caseId: z.string().regex(/^FX-[A-Za-z0-9_-]+-G\d{2}-(?:MR|TG-\d+)$/),
+  matchroomId: z.literal(SPAIN_BELGIUM_MATCHROOM_ID).nullable(),
+  selectedExemplar: z.boolean(),
+  goalOrdinal: z.number().int().positive().safe(),
+  goalClockSeconds: nonnegativeIntegerSchema,
   occurredAt: isoSchema,
   fixtureId: z.string().min(1),
-  fixtureLabel: z.literal("Spain vs Belgium"),
-  homeCode: z.literal("ESP"),
-  awayCode: z.literal("BEL"),
-  marketFamily: z.literal("Match result"),
-  marketLabel: z.literal("Match result · Draw"),
+  fixtureLabel: z.string().min(1),
+  homeCode: z.string().min(2),
+  awayCode: z.string().min(2),
+  marketFamily: z.enum(["Match result", "Full-time total"]),
+  marketLabel: z.string().min(1),
+  lineMilli: z.number().int().nullable(),
+  classification: z.enum(["polymarket_moved_before_txline", "no_material_reprice_in_window"]),
   detector: z.literal("STALE_QUOTE_FEASIBILITY"),
-  disposition: z.literal("No trade"),
-  executionOutcome: z.literal("Not executed"),
+  disposition: z.string().min(1),
+  executionOutcome: z.string().min(1),
   evidenceLane: z.literal("Research only"),
   source: z.literal("Captured replay"),
-  verificationStatus: z.literal("Verified"),
-  reason: z.literal("Market moved before signal"),
+  verificationStatus: z.literal("Internally reconciled"),
+  reason: z.string().min(1),
   preTriggerMarketMoveBps: z.number().int()
 }).strict();
 
 export const casebookApiResponseSchema = z.object({
   data: z.object({
-    schemaVersion: z.literal(2),
+    schemaVersion: z.literal(3),
     snapshotId: z.literal(CASEBOOK_SNAPSHOT_ID),
     generatedAt: isoSchema,
     mode: z.literal("offline_artifact"),
@@ -297,11 +333,29 @@ export const casebookApiResponseSchema = z.object({
     realMoneyGate: z.literal("closed"),
     tradeable: z.literal(false),
     statistics: z.object({
-      totalCases: z.literal(1),
-      noTradeCases: z.literal(1),
+      totalCases: z.number().int().positive().safe(),
+      noTradeCases: z.number().int().positive().safe(),
       executedCases: z.literal(0),
-      verifiedCases: z.literal(1),
+      reconciledCases: z.number().int().positive().safe(),
       capitalMovedMicros: z.literal(0)
+    }).strict(),
+    corpus: z.object({
+      unit: z.literal("goal_market_feasibility_observation"),
+      coverage: z.literal("all_reported_goal_market_cases"),
+      captureReplays: z.literal(1),
+      fixtureCount: z.literal(1),
+      goalEvents: z.number().int().positive().safe(),
+      marketEventCases: z.number().int().positive().safe(),
+      movedBeforeTxlineCases: nonnegativeIntegerSchema,
+      noMaterialRepriceCases: nonnegativeIntegerSchema,
+      cleanStaleWindows: z.literal(0),
+      commitment: hashSchema,
+      assurance: z.literal("local_file_sha256_not_capture_manifest_membership"),
+      selectedExemplar: z.object({
+        caseId: z.string().min(1),
+        policy: z.literal("earliest_pretrigger_match_result_then_largest_pretrigger_ask_move"),
+        detail: z.string().min(1)
+      }).strict()
     }).strict(),
     filterOptions: z.object({
       fixtures: z.array(z.string()),
@@ -312,7 +366,7 @@ export const casebookApiResponseSchema = z.object({
       evidenceLanes: z.array(z.string()),
       sources: z.array(z.string())
     }).strict(),
-    cases: z.array(casebookSummarySchema).length(1),
+    cases: z.array(casebookSummarySchema).min(1),
     selectedCase: z.object({
       summary: casebookSummarySchema,
       match: matchSchema,
@@ -344,7 +398,33 @@ export const casebookApiResponseSchema = z.object({
     }).strict(),
     publicDataPolicy: publicDataPolicySchema
   }).strict()
-}).strict();
+}).strict().superRefine((value, context) => {
+  const { data } = value;
+  const selectedRows = data.cases.filter((item) => item.selectedExemplar);
+  if (
+    data.statistics.totalCases !== data.cases.length ||
+    data.statistics.noTradeCases !== data.cases.length ||
+    data.statistics.reconciledCases !== data.cases.length ||
+    data.corpus.marketEventCases !== data.cases.length ||
+    data.corpus.movedBeforeTxlineCases + data.corpus.noMaterialRepriceCases !== data.cases.length ||
+    selectedRows.length !== 1 ||
+    selectedRows[0]?.caseId !== data.corpus.selectedExemplar.caseId ||
+    data.selectedCase.summary.caseId !== data.corpus.selectedExemplar.caseId ||
+    data.selectedCase.summary.matchroomId !== SPAIN_BELGIUM_MATCHROOM_ID ||
+    data.cases.some((item) => item.selectedExemplar !== (item.matchroomId !== null))
+  ) {
+    context.addIssue({
+      code: "custom",
+      message: "Casebook corpus counts or exemplar identity do not reconcile"
+    });
+  }
+  for (const item of data.cases) {
+    const lineIsValid = item.marketFamily === "Match result" ? item.lineMilli === null : item.lineMilli !== null;
+    if (!lineIsValid) {
+      context.addIssue({ code: "custom", message: `Casebook market line is invalid for ${item.caseId}` });
+    }
+  }
+});
 
 const studyCountsSchema = z.object({
   matches: nonnegativeIntegerSchema,

@@ -34,6 +34,14 @@ export type PaperRuntimeBatch = {
   settlementResults: PaperSettlementResult[];
 };
 
+export type PaperRuntimeIngestOptions = {
+  haltSignal?: AbortSignal;
+};
+
+function operationHalted(options: PaperRuntimeIngestOptions): boolean {
+  return options.haltSignal?.aborted === true;
+}
+
 export class PaperStudyRuntime {
   constructor(readonly dependencies: {
     featureProcessor: FeatureProcessor;
@@ -43,9 +51,24 @@ export class PaperStudyRuntime {
     settlementScheduler?: PaperSettlementScheduler;
   }) {}
 
-  async ingest(event: CanonicalEvent): Promise<PaperRuntimeBatch> {
+  async ingest(
+    event: CanonicalEvent,
+    options: PaperRuntimeIngestOptions = {}
+  ): Promise<PaperRuntimeBatch> {
     // Existing cases see this event before a signal created by the same event can be queued.
-    const caseResults = await this.dependencies.scheduler.ingest(event);
+    const caseResults = await this.dependencies.scheduler.ingest(event, options);
+    if (operationHalted(options)) {
+      const emptyNormalization = normalizeExecutableEconomicCases([]);
+      return {
+        rawSignals: [],
+        signals: [],
+        economicCaseNormalization: emptyNormalization.summary,
+        routedSignalIds: [],
+        caseResults,
+        closeResults: [],
+        settlementResults: []
+      };
+    }
     const closeResults = this.dependencies.closeScheduler?.ingest(event) ?? [];
     const settlementResults = this.dependencies.settlementScheduler?.ingest(event) ?? [];
     const rawSignals = this.dependencies.featureProcessor
@@ -55,7 +78,14 @@ export class PaperStudyRuntime {
     const signals = normalization.signals;
     const routedSignalIds: string[] = [];
     for (const signal of signals) {
-      if (await this.dependencies.scheduler.enqueue(signal)) routedSignalIds.push(signal.signalId);
+      if (await this.dependencies.scheduler.enqueue(signal, options)) routedSignalIds.push(signal.signalId);
+      if (operationHalted(options)) {
+        this.dependencies.scheduler.haltPending(
+          Math.max(event.observedTsMs, signal.observedAtTsMs),
+          "session_halted:runtime_signal_queue"
+        );
+        break;
+      }
     }
     return {
       rawSignals,

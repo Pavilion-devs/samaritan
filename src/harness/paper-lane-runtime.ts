@@ -32,7 +32,15 @@ export function eligiblePaperLaneFixtures(
   universe: PaperFixtureUniverse
 ): PaperFixtureEvidence[] {
   return universe.fixtures.filter((fixture) => {
-    const executable = fixture.capabilities.executablePaperReplay &&
+    const executable = fixture.pairedCapture !== null &&
+      fixture.pairedCapture.mappingConfirmed &&
+      fixture.pairedCapture.selectedBookDepthComplete &&
+      fixture.pairedCapture.exactFixtureTxlineOddsAvailable &&
+      fixture.pairedCapture.exactFixtureTxlineScoresAvailable &&
+      fixture.pairedCapture.exactFixtureScoreCompleted &&
+      fixture.capabilities.executablePaperReplay &&
+      fixture.capabilities.kickoffCloseReplay &&
+      fixture.capabilities.publicResolutionReplay &&
       fixture.bountyLane.mode === "executable_book_replay" &&
       fixture.mappingStatus === "verified";
     if (lane === "bounty") return executable;

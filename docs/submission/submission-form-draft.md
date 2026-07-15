@@ -10,13 +10,13 @@ Listing checked: [TxODDS — Trading Tools and Agents](https://superteam.fun/ear
 
 ## One-liner
 
-Samaritan turns live TXLine odds and score events into deterministic signals, bounded Claude theses, fail-closed paper decisions, and independently verifiable decision receipts.
+Samaritan turns official TXLine evidence into deterministic signals and fail-closed paper decisions, with a bounded Claude-thesis boundary and independently verifiable decision receipts.
 
 ## Briefly explain your Project
 
 Sports-trading agents are easy to demo badly: send odds to a model, accept confident prose, and hide the timing, risk, or failed hypotheses. Samaritan is built around the opposite idea—**detect deterministically, reason within a strict boundary, authorize in code, and prove the entire decision lifecycle**.
 
-Samaritan consumes official TXLine fixture, odds, and score APIs, including live mainnet SL12 SSE. Live and historical records become the same canonical event types on one bus, so the feature, detector, risk, and paper-execution path cannot switch to easier logic during replay. Deterministic detectors escalate only selected cases. Claude can return a strict thesis but cannot size a position, access a wallet, or place an order. Code-owned checks revalidate eligibility, timing, evidence, mapping, fees, exposure, and drawdown before a depth-aware paper simulator acts. Every stage is appended to a v2 hash-chained ledger before the next action and can be exported as a licence-safe Decision Receipt.
+Samaritan consumes official TXLine fixture, odds, and score APIs, including live mainnet SL12 SSE. Live and captured-replay adapters emit the same canonical event types into one conductor, so strategy code receives no mode flag. Deterministic detectors escalate only selected cases. In an eligible registered session, Claude can return a strict thesis but cannot size a position, access a wallet, or place an order. Code-owned checks revalidate eligibility, timing, evidence, mapping, fees, exposure, and drawdown before a depth-aware paper simulator acts. Every stage is appended to a v2 hash-chained ledger before the next action and can be exported as a licence-safe Decision Receipt. The current real capture did not enter Claude; the complete public lifecycle uses deterministic model stubs, and real Anthropic admission is blocked while v2 is unregistered.
 
 The demo proves two different things honestly. A synchronized Spain–Belgium capture shows a real no-trade: across 18 measured market-event cases, zero produced a clean post-TXLine stale window, so the detector stays disabled. A separate, prominently labelled synthetic fixture runs the full paper lifecycle—signal, triage, thesis, deterministic risk, intent, fill, close, settlement, and receipt—without any external model, venue, wallet, or network call and is excluded from performance evidence.
 
@@ -63,8 +63,8 @@ Replace every placeholder only after testing it in a signed-out/incognito browse
 
 - **Live and working MVP:** `[PUBLIC_MVP_URL]`
 - **Live demo video (≤5:00, publicly viewable):** `[YOUTUBE_OR_LOOM_URL]`
-- **Public repository:** `[PUBLIC_GITHUB_URL]`
-- **Technical documentation:** `[PUBLIC_TECHNICAL_OVERVIEW_URL]`
+- **Public repository:** [github.com/Pavilion-devs/samaritan](https://github.com/Pavilion-devs/samaritan)
+- **Technical documentation:** [Samaritan technical overview](https://github.com/Pavilion-devs/samaritan/blob/agent/winner-ready-release/docs/submission/technical-overview.md)
 - **Optional X profile/post:** `[PUBLIC_X_URL_OR_REMOVE]`
 
 Do not add a Solana explorer link unless an actual devnet transaction has been submitted and the public `anchor:verify` command passes against the exact receipt. At the time of this draft, no such link exists.
@@ -75,7 +75,7 @@ What worked best was the combination of normalized de-vigged `Pct`, live odds an
 
 The main friction was contract precision rather than product scope: timestamp units and snapshot omission behavior, quote-array/no-quote semantics, service-level capability metadata, score/VAR revision lifecycle, retention/empty-result semantics, auth expiry/reactivation, and end-to-end proof-verification examples. Our highest-value requests are explicit numeric units in OpenAPI, a versioned score/action state machine, authoritative per-network service-level metadata, a documented auth/SSE resume lifecycle, and fixed validation vectors with a first-party TypeScript verifier.
 
-Full draft feedback: `[PUBLIC_TXLINE_FEEDBACK_URL]` or [repository source](txline-api-feedback.md).
+Full draft feedback: [TXLine API feedback](https://github.com/Pavilion-devs/samaritan/blob/agent/winner-ready-release/docs/submission/txline-api-feedback.md).
 
 ## Final human release checklist
 

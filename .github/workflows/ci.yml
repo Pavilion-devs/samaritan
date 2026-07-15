@@ -25,7 +25,7 @@ jobs:
       - name: Install pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 10.32.1
+          version: 11.13.0
           run_install: false
 
       - name: Install Node.js 22
@@ -47,7 +47,7 @@ jobs:
         run: pnpm public:audit
 
       - name: Install isolated Phase 0 capture dependencies
-        run: pnpm --dir phase0 install --frozen-lockfile --ignore-workspace
+        run: pnpm --dir phase0 install --frozen-lockfile
 
       - name: Typecheck Phase 0 capture tools
         run: pnpm --dir phase0 exec tsc -p tsconfig.json --noEmit

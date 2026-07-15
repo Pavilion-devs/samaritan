@@ -50,7 +50,22 @@ export function BrandMark() {
   return <span className="brand-mark" aria-hidden="true"><i /><i /></span>;
 }
 
-export function Navigation({ active, caseCount = 1 }: { active: ProductRoute; caseCount?: number }) {
+export type ProvenanceTone = "capture" | "configured" | "historical" | "offline" | "synthetic";
+
+export function ProvenanceBadge({ label, tone }: { label: string; tone: ProvenanceTone }) {
+  return <span className={`provenance-badge ${tone}`}><i aria-hidden="true" />{label}</span>;
+}
+
+export function formatUsdMicros(value: number, minimumFractionDigits = 2) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits,
+    maximumFractionDigits: 2
+  }).format(value / 1_000_000);
+}
+
+export function Navigation({ active, caseCount }: { active: ProductRoute; caseCount?: number }) {
   return (
     <aside className="sidebar">
       <a className="brand" href="/command" aria-label="Samaritan Command home"><BrandMark /><span>Samaritan</span></a>
@@ -58,16 +73,16 @@ export function Navigation({ active, caseCount = 1 }: { active: ProductRoute; ca
         <span className="nav-group">Workspace</span>
         <a className={active === "command" ? "active" : undefined} href="/command" aria-current={active === "command" ? "page" : undefined}><Icon name="command" /><span>Command</span></a>
         <a className={active === "matchroom" ? "active" : undefined} href="/matchroom" aria-current={active === "matchroom" ? "page" : undefined}><Icon name="replay" /><span>Matchroom</span></a>
-        <a className={active === "casebook" ? "active" : undefined} href="/casebook" aria-current={active === "casebook" ? "page" : undefined}><Icon name="case" /><span>Casebook</span><em>{caseCount}</em></a>
+        <a className={active === "casebook" ? "active" : undefined} href="/casebook" aria-current={active === "casebook" ? "page" : undefined}><Icon name="case" /><span>Casebook</span>{caseCount === undefined ? null : <em>{caseCount}</em>}</a>
         <a className={active === "study" ? "active" : undefined} href="/study" aria-current={active === "study" ? "page" : undefined}><Icon name="chart" /><span>Study</span></a>
         <a href="/command#proof"><Icon name="proof" /><span>Proof</span></a>
         <span className="nav-group system-group">Read only</span>
-        <a href="/command#system"><Icon name="system" /><span>System</span><i className="feed-dot" aria-label="Evidence system verified" /></a>
+        <a href="/command#system"><Icon name="system" /><span>System</span><i className="feed-dot" aria-label="Offline evidence snapshot available" /></a>
       </nav>
       <div className="sidebar-bottom">
         <div className="gate-card">
           <span className="shield-lock"><Icon name="shield" /></span>
-          <span><b>Gate closed</b><small>Protective live lock</small></span>
+          <span><b>Gate closed</b><small>Real-money disabled in bounty build</small></span>
         </div>
         <div className="owner">
           <span className="owner-avatar">D</span>
@@ -99,9 +114,9 @@ export function Topbar({ title, modeLabel, modeClass }: {
     <header className="topbar">
       <div className="mobile-brand"><BrandMark /><b>Samaritan</b></div>
       <div className="page-title"><span>World Cup 2026 / Observer workspace</span><h1>{title}</h1></div>
-      <div className="system-state" aria-label="Current system state">
+      <div className="system-state" aria-label="Artifact system state">
         <span className={`state-chip ${modeClass}`}><i />{modeLabel}</span>
-        <span className="state-chip paper">Paper</span>
+        <span className="state-chip paper">No real orders</span>
         <span className="state-chip gate"><Icon name="shield" />Real-money gate closed</span>
       </div>
     </header>

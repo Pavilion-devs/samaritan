@@ -20,8 +20,14 @@ const config = {
   },
   capture: {
     scheduledStartUtc: "2026-07-14T16:00:00.000Z",
+    scheduledEndUtc: "2026-07-14T22:00:00.000Z",
     durationMinutes: 360,
-    runLabel: "paired-france-spain-2026-07-14"
+    runLabel: "paired-france-spain-2026-07-14",
+    polymarketMaxAssets: 50,
+    discoveryIntervalSeconds: 900,
+    startupGraceSeconds: 180,
+    streamStaleSeconds: 300,
+    maxStartupSkewSeconds: 120
   },
   evidence: { txlineFixtures: "fixtures", polymarketEvents: "events", readinessReport: "report" },
   note: "Capture only; no trading."
@@ -50,7 +56,13 @@ const polymarketEvents = [
 
 describe("paired capture config validation", () => {
   it("validates evidence but withholds launch until human confirmation", () => {
-    const result = validateCaptureConfig({ repoRoot, config, txlineFixtures, polymarketEvents });
+    const result = validateCaptureConfig({
+      repoRoot,
+      config,
+      txlineFixtures,
+      polymarketEvents,
+      nowTsMs: Date.parse("2026-07-14T15:00:00.000Z")
+    });
     expect(result).toMatchObject({
       evidenceValid: true,
       readyToSchedule: false,
@@ -64,10 +76,14 @@ describe("paired capture config validation", () => {
       config: { ...config, status: "human_confirmed_for_capture_only", confirmedBy: "Deborah", confirmedAt: "2026-07-12" },
       repoRoot,
       txlineFixtures,
-      polymarketEvents
+      polymarketEvents,
+      nowTsMs: Date.parse("2026-07-14T15:00:00.000Z")
     });
     expect(result.readyToSchedule).toBe(true);
-    expect(result.launch?.command).toContain("--txline-fixture-id 123 --duration-minutes 360");
+    expect(result.launch?.command).toContain("--txline-fixture-id 123 --capture-start-utc 2026-07-14T16:00:00.000Z");
+    expect(result.launch?.command).toContain("--capture-end-utc 2026-07-14T22:00:00.000Z --max-startup-skew-seconds 120");
+    expect(result.launch?.command).toContain("--event-slugs fifwc-fra-esp-2026-07-14,fifwc-fra-esp-2026-07-14-more-markets");
+    expect(result.launch?.command).toContain("--max-assets 50 --discovery-interval-seconds 900");
     expect(result.launch).toMatchObject({
       cwd: `${repoRoot}/phase0`,
       logPath: `${repoRoot}/samples/_logs/paired-france-spain-2026-07-14.log`,
@@ -83,5 +99,33 @@ describe("paired capture config validation", () => {
       txlineFixtures: [{ ...txlineFixtures[0], StartTime: Date.parse(kickoff) + 60_000 }],
       polymarketEvents
     })).toThrow(/changed/);
+  });
+
+  it("withholds a confirmed launch after its scheduled start", () => {
+    const result = validateCaptureConfig({
+      config: { ...config, status: "human_confirmed_for_capture_only", confirmedBy: "Deborah", confirmedAt: "2026-07-12" },
+      repoRoot,
+      txlineFixtures,
+      polymarketEvents,
+      nowTsMs: Date.parse("2026-07-14T16:00:00.001Z")
+    });
+    expect(result).toMatchObject({
+      evidenceValid: true,
+      readyToSchedule: false,
+      reason: "scheduled_start_passed",
+      launch: null
+    });
+  });
+
+  it("rejects a relative duration that disagrees with the reviewed absolute end", () => {
+    expect(() => validateCaptureConfig({
+      config: {
+        ...config,
+        capture: { ...config.capture, scheduledEndUtc: "2026-07-14T21:59:59.000Z" }
+      },
+      repoRoot,
+      txlineFixtures,
+      polymarketEvents
+    })).toThrow(/Absolute capture window/);
   });
 });

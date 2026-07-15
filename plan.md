@@ -1,17 +1,17 @@
 # SAMARITAN — Build Plan
 
-*v1.1, July 10, 2026. Ground truth captured; strategies corrected to CONSENSUS_MOVE, XMARKET, FADER, MODELER. Deadline: submission **July 18** (one-day buffer before the July 19 close, which is also World Cup final day).*
+*v1.2, July 15, 2026. Ground truth captured; strategy designs corrected to CONSENSUS_MOVE, XMARKET, FADER, MODELER. The bounty release is paper-only, the complete lifecycle proof uses deterministic model stubs, and the current receipt is unanchored. Deadline: submission **July 18** (one-day buffer before the July 19 close, which is also World Cup final day).*
 
 ## The one-line mission
 
-Ship a live, replayable, risk-gated sports trading system on TXLine World Cup data — paper + gated Polymarket execution — with a verifiable on-chain track record by July 18.
+Ship a live/replay-capable, risk-gated paper sports-trading system on TXLine World Cup data with independently verifiable local decision evidence by July 18. Real-money execution and Solana submission remain separately human-gated roadmap items, not bounty-release claims.
 
 ## Non-negotiables (from research + legal terms)
 
 1. **The Gate:** no real money moves until the group-stage replay study (Phase 3) is complete and reviewed.
 2. **Judge access:** hosted demo, zero cost, zero wallets for judges. Credentials live server-side.
 3. **Submission framing:** Deborah is the participant; Samaritan is her product that uses Claude. Never framed as "AI-built."
-4. **Real money is pre-match only in v1.** In-play signals trade on paper until loop latency is measured.
+4. **The bounty build is paper-only.** Any later real-money path would be pre-match only and remains blocked by the Phase 3 gate plus Deborah's explicit authority; in-play signals stay paper-only until loop latency is measured.
 5. **No bookmaker scraping/automation. Ever.** TXLine + Polymarket APIs only.
 6. **Replay and live share one code path.** If a strategy behaves differently in replay vs live, that's a bug, not a feature.
 
@@ -28,7 +28,8 @@ The docs only tell us so much; now we touch the real thing.
 - [x] Capture and archive real fixtures, historical odds/scores, and a full mainnet odds+scores SSE match
 - [x] Verify price format, `Pct` scale, market taxonomy, World Cup `CompetitionId`, score action envelope, retention, and latency behavior
 - [x] Polymarket V2 public-market smoke test: metadata, rules, tick/fee fields, order book
-- [x] Confirm human-participant framing: Deborah is the participant; AI development assistance and Claude as a product component are allowed
+- [x] Adopt the conservative human-participant framing: Deborah is the participant, product decision-maker, narrator, reviewer, and submitter; Claude is only a bounded product component and development aid
+- [ ] Retain written sponsor clarification before relying on any broader interpretation of the hackathon AI clause or public derived-data display rights
 
 **Exit criteria:** a `samples/` directory of real payloads + a short WHAT-WE-GOT-WRONG.md correcting any doc-vs-reality gaps.
 
@@ -95,16 +96,16 @@ The mandatory study before any real-money trading. Deliverable is a written repo
 - [x] Public CLOB execution metadata: cached V2 fee curve, taker-only flag, minimum shares, tick size, condition/token identity; malformed or legacy-only metadata fails closed
 - [x] Paper portfolio evidence: actual entry cost, midpoint/executable CLV, settlement P&L/Brier, exposure, equity peak, and drawdown state
 - [x] Kickoff/settlement lifecycle: latest canonical pre-kickoff close, public winning-asset resolution, and pre-mutation append-only accounting
-- [x] Registered evidence evaluator: ledger reconstruction, sealed long-run endpoints, per-match rows, 10,000-iteration match-block bootstrap, random-direction control, and guardrails
+- [x] Protocol-configured evidence evaluator: ledger reconstruction, sealed long-run endpoints, per-match rows, 10,000-iteration match-block bootstrap, random-direction control, and guardrails
 - [x] Preserve the v1 two-lane zero-observation ledgers as audit history; do not append under the unregistered v2 candidate
 - [x] Fixture evidence/readiness gates: paired-book vs sampled-history classification, physical scheduler exclusion, observed-time captured replay merge, and three-hour pre-kickoff capture target
 - [x] Semifinal capture candidates: authenticated read-only TXLine refresh, exact France-Spain / England-Argentina cross-source identity, full-time totals rules check, and launch withheld pending human capture-only confirmation
 - [x] Semifinal capture schedule: Deborah capture-only confirmation, fail-closed starts three hours pre-kickoff, detached process checks, and post-run canonical replay verification
 - [x] Rolling fixture admission: atomic two-lane refresh, verified mapping + paired executable evidence, immutable admitted identity, and pre-Claude research-only rejection
-- [x] Evidence artifact writer: ledger-derived JSON + preregistered per-match Markdown table with strict long-run sealing
+- [x] Evidence artifact writer: ledger-derived JSON + frozen-protocol per-match Markdown table with strict long-run sealing
 - [x] Spend controls: shared append-only reservations, $200 operating target, $300 pre-request hard project ceiling, and fail-closed API accounting
 
-**Exit criteria:** end-to-end on replay — signal fires, Haiku triages, Opus writes a thesis, risk manager rules, paper fill lands, ledger records all of it.
+**Bounty-slice exit criteria:** the shared replay conductor completes signal → deterministic Haiku-shaped stub → deterministic Opus-shaped stub → hard risk → paper fill → settlement and ledger proof. A real Haiku/Opus replay remains separately blocked until Deborah registers v2 and a fixture passes exact admission.
 
 ### Phase 5 — Tournament & real execution (Jul 15–16)
 
@@ -123,12 +124,12 @@ The mandatory study before any real-money trading. Deliverable is a written repo
 - [ ] Dashboard (the judge surface), implemented against the approved Matchroom v2 dark-hybrid direction in [`docs/UI.md`](docs/UI.md): Command, Matchroom, Decision Rail, Casebook, Study, and Proof; live/replay state, triage -> thesis -> veto/approval, CLV/calibration, and verification remain visibly auditable. Light mode is deferred and non-blocking.
 - [ ] Hosted deployment: credentials server-side, judges get a URL, read-only
 
-**Exit criteria:** a stranger with a link can watch Samaritan think during a live match.
+**Exit criteria:** a stranger with a link can inspect captured evidence and the clearly separated synthetic lifecycle without credentials, a wallet, or private feed redistribution. A current live-Claude case is not required or claimed while v2 is unregistered.
 
 ### Phase 7 — Live fire & submission (Jul 17–18)
 
 - [ ] Run live through semifinals; capture the best sequences
-- [ ] Demo video: replay proof (group stage CLV curves) → live signal → agent debate → risk veto/approval → fill → on-chain anchor
+- [ ] Demo video: real captured refusal → corrected historical signal evidence → synthetic stubbed lifecycle → offline receipt verification → explicit unanchored/closed-gate boundary
 - [ ] Submission writeup: what it is, what's measured, what's verifiable; framing per legal terms
 - [ ] **Submit July 18.** July 19 (final day) is buffer + live victory lap, not crunch.
 
@@ -140,7 +141,7 @@ The mandatory study before any real-money trading. Deliverable is a written repo
 |---|---|
 | TXLine free tier has no named bookmakers | Momentum is consensus-regime detection; no v1 claim of bookmaker leader-lag |
 | Historical Polymarket prices are non-executable samples | Conservative research fills only; live books establish executable spread/depth behavior |
-| Polymarket integration changes | V2-only adapter; paper is the always-working fallback |
+| Polymarket integration changes | V2 public-data and fee integration only in the bounty build; deterministic paper execution is the demonstrated path and no production order adapter is connected |
 | Few live matches left | Rescued replay data carries the demo; remaining matches provide synchronized microstructure evidence |
 | Loop too slow for in-play edges | In-play is paper-only in v1 by design; latency measured, not assumed |
 | Claude API spend | Triage-first funnel; Haiku screens everything; Opus only on escalation; prompt caching on static context |

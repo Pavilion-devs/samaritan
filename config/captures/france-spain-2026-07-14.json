@@ -22,8 +22,14 @@
   },
   "capture": {
     "scheduledStartUtc": "2026-07-14T16:00:00.000Z",
+    "scheduledEndUtc": "2026-07-14T22:00:00.000Z",
     "durationMinutes": 360,
-    "runLabel": "paired-france-spain-2026-07-14"
+    "runLabel": "paired-france-spain-2026-07-14",
+    "polymarketMaxAssets": 50,
+    "discoveryIntervalSeconds": 900,
+    "startupGraceSeconds": 180,
+    "streamStaleSeconds": 300,
+    "maxStartupSkewSeconds": 120
   },
   "evidence": {
     "txlineFixtures": "samples/fixtures/mainnet-world-cup-fixtures.json",

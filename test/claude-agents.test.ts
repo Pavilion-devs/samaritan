@@ -6,9 +6,12 @@ import Anthropic from "@anthropic-ai/sdk";
 import { describe, expect, it, vi } from "vitest";
 import {
   ClaudeAnalystAgent,
+  CLAUDE_PROMPT_VERSION,
   ClaudeTriageAgent,
+  type ClaudeInvocationEvidence,
   type ClaudeMessagesClient
 } from "../src/agents/claude.js";
+import { receiptAgentRunFromClaudeEvidence } from "../src/proof/claude-invocation-evidence.js";
 import { CLAUDE_MODEL } from "../src/agents/claude-pricing.js";
 import { ClaudeSpendLedger } from "../src/agents/claude-spend-ledger.js";
 import type { TradeThesis } from "../src/agents/contracts.js";
@@ -107,6 +110,35 @@ function clientReturning(response: Message): {
 }
 
 describe("bounded Claude agents", () => {
+  it("forwards a runtime halt to an in-flight Claude request and settles its reservation", async () => {
+    const ledger = new ClaudeSpendLedger(":memory:");
+    const controller = new AbortController();
+    const create = vi.fn((_params: MessageCreateParamsNonStreaming, options?: { signal?: AbortSignal }) =>
+      new Promise<Message>((_resolve, reject) => {
+        options?.signal?.addEventListener("abort", () => reject(options.signal?.reason), { once: true });
+      })
+    );
+    const agent = new ClaudeTriageAgent({
+      client: { create },
+      spendLedger: ledger,
+      requestId: () => "request-aborted-in-flight"
+    });
+
+    const pending = agent.triage({
+      caseId: "case-aborted-in-flight",
+      signal: signal(),
+      haltSignal: controller.signal
+    });
+    await vi.waitFor(() => expect(create).toHaveBeenCalledOnce());
+    expect(create.mock.calls[0]?.[1]?.signal).toBe(controller.signal);
+    controller.abort(new Error("operator halt"));
+
+    await expect(pending).rejects.toThrow(/Claude request failed/);
+    expect(ledger.summary()).toMatchObject({ outstandingReservedNanoUsd: 0 });
+    expect(ledger.verifyChain()).toMatchObject({ valid: true, rows: 2 });
+    ledger.close();
+  });
+
   it("forces Haiku through one strict triage submission tool", async () => {
     const ledger = new ClaudeSpendLedger(":memory:");
     const fake = clientReturning(message({
@@ -145,6 +177,56 @@ describe("bounded Claude agents", () => {
     ledger.close();
   });
 
+  it("emits hash-only evidence and refuses injected-client receipt claims", async () => {
+    const ledger = new ClaudeSpendLedger(":memory:");
+    const captured: ClaudeInvocationEvidence[] = [];
+    const fake = clientReturning(message({
+      content: [{
+        type: "tool_use",
+        id: "tool-evidence",
+        name: "submit_triage",
+        input: { decision: "escalate", priority: "normal", rationale: "Review the live-book gap." },
+        caller: { type: "direct" }
+      }]
+    }));
+    const agent = new ClaudeTriageAgent({
+      client: fake.client,
+      spendLedger: ledger,
+      requestId: () => "private-request-id",
+      evidenceSink: (evidence) => { captured.push(evidence); }
+    });
+
+    await agent.triage({ caseId: "case-evidence", signal: signal() });
+
+    expect(captured).toHaveLength(1);
+    expect(captured[0]).toMatchObject({
+      caseId: "case-evidence",
+      stage: "triage",
+      invocationClass: "injected_client",
+      model: CLAUDE_MODEL.triage,
+      promptVersion: CLAUDE_PROMPT_VERSION.triage,
+      actualCostNanoUsd: 200_000
+    });
+    for (const hash of [
+      captured[0]!.promptSha256,
+      captured[0]!.responseSha256,
+      captured[0]!.billingEvidenceSha256
+    ]) expect(hash).toMatch(/^[a-f0-9]{64}$/);
+    expect(JSON.stringify(captured[0])).not.toContain("private-request-id");
+    expect(JSON.stringify(captured[0])).not.toContain("Review the live-book gap.");
+    expect(() => receiptAgentRunFromClaudeEvidence(captured[0]!, "case-evidence"))
+      .toThrow(/Injected Claude clients/);
+    expect(() => receiptAgentRunFromClaudeEvidence({
+      ...captured[0]!,
+      invocationClass: "anthropic_api"
+    }, "different-case")).toThrow(/different decision case/);
+    expect(() => receiptAgentRunFromClaudeEvidence({
+      ...captured[0]!,
+      invocationClass: "anthropic_api"
+    }, "case-evidence")).toThrow(/reference generated after local hash-chain verification/);
+    ledger.close();
+  });
+
   it.each([
     {
       name: "text instead of a tool",
@@ -175,6 +257,36 @@ describe("bounded Claude agents", () => {
       outstandingReservedNanoUsd: 0
     });
     expect(ledger.verifyChain()).toMatchObject({ valid: true, rows: 2 });
+    ledger.close();
+  });
+
+  it("fails closed when the provider returns a different model identity", async () => {
+    const ledger = new ClaudeSpendLedger(":memory:");
+    const captured: ClaudeInvocationEvidence[] = [];
+    const fake = clientReturning(message({
+      model: CLAUDE_MODEL.analyst,
+      content: [{
+        type: "tool_use",
+        id: "tool-wrong-model",
+        name: "submit_triage",
+        input: { decision: "drop", priority: "low", rationale: "Wrong model response." },
+        caller: { type: "direct" }
+      }]
+    }));
+    const agent = new ClaudeTriageAgent({
+      client: fake.client,
+      spendLedger: ledger,
+      requestId: () => "request-wrong-model",
+      evidenceSink: (evidence) => { captured.push(evidence); }
+    });
+
+    await expect(agent.triage({ caseId: "case-1", signal: signal() }))
+      .rejects.toThrow(/response model mismatch/);
+    expect(captured).toEqual([]);
+    expect(ledger.summary()).toMatchObject({
+      actualCostNanoUsd: 200_000,
+      outstandingReservedNanoUsd: 0
+    });
     ledger.close();
   });
 

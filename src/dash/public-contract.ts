@@ -62,7 +62,9 @@ export type AvailabilityGap = {
 
 export type MatchroomSnapshot = {
   schemaVersion: 2;
-  snapshotId: string;
+  snapshotId: typeof SPAIN_BELGIUM_MATCHROOM_ID;
+  caseId: string;
+  casebookCaseCount: number;
   generatedAt: string;
   mode: "captured_replay";
   executionMode: "paper";
@@ -72,19 +74,20 @@ export type MatchroomSnapshot = {
     fixtureId: string;
     eventSlug: string;
     competition: "World Cup";
-    stage: "Round of 16";
+    stage: "Captured fixture";
     kickoffUtc: string;
     originalMatchDate: string;
-    home: { name: string; code: "ESP" };
-    away: { name: string; code: "BEL" };
-    scoreAtCursor: { home: 1; away: 0 };
+    home: { name: string; code: string };
+    away: { name: string; code: string };
+    scoreAtCursor: { home: number; away: number };
+    goalOrdinal: number;
     clockSeconds: number;
     clockLabel: string;
   };
   market: {
     family: "match_result";
-    outcome: "draw";
-    label: "Match result · Draw";
+    outcome: string;
+    label: string;
     period: "90 minutes plus stoppage time";
     mappingStatus: "research_only";
   };
@@ -124,6 +127,8 @@ export type MatchroomSnapshot = {
     movedBeforeTxlineCases: number;
     noMaterialRepriceCases: number;
     cleanStaleWindows: 0;
+    corpusCommitment: string;
+    corpusAssurance: "local_file_sha256_not_capture_manifest_membership";
   };
   publicDataPolicy: PublicDataPolicy;
 };
@@ -132,12 +137,20 @@ export type DashboardApiResponse = {
   data: MatchroomSnapshot;
 };
 
-export type CommandFixturePhase = "scheduled" | "capture_window" | "awaiting_verification";
+export type CommandFixturePhase = "scheduled" | "running" | "complete" | "failed" | "unknown";
+
+export type CommandCaptureTerminalEvidence = {
+  windowStartUtc: string;
+  windowEndUtc: string;
+  synchronizedStartUtc: string;
+  synchronizedEndUtc: string;
+  streamCount: 3;
+};
 
 export type CommandFeedState = {
   id: "txline" | "polymarket" | "decision_ledger" | "replay_proof";
   label: string;
-  status: "scheduled" | "initialized" | "verified";
+  status: CommandFixturePhase | "initialized" | "verified";
   statusLabel: string;
   detail: string;
 };
@@ -148,30 +161,42 @@ export type CommandFixture = {
   away: { name: string; code: string };
   kickoffUtc: string;
   captureStartUtc: string;
+  captureEndUtc: string;
   signalCutoffUtc: string;
   eventSlug: string;
   phase: CommandFixturePhase;
   statusLabel: string;
+  statusDetail: string;
+  statusSource: "analysis_manifest" | "supervisor_status" | "reviewed_config" | "none";
+  statusUpdatedAt: string | null;
+  terminalEvidence: CommandCaptureTerminalEvidence | null;
   identityStatus: "exact_match_confirmed";
   captureOnly: true;
   tradeable: false;
 };
 
 export type CommandCase = {
-  caseId: "ESP-BEL-01";
+  caseId: string;
   matchroomId: typeof SPAIN_BELGIUM_MATCHROOM_ID;
   fixtureId: string;
-  fixtureLabel: "Spain vs Belgium";
+  fixtureLabel: string;
+  home: MatchroomSnapshot["match"]["home"];
+  away: MatchroomSnapshot["match"]["away"];
   occurredAt: string;
-  marketLabel: "Match result · Draw";
+  marketLabel: string;
+  marketOutcomeLabel: string;
   candidateLabel: "Live-lane gate readout";
   disposition: "no_trade";
-  dispositionLabel: "No trade";
-  reason: "Market moved before signal";
+  dispositionLabel: string;
+  reason: string;
   evidenceStatus: "verified_replay";
   preTriggerMarketMoveBps: number;
   consensusMoveFromBaselineBps: number;
   bestAsk: number;
+  canonicalEvents: number;
+  capitalMovedMicros: 0;
+  ordersPlaced: 0;
+  walletAccessed: false;
 };
 
 export type CommandSnapshot = {
@@ -189,10 +214,11 @@ export type CommandSnapshot = {
     feeds: CommandFeedState[];
   };
   featuredCase: CommandCase & {
-    scoreLabel: "1–0";
+    scoreLabel: string;
+    scoreAtCursor: MatchroomSnapshot["match"]["scoreAtCursor"];
+    clockSeconds: number;
     clockLabel: string;
     conclusion: string;
-    canonicalEvents: number;
     identityParity: true;
     chart: PublicBookPoint[];
   };
@@ -243,27 +269,32 @@ export type CommandApiResponse = {
 };
 
 export type CasebookCaseSummary = {
-  caseId: "ESP-BEL-01";
-  matchroomId: typeof SPAIN_BELGIUM_MATCHROOM_ID;
+  caseId: string;
+  matchroomId: typeof SPAIN_BELGIUM_MATCHROOM_ID | null;
+  selectedExemplar: boolean;
+  goalOrdinal: number;
+  goalClockSeconds: number;
   occurredAt: string;
   fixtureId: string;
-  fixtureLabel: "Spain vs Belgium";
-  homeCode: "ESP";
-  awayCode: "BEL";
-  marketFamily: "Match result";
-  marketLabel: "Match result · Draw";
+  fixtureLabel: string;
+  homeCode: string;
+  awayCode: string;
+  marketFamily: "Match result" | "Full-time total";
+  marketLabel: string;
+  lineMilli: number | null;
+  classification: "polymarket_moved_before_txline" | "no_material_reprice_in_window";
   detector: "STALE_QUOTE_FEASIBILITY";
-  disposition: "No trade";
-  executionOutcome: "Not executed";
+  disposition: string;
+  executionOutcome: string;
   evidenceLane: "Research only";
   source: "Captured replay";
-  verificationStatus: "Verified";
-  reason: "Market moved before signal";
+  verificationStatus: "Internally reconciled";
+  reason: string;
   preTriggerMarketMoveBps: number;
 };
 
 export type CasebookSnapshot = {
-  schemaVersion: 2;
+  schemaVersion: 3;
   snapshotId: typeof CASEBOOK_SNAPSHOT_ID;
   generatedAt: string;
   mode: "offline_artifact";
@@ -271,11 +302,29 @@ export type CasebookSnapshot = {
   realMoneyGate: "closed";
   tradeable: false;
   statistics: {
-    totalCases: 1;
-    noTradeCases: 1;
-    executedCases: 0;
-    verifiedCases: 1;
+    totalCases: number;
+    noTradeCases: number;
+    executedCases: number;
+    reconciledCases: number;
     capitalMovedMicros: 0;
+  };
+  corpus: {
+    unit: "goal_market_feasibility_observation";
+    coverage: "all_reported_goal_market_cases";
+    captureReplays: 1;
+    fixtureCount: 1;
+    goalEvents: number;
+    marketEventCases: number;
+    movedBeforeTxlineCases: number;
+    noMaterialRepriceCases: number;
+    cleanStaleWindows: 0;
+    commitment: string;
+    assurance: "local_file_sha256_not_capture_manifest_membership";
+    selectedExemplar: {
+      caseId: string;
+      policy: "earliest_pretrigger_match_result_then_largest_pretrigger_ask_move";
+      detail: string;
+    };
   };
   filterOptions: {
     fixtures: string[];
