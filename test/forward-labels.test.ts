@@ -36,6 +36,7 @@ function snapshot(tsMs: number, consensus: number, polymarket: number): FeatureS
     triggerEventId: `event-${tsMs}`,
     triggerSource: "polymarket",
     asOfTsMs: tsMs,
+    observedAtTsMs: tsMs,
     fixtureId: "fixture-1",
     market: {
       family: "match_result",

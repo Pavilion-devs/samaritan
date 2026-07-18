@@ -1,6 +1,6 @@
 # 01 — Research: The Bounty, The Data, The Battlefield
 
-*Research conducted July 3–4 and updated from Phase 0/0.5 captures through July 10, 2026. Captured samples override documentation when they disagree.*
+*Research conducted July 3–4 and updated from Phase 0/0.5 captures through July 10, with bounty/competition status refreshed July 18, 2026. Captured samples override documentation when they disagree.*
 
 ---
 
@@ -13,13 +13,13 @@
 | Track prize | **16,000 USDT** — 10,000 / 4,000 / 2,000 |
 | Hackathon window | June 24 – **July 19, 2026** (submission deadline; final match day) |
 | Winners announced | July 29, 2026 |
-| Competition | ~13 submissions in the track as of July 3 |
-| Eligibility | Global. Explicitly open to individual devs, teams, **and autonomous AI agents** |
+| Competition | **76 submissions reported by the official listing count endpoint as of July 18**; the number is volatile and must be rechecked at submission |
+| Eligibility | Global listing; the brief mentions AI agents, while the binding terms restrict participation/submission to natural persons. Deborah is the sole participant and owner. |
 | Other tracks | Prediction Markets & Settlement; Consumer & Fan Experiences (not ours) |
 | Contact | Telegram: TxLINEChat |
 | Hackathon pitch | "Real products powered by TxODDS live football API on Solana" — real-time World Cup data wired into on-chain products. TxODDS is waiving data fees and the token payment requirement for the World Cup tier. |
 
-**Reading the judges:** it's a TxODDS + Solana event. Winning entries will (a) actually use TXLine deeply, (b) have a crypto-native/on-chain angle, (c) be real products, not demos. Our on-chain verifiable decision ledger and Merkle-proof validation hit (b) directly; the replay-backtested strategy engine hits (a) and (c).
+**Reading the judges:** this is a TxODDS + Solana event, but the brief is more specific than that shorthand. It scores core ingestion, autonomous operation, defensible logic/architecture, novelty, and production readiness, and says the demo video is weighted heavily because live match activity may be absent during review. Samaritan must therefore show a working strategy lifecycle, not merely architecture, while distinguishing local hash-chain verification from any Solana anchor that has actually been submitted and verified.
 
 ### 1.1 Hackathon legal terms — VERIFIED ([terms page](https://txline.txodds.com/documentation/legal/hackathon-terms))
 
@@ -28,7 +28,7 @@ These are binding and shape the build:
 | Rule | Exact/near-exact language | Consequence for Samaritan |
 |---|---|---|
 | Originality | "Original work created during the Hackathon period"; open-source components OK with attribution; "significant portions … developed during the Hackathon" | We start clean July 4 — fully compliant |
-| **AI clause** | "Entries must be created, developed and submitted by **human participants**" — AI-generated submissions prohibited | TxLINE clarified that AI assistance is allowed. **Deborah remains the participant/project owner and submits Samaritan; Claude is development assistance and a runtime product component.** Never market the entry as “AI-built.” |
+| **AI clause** | "Entries must be created, developed and submitted by **human participants**"; TxODDS may disqualify an entry materially controlled by a bot or autonomous process | **Deborah must remain the participant, product decision-maker, narrator, reviewer, and submitter.** Claude is a bounded runtime component and development assistant, never the entrant or autonomous submitter. The listing's broader “AI agents” language does not erase the stricter legal terms; retain written sponsor clarification before relying on any interpretation. |
 | **Judge access** | TxODDS "shall not be required to purchase any software, subscription, licence, token, cryptocurrency, digital asset or third-party service, **nor establish any blockchain wallet or account**" | Demo must be a **hosted app with our credentials server-side** + bundled replay dataset. Judges never touch a wallet. Non-compliance = disqualification. |
 | Data license | No redistribution/publishing/sublicensing of Data; no reconstructing competing data products; hackathon data license **terminates when the hackathon ends** | Public-facing surfaces must not re-serve raw TXLine feeds. Post-hackathon we operate under the normal free/paid tier terms (which explicitly allow commercial use) — separate license from the hackathon one. |
 | Compliance | Must comply with all gambling/gambling-tech laws; restricted jurisdictions may be excluded | Real-money leg (Polymarket) is our own account/jurisdiction responsibility, separate from the submission itself |
@@ -57,12 +57,13 @@ TXLine = "cryptographically verifiable sports data through a hybrid Solana on-ch
 
 | Service Level | Data | Latency | Networks |
 |---|---|---|---|
-| **SL1** | World Cup + Int'l Friendlies | **60-second delay** | mainnet + devnet |
+| **SL1 mainnet** | World Cup + Int'l Friendlies | **60-second delay** | mainnet |
+| **SL1 devnet** | World Cup + Int'l Friendlies | Current on-chain row reports `samplingIntervalSec = 0`; re-read the pricing matrix at subscription time | devnet |
 | **SL12** | World Cup + Int'l Friendlies | **Real-time** | **mainnet only** |
 
 Both include **full historical replay access**. Free tier is explicitly allowed for commercial use.
 
-**Implication:** in-play trading on a 60s delay is dead on arrival — the market has already repriced. We run **SL12 on mainnet** for live trading and can use devnet SL1 for integration testing. (Our wallet situation supports both.)
+**Implication:** mainnet SL1's 60-second delay is unsuitable for time-sensitive decisions. We run **SL12 on mainnet** for authoritative real-time evidence and use devnet SL1 for integration/on-chain validation. The official July 12 page now reports devnet SL1 `samplingIntervalSec = 0`, contradicting the earlier blanket 60-second description; code must inspect the current on-chain pricing row rather than infer devnet latency from the service-level number.
 
 ### 2.3 Endpoints (from the OpenAPI spec)
 
@@ -86,6 +87,8 @@ Both include **full historical replay access**. Free tier is explicitly allowed 
 
 SSE notes: standard `id`/`event`/`data`/`retry` format; heartbeat events; resumable via `Last-Event-ID`; `Accept-Encoding: gzip` cuts bandwidth 70–80%.
 
+**July 18 repository/docs drift:** the current official `txodds/tx-on-chain` repository includes runnable mainnet and devnet examples for `GET /api/scores/stat-validation-v3` plus the on-chain `validateStatV3` multiproof method. Its payload uses `statsToProve`, `multiproof.indices`, and `multiproof.hashes`. The hosted validation prose and checked OpenAPI still emphasize the legacy/V2 surface, so Samaritan records V3 as a discovered sponsor capability, not as an endpoint already integrated or demonstrated. Do not claim V3 proof support until a real response is captured and its exact network-matched IDL path passes locally. [Official validation guide](https://github.com/txodds/tx-on-chain/blob/main/documentation/examples/onchain-validation.mdx) · [official mainnet V3 example](https://github.com/txodds/tx-on-chain/blob/main/examples/mainnet/scripts/subscription_scores_v3c.ts)
+
 ### 2.4 Data models
 
 **Fixture:** `FixtureId` (int64), `Participant1/2` (+ IDs), `Participant1IsHome`, `StartTime`, `Competition`, `CompetitionId`, `FixtureGroupId`, `Ts`.
@@ -99,7 +102,7 @@ SSE notes: standard `id`/`event`/`data`/`retry` format; heartbeat events; resuma
 | `SuperOddsType` | Market: Match Result, Over/Under, Handicap | The liquid core markets |
 | `MarketParameters` | e.g. the O/U line or handicap value | Line-move vs price-move distinction |
 | `MarketPeriod` | Full Time, Half Time, … | Period-specific markets |
-| `PriceNames`, `Prices` | Outcome labels + raw odds (int32, ×1000) | Price stream |
+| `PriceNames`, `Prices` | Outcome labels + raw odds (int32, ×1000) | Price stream. The Spain-Belgium synchronized SSE capture also contained mapped market rows with intact `PriceNames` but both `Prices: []` and `Pct: []`; these are no-quote transitions and are skipped rather than normalized as zero prices. Partially populated/misaligned arrays still fail validation. |
 | `Pct` | **De-vigged implied probabilities** as 3dp strings on a 0–100 percent scale | The margin removal is DONE FOR US, but ingest must divide by 100 for Samaritan's internal 0–1 probability convention. Phase 0 devnet + mainnet rows summed near 100, not near 1. |
 | `InRunning` | Live-market flag | Pre-match vs in-play routing |
 | `GameState` | Match state at time of odds | Context for every tick when populated. Phase 0 devnet + mainnet historical odds rows had this blank on all scanned rows. |
@@ -120,8 +123,9 @@ SSE notes: standard `id`/`event`/`data`/`retry` format; heartbeat events; resuma
 - **CLOB V2 is live on production** at `https://clob.polymarket.com` as of Apr 28, 2026; legacy V1 SDKs/V1-signed orders are no longer production-compatible. Build against `@polymarket/clob-client-v2` / V2 REST only ([changelog](https://docs.polymarket.com/changelog)).
 - **Public historical prices are recoverable by outcome token ID:** `GET https://clob.polymarket.com/prices-history?market=<TOKEN_ID>&startTs=<unix-seconds>&endTs=<unix-seconds>&fidelity=1` returns `history: [{t,p}]`. Despite the parameter name, `market` is the CLOB asset/token ID. Absolute `startTs`/`endTs` must not be combined with `interval`. Phase 0.5 captured official HTTP 400 responses for multi-week requests (`interval is too long`), so the rescue archive uses atomic five-day segments and timestamp de-duplication. The response has no bid, ask, size, or spread fields and must not be treated as an executable quote archive.
 - **Public live order books require no authentication:** subscribe asset IDs at `wss://ws-subscriptions-clob.polymarket.com/ws/market`, set `custom_feature_enabled: true` for `best_bid_ask`, `new_market`, and `market_resolved`, and send `PING` every 10 seconds. Initial `book`, `price_change`, `last_trade_price`, and tick-size events are recorded separately from TXLine until the shared Phase 1 bus exists.
+- **Public V2 execution metadata requires no authentication:** `GET /clob-markets/{condition_id}` returns compact condition/token identity plus `mos` minimum order size, `mts` tick size, and `fd = {r,e,to}` fee-curve details. A July 12 smoke returned sports rate `0.05`, exponent `1`, taker-only, and minimum size `5`. The OpenAPI lists a staging hostname, but it returned 503 during validation and no official test-funds workflow was documented; do not treat it as a Polymarket devnet.
 - **Phase 0.5 archive scale:** 799 match-family Gamma records representing 100 unique matches; 300 Match Result and 861 full-time totals conditions; 2,320 non-empty outcome-token histories containing 90,795,313 points. Two tokens for one Morocco–Haiti O/U 8.5 condition returned empty HTTP 200 histories. Candidate mapping covers 98/102 captured TXLine fixtures and is research-only.
-- Live in-play markets exist across matches. The proposed repricing lag after goals/reds is still a hypothesis, not a Phase 0 result: one-minute price history cannot establish a seconds-level stale-order edge, and the captured history is not bid/ask data. It requires synchronized TXLine + live Polymarket order-book measurement.
+- Live in-play markets exist across matches. The July 10 synchronized Spain-Belgium capture tested the proposed post-goal repricing lag with executable books: across three goals and six exact market groups, 12/18 exploratory cases had already moved at least 50 probability bps before TXLine first delivery, 6/18 had no material 30-second move, and 0/18 showed a clean post-TXLine stale window. One match is not a fitted distribution, but it does not support STALE_QUOTE; the detector remains disabled and paper-only.
 
 ---
 
@@ -138,7 +142,7 @@ SSE notes: standard `id`/`event`/`data`/`retry` format; heartbeat events; resuma
 2. **Market fields verified but constrained.** Phase 0 confirmed Match Result / Over-Under / Handicap coverage in the free World Cup capture, but also confirmed the free tier exposes consensus `TXLineStablePriceDemargined` rows rather than multiple bookmaker feeds. SSE score payloads are richer than the original docs summary; keep parsers open around actions and state fields.
 3. **Thin remaining schedule.** Live demo material is scarce. The rescued TXLine + Polymarket archive carries the pre-match study; remaining fixtures supply synchronized live microstructure evidence. Fixture/market discovery must roll because later matches are published over time.
 4. **Polymarket V2 is already live, but market metadata still needs per-market verification.** Mitigation: isolate execution behind an adapter interface; paper adapter is the fallback that always works; fetch tick size/fees/rules per token before any mapping is tradeable.
-5. **Real-money risk.** We ARE wiring real execution (decision locked), so bankroll limits, kill switches, and the risk-manager veto are not optional features — they're the difference between a trading system and a donation.
+5. **Real-money risk.** The bounty build is paper-only and has no connected production trading adapter or credential. Any later real-money work remains behind the Phase 3 gate, Deborah's explicit authority, bankroll limits, kill switches, and the deterministic risk-manager boundary.
 6. **World Cup ends July 19.** Post-hackathon, the system must retarget to club football (TXLine paid tiers, USDT-priced) — architecture must be competition-agnostic from day one.
 
 ---

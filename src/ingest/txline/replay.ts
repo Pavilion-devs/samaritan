@@ -9,8 +9,13 @@ type CapturedFrame = {
   rawFrame: string;
 };
 
-export async function* replayCapturedTxLineFrames(path: string): AsyncGenerator<CanonicalEvent> {
-  for await (const frame of readNdjson<CapturedFrame>(path)) {
+export async function* replayCapturedTxLineFrames(
+  path: string,
+  options: { onInputHash?: (hash: string) => void } = {}
+): AsyncGenerator<CanonicalEvent> {
+  for await (const frame of readNdjson<CapturedFrame>(path, {
+    ...(options.onInputHash === undefined ? {} : { onSha256: options.onInputHash })
+  })) {
     const envelope = capturedFrameToEnvelope(frame);
     if (envelope === null) continue;
     yield* normalizeTxLineEnvelope(envelope);

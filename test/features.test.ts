@@ -47,7 +47,7 @@ function quote(tsMs: number, home: number): OddsQuoteEvent {
   };
 }
 
-function book(tsMs: number): PolymarketBookEvent {
+function book(tsMs: number, bid = 0.45, ask = 0.47): PolymarketBookEvent {
   return {
     schemaVersion: CANONICAL_SCHEMA_VERSION,
     kind: "polymarket.book",
@@ -64,11 +64,11 @@ function book(tsMs: number): PolymarketBookEvent {
     tokenRole: "canonical",
     bids: [
       { price: probability(0.44), size: "10" },
-      { price: probability(0.45), size: "5" }
+      { price: probability(bid), size: "5" }
     ],
     asks: [
       { price: probability(0.48), size: "10" },
-      { price: probability(0.47), size: "5" }
+      { price: probability(ask), size: "5" }
     ],
     lastTradePrice: probability(0.46),
     tickSize: "0.01"
@@ -156,5 +156,50 @@ describe("feature engine", () => {
       side: null
     };
     expect(engine.ingest(complement)).toEqual([]);
+  });
+
+  it("drops regressing TXLine source observations before they mutate feature state", () => {
+    const engine = new FeatureEngine(config);
+    engine.ingest(quote(10_000, 0.5));
+    engine.ingest(book(10_500));
+    const before = engine.ingest(quote(11_000, 0.51));
+    expect(engine.ingest({ ...quote(10_750, 0.9), observedTsMs: 11_020 })).toEqual([]);
+
+    const after = engine.ingest(book(11_500)).find((snapshot) => snapshot.outcome === "home");
+    const homeBefore = before.find((snapshot) => snapshot.outcome === "home");
+    expect(after?.consensus.probability).toBe(homeBefore?.consensus.probability);
+    expect(after?.consensus.updateCount).toBe(homeBefore?.consensus.updateCount);
+    expect(after?.consensus.cusumUp).toBe(homeBefore?.consensus.cusumUp);
+    expect(engine.diagnostics().rejectedSourceRegressions.txline).toBe(3);
+  });
+
+  it("drops regressing Polymarket books before they overwrite the current quote", () => {
+    const engine = new FeatureEngine(config);
+    engine.ingest(quote(10_000, 0.5));
+    const [current] = engine.ingest(book(11_000, 0.45, 0.47));
+    expect(engine.ingest({ ...book(10_900, 0.1, 0.2), observedTsMs: 11_025 })).toEqual([]);
+
+    const [after] = engine.ingest(quote(11_500, 0.51));
+    expect(after?.polymarket.bestBid).toBe(current?.polymarket.bestBid);
+    expect(after?.polymarket.bestAsk).toBe(current?.polymarket.bestAsk);
+    expect(after?.polymarket.probability).toBe(current?.polymarket.probability);
+    expect(engine.diagnostics().rejectedSourceRegressions.polymarket).toBe(1);
+  });
+
+  it("accepts small source-clock lead while preserving the observed delta diagnostic", () => {
+    const engine = new FeatureEngine(config);
+    const sourceAhead = { ...quote(10_000, 0.5), observedTsMs: 9_936 };
+    expect(engine.ingest(sourceAhead)).toHaveLength(3);
+    expect(engine.diagnostics().sourceObservationDeltaMs.txline).toEqual({
+      minimum: -64,
+      maximum: -64
+    });
+  });
+
+  it("fails closed on regressing observed knowledge time", () => {
+    const engine = new FeatureEngine(config);
+    engine.ingest(quote(10_000, 0.5));
+    expect(engine.ingest({ ...quote(11_000, 0.51), observedTsMs: 10_009 })).toEqual([]);
+    expect(engine.diagnostics().rejectedObservedRegressions.txline).toBe(1);
   });
 });

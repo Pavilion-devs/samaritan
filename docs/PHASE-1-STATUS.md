@@ -1,6 +1,6 @@
 # Phase 1 — Data Backbone Status
 
-*Completed July 10, 2026. The synchronized Spain–Belgium capture remains scheduled evidence for the Phase-3 live lane; it is no longer treated as a blocker to the Phase-1 software exit criterion.*
+*Completed July 10, 2026; evidence status corrected July 15. The synchronized Spain–Belgium capture and replay are complete. Its 18 goal×market feasibility observations found no clean post-TXLine stale window, so STALE_QUOTE remains disabled and the corpus is research-only.*
 
 ## Spain–Belgium capture confirmation
 
@@ -15,7 +15,7 @@ The machine-readable record is `config/captures/spain-belgium-2026-07-10.json`. 
 
 ## Implemented
 
-- Node `22.23.1`, pnpm `10.32.1`, strict TypeScript, ESM, and vitest are pinned at the workspace root.
+- Node `22.23.1`, pnpm `11.13.0`, strict TypeScript, ESM, and vitest are pinned at the workspace root.
 - `CanonicalEventBus` exposes one event union to every downstream consumer. There is no live/replay mode field.
 - TXLine normalization uses captured field shapes. `Pct` is divided by 100; `Prices` remains integer x1000; `NA` stays missing rather than becoming zero.
 - Total lines are exact integer milli-goals, so `2.5` is keyed as `2500` rather than by floating-point identity.
@@ -61,4 +61,4 @@ The full local archive import completed in 73.6 seconds and created `data/resear
 
 Gamma rolling discovery is connected to the mapping-candidate writer. A July 10 smoke found 57 open World Cup match-family events, refreshed 48 candidate assets, merged them with the research registry, and produced zero tradeable assets.
 
-The synchronized Spain–Belgium capture will still be replayed through the product bus and used for the Phase-3 live lane. `STALE_QUOTE` remains paper-only because historical sampled prices do not contain executable bid/ask depth.
+The synchronized Spain–Belgium capture was replayed through the product bus and used for the live-lane feasibility study. Across 18 goal×market observations, 12 had already moved before TXLine and 6 had no material reprice; none established a clean post-TXLine stale window. `STALE_QUOTE` remains disabled, and the capture did not enter an execution or Claude runtime.

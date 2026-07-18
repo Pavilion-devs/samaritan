@@ -5,10 +5,15 @@ import {
   type CanonicalEvent,
   type FeedEvent
 } from "../../bus/events.js";
+import {
+  BoundedAsyncQueue,
+  type BoundedAsyncQueueSnapshot
+} from "../../domain/bounded-async-queue.js";
 import { MappingRegistry } from "../../mapping/registry.js";
 import { normalizePolymarketPayload } from "./normalizer.js";
 
 export const POLYMARKET_MARKET_WS_URL = "wss://ws-subscriptions-clob.polymarket.com/ws/market";
+export const POLYMARKET_DEFAULT_EVENT_QUEUE_CAPACITY = 1_024;
 
 export type PolymarketLiveOptions = {
   registry: MappingRegistry;
@@ -18,41 +23,19 @@ export type PolymarketLiveOptions = {
   refreshMappings?: () => Promise<MappingRegistry>;
   now?: () => number;
   createSocket?: (url: string) => WebSocket;
+  eventQueueCapacity?: number;
+  /** Synchronous operations telemetry; queue failure still wins if this throws. */
+  onQueueState?: (snapshot: BoundedAsyncQueueSnapshot) => void;
 };
 
 function isAborted(signal: AbortSignal | undefined): boolean {
   return signal?.aborted === true;
 }
 
-type QueueItem<T> = { type: "value"; value: T } | { type: "end" };
-
-class AsyncQueue<T> {
-  readonly #items: QueueItem<T>[] = [];
-  #waiting: ((item: QueueItem<T>) => void) | null = null;
-
-  push(value: T): void {
-    this.#put({ type: "value", value });
-  }
-
-  end(): void {
-    this.#put({ type: "end" });
-  }
-
-  #put(item: QueueItem<T>): void {
-    if (this.#waiting) {
-      const waiting = this.#waiting;
-      this.#waiting = null;
-      waiting(item);
-    } else this.#items.push(item);
-  }
-
-  async take(): Promise<QueueItem<T>> {
-    const item = this.#items.shift();
-    if (item) return item;
-    return new Promise((resolve) => {
-      this.#waiting = resolve;
-    });
-  }
+function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
+  return (
+    (typeof value === "object" && value !== null) || typeof value === "function"
+  ) && typeof (value as { then?: unknown }).then === "function";
 }
 
 function statusEvent(
@@ -105,15 +88,16 @@ function rawDataAsString(data: RawData): string {
 function delay(ms: number, signal?: AbortSignal): Promise<void> {
   if (isAborted(signal)) return Promise.resolve();
   return new Promise((resolve) => {
-    const timer = setTimeout(resolve, ms);
-    signal?.addEventListener(
-      "abort",
-      () => {
-        clearTimeout(timer);
-        resolve();
-      },
-      { once: true }
-    );
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", finish);
+      resolve();
+    };
+    const timer = setTimeout(finish, ms);
+    signal?.addEventListener("abort", finish, { once: true });
   });
 }
 
@@ -122,23 +106,67 @@ export async function* livePolymarketEvents(options: PolymarketLiveOptions): Asy
   const createSocket = options.createSocket ?? ((url: string) => new WebSocket(url));
   const reconnectDelayMs = options.reconnectDelayMs ?? 2_000;
   const discoveryIntervalMs = options.discoveryIntervalMs ?? 60_000;
+  const eventQueueCapacity = options.eventQueueCapacity ?? POLYMARKET_DEFAULT_EVENT_QUEUE_CAPACITY;
   let registry = options.registry;
   const subscribed = new Set(registry.assetIds());
   let connection = 0;
 
   while (!isAborted(options.signal)) {
     yield statusEvent(connection === 0 ? "connecting" : "reconnecting", null, now(), connection);
-    const queue = new AsyncQueue<CanonicalEvent>();
+    if (isAborted(options.signal)) break;
+    const queue = new BoundedAsyncQueue<CanonicalEvent>({
+      label: "Polymarket WebSocket canonical event queue",
+      capacity: eventQueueCapacity
+    });
     const socket = createSocket(POLYMARKET_MARKET_WS_URL);
     let heartbeat: ReturnType<typeof setInterval> | undefined;
     let discovery: ReturnType<typeof setInterval> | undefined;
     let refreshBusy = false;
+    let halted = false;
+
+    const reportQueue = (snapshot: BoundedAsyncQueueSnapshot): void => {
+      const result: unknown = options.onQueueState?.(snapshot);
+      if (isPromiseLike(result)) {
+        void Promise.resolve(result).catch(() => undefined);
+        throw new Error("Polymarket onQueueState must be synchronous");
+      }
+    };
+    const halt = (error: unknown): void => {
+      if (halted) return;
+      halted = true;
+      const snapshot = queue.fail(error);
+      try {
+        reportQueue(snapshot);
+      } catch {
+        // Preserve the queue/runtime failure that caused the halt.
+      }
+      if (socket.readyState === WebSocket.OPEN) socket.close(1011, "event queue halted");
+      else if (socket.readyState === WebSocket.CONNECTING) socket.terminate();
+    };
+    const enqueue = (event: CanonicalEvent): boolean => {
+      if (halted) return false;
+      try {
+        reportQueue(queue.push(event));
+        return true;
+      } catch (error) {
+        halt(error);
+        return false;
+      }
+    };
 
     const abort = () => {
+      if (!halted) {
+        try {
+          reportQueue(queue.stop());
+        } catch (error) {
+          halt(error);
+        }
+      }
       if (socket.readyState === WebSocket.OPEN) socket.close(1000, "aborted");
       else if (socket.readyState === WebSocket.CONNECTING) socket.terminate();
     };
     options.signal?.addEventListener("abort", abort, { once: true });
+    if (isAborted(options.signal)) abort();
     socket.on("open", () => {
       subscribe(socket, [...subscribed]);
       heartbeat = setInterval(() => {
@@ -158,7 +186,7 @@ export async function* livePolymarketEvents(options: PolymarketLiveOptions): Asy
             })
             .catch((error: unknown) => {
               const detail = error instanceof Error ? error.message : String(error);
-              queue.push(statusEvent("degraded", `mapping discovery: ${detail}`, now(), connection));
+              enqueue(statusEvent("degraded", `mapping discovery: ${detail}`, now(), connection));
             })
             .finally(() => {
               refreshBusy = false;
@@ -176,21 +204,30 @@ export async function* livePolymarketEvents(options: PolymarketLiveOptions): Asy
       if (["PING", "PONG", "pong"].includes(raw)) return;
       try {
         const payload = JSON.parse(raw) as unknown;
-        for (const event of normalizePolymarketPayload(payload, observedTsMs, registry)) queue.push(event);
+        for (const event of normalizePolymarketPayload(payload, observedTsMs, registry)) {
+          if (!enqueue(event)) break;
+        }
       } catch (error) {
         const detail = error instanceof Error ? error.message : String(error);
-        queue.push(statusEvent("degraded", `message rejected: ${detail}`, observedTsMs, connection));
+        enqueue(statusEvent("degraded", `message rejected: ${detail}`, observedTsMs, connection));
       }
     });
     socket.on("error", (error) => {
-      queue.push(statusEvent("degraded", error.message, now(), connection));
+      enqueue(statusEvent("degraded", error.message, now(), connection));
     });
-    socket.on("close", () => queue.end());
+    socket.on("close", () => {
+      if (halted) return;
+      try {
+        reportQueue(queue.end());
+      } catch (error) {
+        halt(error);
+      }
+    });
 
     try {
       while (true) {
         const item = await queue.take();
-        if (item.type === "end") break;
+        if (item.done) break;
         yield item.value;
       }
     } finally {

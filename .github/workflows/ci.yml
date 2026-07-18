@@ -1,0 +1,56 @@
+name: Samaritan CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: samaritan-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.13.0
+          run_install: false
+
+      - name: Install Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Reject moderate or greater judge-runtime advisories
+        run: pnpm security:audit
+
+      - name: Verify the complete clean-clone judge path
+        run: pnpm judge:check
+
+      - name: Verify tracked public artifacts
+        run: pnpm public:audit
+
+      - name: Install isolated Phase 0 capture dependencies
+        run: pnpm --dir phase0 install --frozen-lockfile
+
+      - name: Typecheck Phase 0 capture tools
+        run: pnpm --dir phase0 exec tsc -p tsconfig.json --noEmit
+
+      - name: Test Phase 0 capture tools
+        run: pnpm --dir phase0 test

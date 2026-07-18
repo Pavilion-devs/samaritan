@@ -228,6 +228,7 @@ export class DetectorBank {
       signalId: signalId(identity),
       kind,
       detectedAtTsMs: snapshot.asOfTsMs,
+      observedAtTsMs: snapshot.observedAtTsMs,
       fixtureId: snapshot.fixtureId,
       market: snapshot.market,
       outcome: snapshot.outcome,

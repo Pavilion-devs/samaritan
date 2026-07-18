@@ -8,8 +8,11 @@ export type TotalLineEvidence = {
   lineMilli: number;
   mappingStatus: MappingStatus;
   txlineMarketObserved: boolean;
+  selectorCutoffTsMs: number;
   preKickoffOverProbability: Probability | null;
   preKickoffPointTsMs: number | null;
+  coverageFirstPointTsMs: number | null;
+  coverageLastPointTsMs: number | null;
   volume: number;
   liquidity: number;
   coveragePoints: number;
@@ -46,6 +49,7 @@ export type RankedTotalLine = TotalLineEvidence & {
 
 export type TotalLineSelection = {
   fixtureId: string;
+  latestAllowedSelectorCutoffTsMs: number | null;
   status: "selected" | "no_eligible_line";
   selected: RankedTotalLine | null;
   ranked: RankedTotalLine[];
@@ -71,6 +75,20 @@ function validateConfig(config: TotalLineSelectorConfig): void {
   for (const [name, weight] of Object.entries(config.weights)) finiteNonNegative(weight, `weights.${name}`);
   if (Object.values(config.weights).every((weight) => weight === 0)) {
     throw new RangeError("At least one total-line selector weight must be positive");
+  }
+}
+
+export function assertCausalTotalSelectorConfig(config: TotalLineSelectorConfig): void {
+  validateConfig(config);
+  if (
+    config.minimumVolume !== 0 ||
+    config.minimumLiquidity !== 0 ||
+    config.weights.volume !== 0 ||
+    config.weights.liquidity !== 0
+  ) {
+    throw new Error(
+      "Causal total selector cannot use volume or liquidity without timestamped as-of evidence"
+    );
   }
 }
 
@@ -107,10 +125,17 @@ function winners(rows: TotalLineEvidence[]): {
 export function selectMainTotalLine(
   fixtureId: string,
   evidence: readonly TotalLineEvidence[],
-  config: TotalLineSelectorConfig
+  config: TotalLineSelectorConfig,
+  latestAllowedSelectorCutoffTsMs?: number
 ): TotalLineSelection {
   validateConfig(config);
   if (fixtureId.trim() === "") throw new Error("Total-line selection requires a fixtureId");
+  if (
+    latestAllowedSelectorCutoffTsMs !== undefined &&
+    !Number.isSafeInteger(latestAllowedSelectorCutoffTsMs)
+  ) {
+    throw new RangeError("Latest allowed selector cutoff must be a safe-integer timestamp");
+  }
   const excluded: Array<{ marketId: string; reasons: string[] }> = [];
   const eligible: TotalLineEvidence[] = [];
   for (const row of evidence) {
@@ -131,13 +156,43 @@ export function selectMainTotalLine(
     if (row.preKickoffPointTsMs !== null && !Number.isSafeInteger(row.preKickoffPointTsMs)) {
       throw new Error(`Total line ${row.marketId} has invalid pre-kickoff point timestamp`);
     }
+    if (row.coverageFirstPointTsMs !== null && !Number.isSafeInteger(row.coverageFirstPointTsMs)) {
+      throw new Error(`Total line ${row.marketId} has invalid first coverage timestamp`);
+    }
+    if (row.coverageLastPointTsMs !== null && !Number.isSafeInteger(row.coverageLastPointTsMs)) {
+      throw new Error(`Total line ${row.marketId} has invalid last coverage timestamp`);
+    }
     if (row.preKickoffOverProbability !== null) probability(row.preKickoffOverProbability);
     const reasons: string[] = [];
     if (row.mappingStatus === "rejected") reasons.push("mapping_rejected");
     if (!row.txlineMarketObserved) reasons.push("txline_line_unobserved");
+    const hasValidSelectorCutoff = Number.isSafeInteger(row.selectorCutoffTsMs);
+    if (!hasValidSelectorCutoff) reasons.push("missing_selector_cutoff");
+    else if (
+      latestAllowedSelectorCutoffTsMs !== undefined &&
+      row.selectorCutoffTsMs > latestAllowedSelectorCutoffTsMs
+    ) {
+      reasons.push("selector_cutoff_after_evaluation_start");
+    }
     if (row.preKickoffOverProbability === null) reasons.push("missing_pre_kickoff_probability");
+    else if (row.preKickoffPointTsMs === null) reasons.push("missing_pre_kickoff_probability_timestamp");
+    else if (hasValidSelectorCutoff && row.preKickoffPointTsMs > row.selectorCutoffTsMs) {
+      reasons.push("probability_after_selector_cutoff");
+    }
     else if (Math.abs(row.preKickoffOverProbability - 0.5) > config.maximumDistanceFromEven) {
       reasons.push("too_far_from_even");
+    }
+    if (
+      row.coveragePoints > 0 &&
+      (row.coverageFirstPointTsMs === null || row.coverageLastPointTsMs === null)
+    ) {
+      reasons.push("missing_coverage_cutoff_evidence");
+    } else if (
+      hasValidSelectorCutoff &&
+      row.coverageLastPointTsMs !== null &&
+      row.coverageLastPointTsMs > row.selectorCutoffTsMs
+    ) {
+      reasons.push("coverage_after_selector_cutoff");
     }
     if (row.coveragePoints < config.minimumCoveragePoints) reasons.push("insufficient_coverage");
     if (row.volume < config.minimumVolume) reasons.push("insufficient_volume");
@@ -149,6 +204,7 @@ export function selectMainTotalLine(
   if (eligible.length === 0) {
     return {
       fixtureId,
+      latestAllowedSelectorCutoffTsMs: latestAllowedSelectorCutoffTsMs ?? null,
       status: "no_eligible_line",
       selected: null,
       ranked: [],
@@ -203,6 +259,7 @@ export function selectMainTotalLine(
     );
   return {
     fixtureId,
+    latestAllowedSelectorCutoffTsMs: latestAllowedSelectorCutoffTsMs ?? null,
     status: "selected",
     selected: ranked[0]!,
     ranked,

@@ -21,8 +21,11 @@ function row(
     lineMilli,
     mappingStatus: "candidate",
     txlineMarketObserved: true,
+    selectorCutoffTsMs: 10_000,
     preKickoffOverProbability: probability(price),
     preKickoffPointTsMs: 10_000,
+    coverageFirstPointTsMs: 1_000,
+    coverageLastPointTsMs: 10_000,
     volume,
     liquidity,
     coveragePoints
@@ -73,6 +76,41 @@ describe("dynamic main total selector", () => {
     expect(selected.excluded[0]?.reasons).toEqual([
       "insufficient_coverage",
       "insufficient_liquidity"
+    ]);
+  });
+
+  it("fails closed when probability or coverage crosses the selector cutoff", () => {
+    const probabilityFromFuture = {
+      ...row("future-price", 2_500, 0.5, 0, 0, 10),
+      preKickoffPointTsMs: 10_001
+    };
+    const coverageFromFuture = {
+      ...row("future-coverage", 3_500, 0.5, 0, 0, 10),
+      coverageLastPointTsMs: 10_001
+    };
+    const selected = selectMainTotalLine(
+      "fixture-1",
+      [probabilityFromFuture, coverageFromFuture],
+      baseConfig,
+      10_000
+    );
+    expect(selected.status).toBe("no_eligible_line");
+    expect(selected.excluded).toEqual([
+      { marketId: "future-price", reasons: ["probability_after_selector_cutoff"] },
+      { marketId: "future-coverage", reasons: ["coverage_after_selector_cutoff"] }
+    ]);
+  });
+
+  it("fails closed when the selector cutoff is later than detector evaluation start", () => {
+    const selected = selectMainTotalLine(
+      "fixture-1",
+      [row("late-selector", 2_500, 0.5, 0, 0, 10)],
+      baseConfig,
+      9_999
+    );
+    expect(selected.status).toBe("no_eligible_line");
+    expect(selected.excluded[0]?.reasons).toEqual([
+      "selector_cutoff_after_evaluation_start"
     ]);
   });
 });

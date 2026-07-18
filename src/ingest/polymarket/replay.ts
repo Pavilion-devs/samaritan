@@ -14,9 +14,13 @@ type CapturedMessage = {
 
 export async function* replayCapturedPolymarketMessages(
   path: string,
-  registry: MappingRegistry
+  registry: MappingRegistry,
+  options: { onInputHash?: (hash: string) => void } = {}
 ): AsyncGenerator<CanonicalEvent> {
-  for await (const message of readNdjson<CapturedMessage>(path)) {
+  for await (const message of readNdjson<CapturedMessage>(path, {
+    ...(options.onInputHash === undefined ? {} : { onSha256: options.onInputHash })
+  })) {
+    if (["ping", "pong"].includes(message.rawPayload.trim().toLocaleLowerCase())) continue;
     yield* normalizeCapturedPolymarketMessage(message, registry);
   }
 }

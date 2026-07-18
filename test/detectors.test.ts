@@ -33,6 +33,7 @@ function snapshot(overrides: Partial<FeatureSnapshot> = {}): FeatureSnapshot {
     triggerEventId: "trigger-1",
     triggerSource: "polymarket",
     asOfTsMs: 10_000,
+    observedAtTsMs: 10_000,
     fixtureId: "fixture-1",
     market: {
       family: "match_result",

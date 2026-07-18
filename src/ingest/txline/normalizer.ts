@@ -96,6 +96,7 @@ function normalizeOdds(value: unknown, envelope: IngestEnvelope): OddsQuoteEvent
   const row = oddsSchema.parse(value);
   const definition = marketDefinition(row);
   if (definition === null) return null;
+  if (row.Prices.length === 0 && row.Pct.length === 0) return null;
   if (row.Prices.length !== definition.outcomes.length || row.Pct.length !== definition.outcomes.length) {
     throw new Error(`TXLine outcome array lengths disagree for ${row.MessageId}`);
   }

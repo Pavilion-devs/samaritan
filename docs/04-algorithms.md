@@ -56,6 +56,8 @@ e_exec,o(t) = C_o(t) − PM_ask,o(t) − fees − slip(D(t), stake)
 
 ## 3. STALE_QUOTE — post-event stale orders (in-play; paper-only in v1)
 
+**Current gate evidence (Spain-Belgium, July 10).** At an exploratory 50-probability-bps move threshold, 0/18 goal/market cases showed a clean post-TXLine stale window: 12 had already moved before TXLine first delivery and 6 showed no material move within 30 seconds. This detector is disabled. The specification below remains a measurement definition for additional captures, not an enabled signal.
+
 **Setup.** Score event `E` at `t0` (goal or red card — the two largest instant repricers). Model jump: `Δp_model = p_model(post-state) − p_model(pre-state)` from MODELER's state machine (available instantly — it's a lookup on the fitted state grid, no fitting at trade time).
 
 **Trigger:** at `t0 + δ`: the synchronized live PM book still shows resting orders within `θ_stale` of pre-event prices, size ≥ `s_min`, on the side that the event moved against. `δ` is fitted from live evidence, never assumed to be single-digit.

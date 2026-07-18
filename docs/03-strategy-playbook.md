@@ -1,6 +1,6 @@
 # 03 — Strategy Playbook
 
-*v0.2 (July 10, 2026). Status: V1 STRATEGIES LOCKED; numeric thresholds remain unset until the Phase-3 gate.*
+*v0.4 (July 18, 2026). Status: STRATEGY DESIGN SPEC. The four personas remain the intended tournament roster, not a claim that all four currently run. The corrected historical gate supports only a Total Goals `CONSENSUS_MOVE` candidate; v2 is registered for forward paper observation only, STALE_QUOTE remains disabled, and MODELER is not implemented.*
 
 ## First principles (why anything here works at all)
 
@@ -86,7 +86,7 @@ Effectively the mirror image of CONSENSUS_MOVE, sharing its infrastructure: `Pol
 
 - **Fractional Kelly.** Stake = bankroll × kelly_fraction × edge/odds, with kelly_fraction ≤ 0.25 (quarter-Kelly) — full Kelly is ruin-adjacent under estimation error, and our edges ARE estimates. Per-trade hard cap regardless of formula output.
 - **Exposure caps:** per fixture, per market type, per strategy, per day. Correlated-position rule: positions on the same fixture across markets count toward one bucket.
-- **Real-money gates (execution = BOTH paper and real, per decision):** $50 total bankroll ceiling; no more than $15 aggregate live exposure initially; pre-match only; thesis + deterministic rules + risk judgment + human-confirmed mapping required. Per-trade and drawdown caps are frozen at the Phase-3 review. If Polymarket's minimum order exceeds any cap, Samaritan does not trade.
+- **Bounty execution is paper-only:** the implemented paper configuration uses a $50 reference bankroll, no more than $15 aggregate paper exposure, pre-match admission, a strict thesis boundary, deterministic rules, and a Deborah-reviewed mapping. Any future real-money adapter remains outside the bounty proof and would additionally require the completed Phase-3 gate, fresh explicit authority, frozen per-trade/drawdown caps, and the manual kill switch. If a venue minimum exceeds any cap, the system must refuse the order.
 - **Drawdown circuit breakers:** strategy paused at X% paper drawdown; real-money halted entirely at Y% — X, Y to be agreed.
 - **No martingale, no chasing, ever.** Stake sizing is a pure function of (edge, bankroll); losses don't change the function.
 

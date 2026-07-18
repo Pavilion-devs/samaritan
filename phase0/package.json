@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "test": "tsx --test test/*.test.ts",
     "airdrop:devnet": "tsx src/devnet-airdrop.ts",
     "auth:devnet": "tsx src/txline-auth.ts --network devnet",
     "auth:mainnet": "tsx src/txline-auth.ts --network mainnet",

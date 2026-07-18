@@ -12,6 +12,7 @@
 - Threshold grids are injected, hashed, and evaluated in parallel. Future labels are withheld until an explicit horizon elapses, then applied to the earlier prediction; pending cases are bounded by the horizon and discarded if no fresh resolution point arrives.
 - The current post-hoc labels distinguish cross-market gap convergence, Polymarket reversion while consensus stays fixed, and Polymarket following a sustained consensus direction. Label horizons and minimum movements remain Phase-3 parameters.
 - The dynamic main-total selector is evidence-driven and parameterized. It can weight distance from 50/50, log volume, log liquidity, and history coverage; it fails closed when no exact TX-observed full-time line passes the injected eligibility requirements.
+- The paired-capture live-lane analyzer streams captured TXLine frames and Polymarket NDJSON through the production normalizers, reconstructs canonical top-of-book state and best-level depth, excludes explicit reconnect windows, and measures score-event delivery against every exact mapped market group without loading the 3.3 GB capture into memory.
 
 ## Real-archive smoke evidence
 
@@ -34,13 +35,25 @@ This early result is useful precisely because it rejects an assumed “3–4 poi
 
 The total-line evidence builder produced 590 TX-observed full-time lines across all 98 mapped fixtures, with a latest Over probability at least five minutes before kickoff for every line. A balance-only exploratory rule exactly reproduced the Phase-0 closest-to-50/50 distribution: O/U 2.5 for 77 fixtures, 3.5 for 15, 1.5 for 5, and 4.5 for 1. Across balance-only, equal-weight, and balance-heavy exploratory schemes, weighting changed the winner for one fixture (`17588320`) and 69/98 fixtures still showed disagreement among the raw balance/volume/liquidity/coverage criteria. This is evidence for a stable candidate rule, not approval to freeze it. Archived post-close Gamma liquidity is often zero, so the gate must not treat it as historical executable depth.
 
+The synchronized Spain-Belgium run added 2,262,950 normalized canonical Polymarket events across Match Result and five exact full-time totals groups. TXLine delivered three unique goals with first-seen receive latency of -8 to 49 ms; confirmation revisions arrived 74–162 seconds later. At an exploratory 50-probability-bps material-move threshold, Polymarket had already moved during the five seconds before TXLine first delivery in 12/18 market-event cases. The other 6/18 showed no material move inside 30 seconds, and 0/18 showed a clean post-TXLine repricing case without a prior move. This match does not support the STALE_QUOTE hypothesis. Eight public-WebSocket outages totaled 91.171 seconds and are marked unavailable rather than unchanged-market periods. Full evidence is in `docs/research/paired-spain-belgium-2026-07-10-live-lane.md`.
+
+## Historical gate evidence
+
+**July 14 correction:** the dynamic-total historical result described below is invalidated for decision use. The selector used a Polymarket observation after the eligible signal window for 95/98 fixtures, and its coverage calculation was not constrained to the same as-of cutoff. The reported sample also mixed unsupported sells and complementary expressions of the same economic move. The original values remain below as audit history only; no totals candidate is currently approved. See `docs/research/historical-gate-study-v1-invalidation.md`.
+
+**Corrected rerun:** `docs/research/historical-gate-study-causal-economic-v4.md` uses a T−180-minute selector cutoff, zero future/coverage violations across 590 evidence rows, normalized buy-only Total Goals cases, and fixture-clustered uncertainty. The prespecified Total Goals `CONSENSUS_MOVE` family supports a fresh forward paper study (38 held-out cases / 18 fixtures; `+132.7 bps` after the proxy; 95% CI `+14.3` to `+243.9`), but it is sampled-price signal evidence, not alpha or fill proof. Deborah registered paper v2 for forward observation only on July 18; no qualifying v2 observation existed at registration.
+
+The chronological historical study used 68 training fixtures and 30 sealed heldout fixtures. Training had both sources for 136/136 market groups; heldout had both for 52/60 groups. Configurations were selected only on training labels, required at least 30 predicted-positive training cases, and could not use a detector gap below the 100 probability-bps cost proxy.
+
+The original v1 run produced the numerical outputs retained in `docs/research/historical-gate-study.md`, but the dynamic-total slice does not advance to human review after the causal audit. `XMARKET_DIVERGENCE`, `FADER_CANDIDATE`, and Match Result `CONSENSUS_MOVE` remain rejected on their existing evidence. Dynamic-total `CONSENSUS_MOVE` returns to unapproved research status until a new causal study is completed. The real-money gate remains closed.
+
 ## Verification
 
-`pnpm check` passes under Node `22.23.1` with 33 tests across ten files. `pnpm build` also passes. Tests cover acceleration, sampled-history research gating, archive event reconstruction, no-mode replay identity, future-label isolation, bounded deferred scoring, grid expansion, dynamic total-line ranking/fail-closed behavior, detector behavior, storage integrity, mappings, and source normalization.
+`pnpm check` passes under Node `22.23.1` with 39 tests across twelve files. `pnpm build` also passes. The Phase 0 recorder has an additional Node test that proves an open SSE response is aborted at the capture deadline. Tests cover acceleration, sampled-history research gating, archive event reconstruction, no-mode replay identity, future-label isolation, bounded deferred scoring, grid expansion, dynamic total-line ranking/fail-closed behavior, chronological split isolation, detector behavior, storage integrity, mappings, source normalization, outage pairing, latency histograms, and recorder shutdown.
 
 ## Still open
 
-- Fit and freeze the dynamic main-full-time-total selector on train/test evidence; do not hard-code O/U 2.5 or treat current exploratory weights as production values.
+- Review and either freeze or reject the dynamic main-full-time-total candidate; do not hard-code O/U 2.5 or treat the candidate as production before Deborah's decision.
 - Add `MODEL_MARKET_GAP` only behind a fitted model and valid calibration certificate. No hand-set match-state multipliers are allowed.
-- Add `STALE_QUOTE` and score-event latency labels from synchronized TXLine plus executable Polymarket book data. Historical one-minute samples cannot support this detector.
-- Run the full train/test Phase-3 gate study and freeze thresholds only after review with Deborah.
+- Repeat synchronized live-lane measurement on any remaining mapped matches if practical. `STALE_QUOTE` remains disabled: Spain-Belgium supplied score-event latency labels but no supporting post-TXLine stale-window case.
+- Review the totals-only `CONSENSUS_MOVE` candidate with Deborah, collect executable-book evidence, and freeze or reject its threshold. `XMARKET_DIVERGENCE`, Match Result `CONSENSUS_MOVE`, and `FADER_CANDIDATE` are no-go for v1 on current evidence.

@@ -4,7 +4,8 @@ import {
   CANONICAL_SCHEMA_VERSION,
   type CanonicalEvent,
   type PolymarketBookEvent,
-  type PolymarketPriceEvent
+  type PolymarketPriceEvent,
+  type PolymarketResolutionEvent
 } from "../../bus/events.js";
 import { stableJson } from "../../domain/json.js";
 import { probability, type Probability } from "../../domain/probability.js";
@@ -59,6 +60,15 @@ const lastTradeSchema = z.object({
   price: decimalSchema,
   side: z.enum(["BUY", "SELL"]).optional(),
   size: decimalSchema.optional()
+});
+
+const marketResolvedSchema = z.object({
+  market: z.string().min(1),
+  assets_ids: z.array(z.string().min(1)).min(2),
+  winning_asset_id: z.string().min(1),
+  winning_outcome: z.string().min(1),
+  timestamp: decimalSchema,
+  event_type: z.literal("market_resolved")
 });
 
 function timestampMs(value: string): number {
@@ -137,6 +147,38 @@ function normalizeBook(
   };
 }
 
+function normalizeResolution(
+  value: unknown,
+  observedTsMs: number,
+  registry: MappingRegistry
+): PolymarketResolutionEvent {
+  const row = marketResolvedSchema.parse(value);
+  if (!row.assets_ids.includes(row.winning_asset_id)) {
+    throw new Error("Polymarket resolution winner is absent from assets_ids");
+  }
+  const mapped = registry.resolveAsset(row.winning_asset_id);
+  validateCondition(row.market, mapped);
+  for (const assetId of row.assets_ids) {
+    validateCondition(row.market, registry.resolveAsset(assetId));
+  }
+  const sourceTsMs = timestampMs(row.timestamp);
+  return {
+    schemaVersion: CANONICAL_SCHEMA_VERSION,
+    kind: "polymarket.resolution",
+    eventId: `polymarket:resolution:${createHash("sha256").update(stableJson(row)).digest("hex")}`,
+    source: "polymarket",
+    sourceTsMs,
+    observedTsMs,
+    fixtureId: mapped.fixtureId,
+    market: mapped.market,
+    mappingStatus: mapped.mappingStatus,
+    conditionId: mapped.conditionId,
+    assetIds: row.assets_ids,
+    winningAssetId: row.winning_asset_id,
+    winningOutcomeLabel: row.winning_outcome
+  };
+}
+
 export function normalizePolymarketPayload(
   payload: unknown,
   observedTsMs: number,
@@ -147,6 +189,7 @@ export function normalizePolymarketPayload(
   }
   const eventType = (payload as { event_type?: unknown } | null)?.event_type;
   if (eventType === "book") return [normalizeBook(payload, observedTsMs, registry)];
+  if (eventType === "market_resolved") return [normalizeResolution(payload, observedTsMs, registry)];
   if (eventType === "price_change") {
     const row = priceChangeSchema.parse(payload);
     const sourceTs = timestampMs(row.timestamp);

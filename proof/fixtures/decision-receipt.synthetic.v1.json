@@ -1,0 +1,435 @@
+{
+  "schemaVersion": 1,
+  "receiptType": "samaritan_decision_receipt",
+  "receiptId": "6a5268ce1e18a14b8b07228b74635c4e2337ee40ffa36aefd7a113cf6d174e66",
+  "generatedAtTsMs": 1700000011000,
+  "provenance": {
+    "evidenceClass": "synthetic_proving_fixture",
+    "synthetic": true,
+    "performanceUse": "excluded_synthetic",
+    "label": "SYNTHETIC PROVING FIXTURE — no real match, feed, model call, order, fill, or performance evidence"
+  },
+  "disclosure": {
+    "policy": "hashes_and_derived_signals_only",
+    "rawTxlineFieldsIncluded": false
+  },
+  "build": {
+    "codeVersion": "decision-receipt-v1-synthetic-fixture",
+    "codeSha256": "b3378a2df0ceefd4d0d65a4dbf7cb86ca259be10be737449956502cc38dd64e9",
+    "configSha256": "2a862746dc1f07064367445667a530eea645c42d7ea7f0ffaa432ba72d2d674c"
+  },
+  "sourceEvidence": [
+    {
+      "evidenceRefSha256": "3d3b41a2227873d8b21248202f7b4f883272d57ecef8d0bf6a8098da4cf52b94",
+      "source": "txline",
+      "role": "signal",
+      "sourceTsMs": 1699999999936,
+      "observedAtTsMs": 1700000000000,
+      "payloadSha256": "078399ecb1eedf610fda560c31c8268d71bd8aa0967847f8d46a15397de973df",
+      "disclosure": "hash_only"
+    },
+    {
+      "evidenceRefSha256": "ce70188de2a3ec2c4856b9e7d453b43588ffba88d4f0cf1a54fb15264bc7f400",
+      "source": "polymarket",
+      "role": "signal",
+      "sourceTsMs": 1699999999975,
+      "observedAtTsMs": 1700000000000,
+      "payloadSha256": "c0cbf1028f7d99e2c800c770a9f19edd2630fa7b45cd70d8c2c70137a2f87198",
+      "disclosure": "hash_only"
+    },
+    {
+      "evidenceRefSha256": "0970a82a4d74742708a5ea39e895d7641ce52f92248629afa9280af952808fb0",
+      "source": "polymarket",
+      "role": "execution",
+      "sourceTsMs": 1700000002436,
+      "observedAtTsMs": 1700000002500,
+      "payloadSha256": "dcabb052a305c6f33bf6d019952f4ee8d3e0e57444750ecec411e37b7235fac8",
+      "disclosure": "hash_only"
+    },
+    {
+      "evidenceRefSha256": "cd3a2bb43870e3e037901d91818d22e90271a05248aae7871e851c3b9e10419e",
+      "source": "polymarket",
+      "role": "close",
+      "sourceTsMs": 1700000004930,
+      "observedAtTsMs": 1700000005000,
+      "payloadSha256": "0c45d0ab522c33c8faa6557bcadbd66f69170e1761d6ec550eb60123553754e4",
+      "disclosure": "hash_only"
+    },
+    {
+      "evidenceRefSha256": "807120b1be8e13a10652816d734233b44ea436d2fa190069dc2f72dbb90d2098",
+      "source": "polymarket",
+      "role": "settlement",
+      "sourceTsMs": 1700000009950,
+      "observedAtTsMs": 1700000010000,
+      "payloadSha256": "ce14207457515b49d6df821e29d77c2f1820e1b40c359cd5f831d9922ad86ab3",
+      "disclosure": "hash_only"
+    }
+  ],
+  "agents": {
+    "runs": [
+      {
+        "stage": "triage",
+        "invocationClass": "synthetic_stub",
+        "model": "claude-haiku-4-5",
+        "promptVersion": "triage-v1",
+        "promptSha256": "5165e7052e4f78f3584a2bf8deb109fea2aa2298e05618c3ae62c8759ae8f4d1",
+        "responseSha256": "e306c8b5f4023e537c970fda834c17fe50623f07205c786326e0bea18fc91c20",
+        "billingEvidenceRefSha256": "44d47f382a3be238d8620750a147cff95aff18ff484e944c974ce5987e0e495f",
+        "status": "success",
+        "usage": {
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "cacheCreationInputTokens": 0,
+          "cacheReadInputTokens": 0
+        },
+        "pricing": {
+          "pricingVersion": "anthropic-public-2026-07-12",
+          "currency": "nano_usd",
+          "inputNanoUsdPerToken": 1000,
+          "outputNanoUsdPerToken": 5000,
+          "cacheWriteNanoUsdPerToken": 1250,
+          "cacheReadNanoUsdPerToken": 100
+        },
+        "actualCostNanoUsd": 0
+      },
+      {
+        "stage": "analyst",
+        "invocationClass": "synthetic_stub",
+        "model": "claude-opus-4-8",
+        "promptVersion": "analyst-v1",
+        "promptSha256": "a19775689dfb6bf5032466a6716c0c0a5e4d8358d931bd7869bd10f4b9682523",
+        "responseSha256": "1e3d645c1e9e6c1b8f748b6f2a209ddd22699a0623029355830ea1f3638688a9",
+        "billingEvidenceRefSha256": "47744ac9aab2b40c8deb13f910efc36f61d3204f2157bc06d39a0b502ec6d27e",
+        "status": "success",
+        "usage": {
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "cacheCreationInputTokens": 0,
+          "cacheReadInputTokens": 0
+        },
+        "pricing": {
+          "pricingVersion": "anthropic-public-2026-07-12",
+          "currency": "nano_usd",
+          "inputNanoUsdPerToken": 5000,
+          "outputNanoUsdPerToken": 25000,
+          "cacheWriteNanoUsdPerToken": 6250,
+          "cacheReadNanoUsdPerToken": 500
+        },
+        "actualCostNanoUsd": 0
+      }
+    ],
+    "totalActualCostNanoUsd": 0
+  },
+  "lifecycle": {
+    "finalStatus": "filled_settled",
+    "orderedEventKinds": [
+      "signal_received",
+      "triage_decision",
+      "thesis_submitted",
+      "analysis_completed",
+      "risk_verdict",
+      "execution_intent",
+      "paper_execution",
+      "case_terminal",
+      "position_opened",
+      "position_closed",
+      "position_settled"
+    ],
+    "signal": {
+      "signalRefSha256": "fc61ba747574e3c953a6dd799c50f899300dcf50003fd617639f278d843d882e",
+      "fixtureRefSha256": "1f57de0cedca3e1851b4c05140408d70769031423aa5aa6a93b22e75b036e762",
+      "marketRefSha256": "80b77e4246270ab67aae53c0f61c60545f8b738c7dccf88d7969575bfeae7acb",
+      "lineRefSha256": "fe82e6baa7be838b672749b06987ad38a401fc72651a530e732066bc0daffc86",
+      "detector": "CONSENSUS_MOVE",
+      "sourceTsMs": 1700000000000,
+      "observedAtTsMs": 1700000000000,
+      "marketFamily": "total_goals",
+      "marketPeriod": "full_time",
+      "outcome": "over",
+      "direction": "buy",
+      "eligibility": "pretrade_review_required",
+      "derivedEvidence": {
+        "txlineMovementBucketBps": 25,
+        "consensusVelocityBucketBps": 100,
+        "consensusZScore": 1.5,
+        "polymarketVelocityBucketBps": 0,
+        "polymarketZScore": 0,
+        "cusumUpScore": 0.002,
+        "cusumDownScore": 0,
+        "relativeValueDirection": "consensus_above_venue",
+        "gapBasis": "live_book",
+        "persistenceMs": 60000,
+        "mappingStatus": "verified",
+        "scoreContextActionCount": 0
+      },
+      "sourceEvidenceRefs": [
+        "3d3b41a2227873d8b21248202f7b4f883272d57ecef8d0bf6a8098da4cf52b94",
+        "ce70188de2a3ec2c4856b9e7d453b43588ffba88d4f0cf1a54fb15264bc7f400"
+      ],
+      "ledgerEntryHash": "3a64f4905aea5c1c02f7757cbaf2f7368d0d31e1a176cd66f1f66cc2ccdf7368"
+    },
+    "triage": {
+      "decision": "escalate",
+      "priority": "normal",
+      "rationale": "Synthetic evidence satisfies the proving-fixture escalation path.",
+      "ledgerEntryHash": "6f3d93978471a7af150ee5c97beafb19ae0924c195ae5ee1c62451943f8d51d8"
+    },
+    "thesis": {
+      "schemaVersion": 1,
+      "signalRefSha256": "fc61ba747574e3c953a6dd799c50f899300dcf50003fd617639f278d843d882e",
+      "fixtureRefSha256": "1f57de0cedca3e1851b4c05140408d70769031423aa5aa6a93b22e75b036e762",
+      "marketRefSha256": "80b77e4246270ab67aae53c0f61c60545f8b738c7dccf88d7969575bfeae7acb",
+      "outcome": "over",
+      "direction": "buy",
+      "recommendation": "paper_trade",
+      "disclosure": "private_payload_sha256_commitment",
+      "thesisPayloadSha256": "ab033dcc7a1f947427915746765c84e69ff0e972fd860e79907e7a7a3a6dc51b",
+      "submittedAtTsMs": 1700000000300,
+      "expiresAtTsMs": 1700000900300,
+      "analystModel": "claude-opus-4-8",
+      "ledgerEntryHash": "7b7aacab586ae9586697612d6ee755121cd66d432df402e49b4896e0fc4976c4"
+    },
+    "analysis": {
+      "signalSourceTsMs": 1700000000000,
+      "signalObservedTsMs": 1700000000000,
+      "decisionLatencyMs": 300,
+      "readyAtTsMs": 1700000000300,
+      "venuePlacementDelayMs": 1000,
+      "orderEligibleAtTsMs": 1700000001300,
+      "recommendation": "paper_trade",
+      "ledgerEntryHash": "893f6021f0a397dea91f50e98911d9526213759c57905aecb2257f6332446d00"
+    },
+    "risk": {
+      "decision": "approve",
+      "reasons": [],
+      "stakeMicroUsd": 3000000,
+      "limitPolicy": "deterministic_private_fair_value_boundary",
+      "realMoneyGate": "closed",
+      "ledgerEntryHash": "8cd81eb389ee4a83289158e814fc0ede93b6e0805a09c1dbd159ddeea586c7c4"
+    },
+    "intent": {
+      "lane": "bounty",
+      "signalRefSha256": "fc61ba747574e3c953a6dd799c50f899300dcf50003fd617639f278d843d882e",
+      "fixtureRefSha256": "1f57de0cedca3e1851b4c05140408d70769031423aa5aa6a93b22e75b036e762",
+      "marketRefSha256": "80b77e4246270ab67aae53c0f61c60545f8b738c7dccf88d7969575bfeae7acb",
+      "outcome": "over",
+      "direction": "buy",
+      "stakeMicroUsd": 3000000,
+      "limitPolicy": "deterministic_private_fair_value_boundary",
+      "availableShares": 0,
+      "ledgerEntryHash": "212be5d2c3bdd268bf14b7f9545e7b41224baa2fc61199bd7aae36a36f053c35"
+    },
+    "execution": {
+      "adapter": "paper",
+      "status": "filled",
+      "reason": null,
+      "assetRefSha256": "165750a05c5b4d223975cbfc4c1e6181b052db4bdacd5f93edf445422575e396",
+      "conditionRefSha256": "2e9568f28fc6d4d1f026500f835047b5e096483bd97d428b78cf187e0bc537a2",
+      "direction": "buy",
+      "requestedStakeMicroUsd": 3000000,
+      "grossMicroUsd": 2930000,
+      "feeMicroUsd": 70000,
+      "netConsiderationMicroUsd": 3000000,
+      "filledShares": 5.5,
+      "averagePrice": 0.5327272727272727,
+      "bestPrice": 0.52,
+      "halfSpreadBps": 100,
+      "executableDepthUsd": 10,
+      "slippageProbabilityBps": 127.27272727272698,
+      "bookSourceTsMs": 1700000002436,
+      "bookObservedTsMs": 1700000002500,
+      "bookEvidenceRefSha256": "0970a82a4d74742708a5ea39e895d7641ce52f92248629afa9280af952808fb0",
+      "feeMetadataRefSha256": "494da64419219a3b8d4694bc01b1f8861f596d2fe62335799c15c5ec7c0fc575",
+      "ledgerEntryHash": "facca01a6fcafd86b04cd1dccd12167842f12be43ab53e2b7c083d4aafbe43df"
+    },
+    "position": {
+      "lane": "bounty",
+      "signalRefSha256": "fc61ba747574e3c953a6dd799c50f899300dcf50003fd617639f278d843d882e",
+      "fixtureRefSha256": "1f57de0cedca3e1851b4c05140408d70769031423aa5aa6a93b22e75b036e762",
+      "marketRefSha256": "80b77e4246270ab67aae53c0f61c60545f8b738c7dccf88d7969575bfeae7acb",
+      "conditionRefSha256": "2e9568f28fc6d4d1f026500f835047b5e096483bd97d428b78cf187e0bc537a2",
+      "assetRefSha256": "165750a05c5b4d223975cbfc4c1e6181b052db4bdacd5f93edf445422575e396",
+      "outcome": "over",
+      "lineRefSha256": "fe82e6baa7be838b672749b06987ad38a401fc72651a530e732066bc0daffc86",
+      "openedAtTsMs": 1700000002500,
+      "filledShares": 5.5,
+      "averageEntryPrice": 0.5327272727272727,
+      "entryGrossMicroUsd": 2930000,
+      "entryFeeMicroUsd": 70000,
+      "entryCostMicroUsd": 3000000,
+      "fillStatus": "filled",
+      "entryHalfSpreadBps": 100,
+      "entrySlippageBps": 127.27272727272698,
+      "selectedDepthUsd": 10,
+      "ledgerEntryHash": "6297be56975fc74ea180ee15b23bad116b54236d5f3b3d4c507881dc8edeb084"
+    },
+    "close": {
+      "cutoffTsMs": 1700000005000,
+      "markedAtTsMs": 1700000005000,
+      "bookSourceTsMs": 1700000004930,
+      "bookObservedTsMs": 1700000005000,
+      "closeBid": 0.57,
+      "closeAsk": 0.59,
+      "closeMidpoint": 0.58,
+      "grossMidpointClvBps": 472.72727272727246,
+      "netMidpointClvBps": 345.45454545454544,
+      "executableLiquidationClvBps": 245.45454545454538,
+      "bookEvidenceRefSha256": "cd3a2bb43870e3e037901d91818d22e90271a05248aae7871e851c3b9e10419e",
+      "ledgerEntryHash": "3945a8cf179a117908d99d424d6a1286449cb5571050e810285422c98f3b4259"
+    },
+    "settlement": {
+      "settledAtTsMs": 1700000010000,
+      "won": true,
+      "payoutMicroUsd": 5500000,
+      "pnlMicroUsd": 2500000,
+      "returnBps": 8333.333333333334,
+      "entryBrier": 0.21834380165289258,
+      "resolutionEvidenceRefSha256": "807120b1be8e13a10652816d734233b44ea436d2fa190069dc2f72dbb90d2098",
+      "ledgerEntryHash": "ebadd4b57d1e88a24df104f03918fb8b20e86f51fe17ab913b802f7f13bd31a7"
+    },
+    "terminal": {
+      "status": "filled",
+      "reason": "filled",
+      "decisionLatencyMs": null,
+      "ledgerEntryHash": "ec2db14205262aaa9f4b4c95128db37a389cbe7c33cafd5ba63d0600cb684a62"
+    }
+  },
+  "ledger": {
+    "verificationAtGeneration": "full_v2_chain_valid",
+    "payloadDisclosure": "sha256_commitments_only",
+    "caseIdSha256": "becca5114c0773541b8cc0f18ffd18c67a140a2e863e5a598f5d68d2fbb9036c",
+    "rowsAtGeneration": 12,
+    "finalHeadSequence": 12,
+    "finalHeadHash": "ebadd4b57d1e88a24df104f03918fb8b20e86f51fe17ab913b802f7f13bd31a7",
+    "caseEntries": [
+      {
+        "sequence": 2,
+        "kind": "signal_received",
+        "atTsMs": 1700000000000,
+        "insertedAtMs": 1700000000010,
+        "entryIdSha256": "6c9d8192370ebb7c2a718b0711688e2af9e008d2b4d76cc51fa045e28440da97",
+        "payloadSha256": "f895ad3acba6a4444dfefc1c704d43aa90eb4d45d24d93d89984a8f12e9b54c3",
+        "previousHash": "6449eb53a31b87ec0d7b9f49a59801b5dc677be5b48740006139003c6c309c5a",
+        "entryHash": "3a64f4905aea5c1c02f7757cbaf2f7368d0d31e1a176cd66f1f66cc2ccdf7368",
+        "hashSchemaVersion": 2
+      },
+      {
+        "sequence": 3,
+        "kind": "triage_decision",
+        "atTsMs": 1700000000100,
+        "insertedAtMs": 1700000000110,
+        "entryIdSha256": "87d0950aa0f9c4604d4a4a9b6c2e05e5745ba6db8a33ab5c702989070ca74b42",
+        "payloadSha256": "300be11c438b40f10336d7701903465e0f0d684916445996aa599cb45bcb279d",
+        "previousHash": "3a64f4905aea5c1c02f7757cbaf2f7368d0d31e1a176cd66f1f66cc2ccdf7368",
+        "entryHash": "6f3d93978471a7af150ee5c97beafb19ae0924c195ae5ee1c62451943f8d51d8",
+        "hashSchemaVersion": 2
+      },
+      {
+        "sequence": 4,
+        "kind": "thesis_submitted",
+        "atTsMs": 1700000000300,
+        "insertedAtMs": 1700000000310,
+        "entryIdSha256": "58a72d3a0bdedb06f37877fe17db18b92aef7201c7f1243a49676274e5121c27",
+        "payloadSha256": "ab033dcc7a1f947427915746765c84e69ff0e972fd860e79907e7a7a3a6dc51b",
+        "previousHash": "6f3d93978471a7af150ee5c97beafb19ae0924c195ae5ee1c62451943f8d51d8",
+        "entryHash": "7b7aacab586ae9586697612d6ee755121cd66d432df402e49b4896e0fc4976c4",
+        "hashSchemaVersion": 2
+      },
+      {
+        "sequence": 5,
+        "kind": "analysis_completed",
+        "atTsMs": 1700000000300,
+        "insertedAtMs": 1700000000310,
+        "entryIdSha256": "3b1dc21e93430e1246a0e8ffeeb94825829c85afa99c62ff54bb290a6bd1e4b2",
+        "payloadSha256": "3189b0911b5e14ed47290521b1eb68fcd2dc03d992ac05b4dfdc3ea14e089854",
+        "previousHash": "7b7aacab586ae9586697612d6ee755121cd66d432df402e49b4896e0fc4976c4",
+        "entryHash": "893f6021f0a397dea91f50e98911d9526213759c57905aecb2257f6332446d00",
+        "hashSchemaVersion": 2
+      },
+      {
+        "sequence": 6,
+        "kind": "risk_verdict",
+        "atTsMs": 1700000002500,
+        "insertedAtMs": 1700000002510,
+        "entryIdSha256": "1941c96d23ce7aa3395a1da9922bbbb29637b71253a764d4d690debaf3194cd6",
+        "payloadSha256": "72951bf422061213048536dc8b3c85d4109f0f1b6bfb218f1667324c53933a46",
+        "previousHash": "893f6021f0a397dea91f50e98911d9526213759c57905aecb2257f6332446d00",
+        "entryHash": "8cd81eb389ee4a83289158e814fc0ede93b6e0805a09c1dbd159ddeea586c7c4",
+        "hashSchemaVersion": 2
+      },
+      {
+        "sequence": 7,
+        "kind": "execution_intent",
+        "atTsMs": 1700000002500,
+        "insertedAtMs": 1700000002510,
+        "entryIdSha256": "966bf1628d1cb4a27d8d108aa8a51d45a16cd1407b0484a7e9d301c1ea637999",
+        "payloadSha256": "095dab4ca494ffe658df7a40270d7dbb2b75ac477b29690fdcf3c36e9caade70",
+        "previousHash": "8cd81eb389ee4a83289158e814fc0ede93b6e0805a09c1dbd159ddeea586c7c4",
+        "entryHash": "212be5d2c3bdd268bf14b7f9545e7b41224baa2fc61199bd7aae36a36f053c35",
+        "hashSchemaVersion": 2
+      },
+      {
+        "sequence": 8,
+        "kind": "paper_execution",
+        "atTsMs": 1700000002500,
+        "insertedAtMs": 1700000002510,
+        "entryIdSha256": "37a8d3105fc423efed982b005439833253f1b93a66804cec9dcf3dc9f7d1db08",
+        "payloadSha256": "324f7b7da1190467c8f5fbe4ec5ed5e381d85c7bd216464fcc778da794a89367",
+        "previousHash": "212be5d2c3bdd268bf14b7f9545e7b41224baa2fc61199bd7aae36a36f053c35",
+        "entryHash": "facca01a6fcafd86b04cd1dccd12167842f12be43ab53e2b7c083d4aafbe43df",
+        "hashSchemaVersion": 2
+      },
+      {
+        "sequence": 9,
+        "kind": "case_terminal",
+        "atTsMs": 1700000002500,
+        "insertedAtMs": 1700000002510,
+        "entryIdSha256": "ed60575ca0a5c9123fd8ef9cb59c314f051ed89d4bc5157addc71bf2c652bfa6",
+        "payloadSha256": "a279a2a5d4bef14c5f523f7145bcdbd762a9e4ff6bee856ccf4d3214bacc4ead",
+        "previousHash": "facca01a6fcafd86b04cd1dccd12167842f12be43ab53e2b7c083d4aafbe43df",
+        "entryHash": "ec2db14205262aaa9f4b4c95128db37a389cbe7c33cafd5ba63d0600cb684a62",
+        "hashSchemaVersion": 2
+      },
+      {
+        "sequence": 10,
+        "kind": "position_opened",
+        "atTsMs": 1700000002500,
+        "insertedAtMs": 1700000002510,
+        "entryIdSha256": "68b0696dffcec92707ae1ea69bb2637f847c2783f8537fc35f78b62733d7be3d",
+        "payloadSha256": "424243b8b05516adb7e51afaced01b0cde62687dd39fb073a66f2974778dbf10",
+        "previousHash": "ec2db14205262aaa9f4b4c95128db37a389cbe7c33cafd5ba63d0600cb684a62",
+        "entryHash": "6297be56975fc74ea180ee15b23bad116b54236d5f3b3d4c507881dc8edeb084",
+        "hashSchemaVersion": 2
+      },
+      {
+        "sequence": 11,
+        "kind": "position_closed",
+        "atTsMs": 1700000005000,
+        "insertedAtMs": 1700000005010,
+        "entryIdSha256": "6c93e6fc6e7ca5da3c581fff3cd76667a94c998d7a74383bea0521143fbf7fd5",
+        "payloadSha256": "265c994a18a9a07af46b05896b67aea15953a7e608cf192bfe4023fa087536c8",
+        "previousHash": "6297be56975fc74ea180ee15b23bad116b54236d5f3b3d4c507881dc8edeb084",
+        "entryHash": "3945a8cf179a117908d99d424d6a1286449cb5571050e810285422c98f3b4259",
+        "hashSchemaVersion": 2
+      },
+      {
+        "sequence": 12,
+        "kind": "position_settled",
+        "atTsMs": 1700000010000,
+        "insertedAtMs": 1700000010010,
+        "entryIdSha256": "6e4fc49c621a5b8ec1f25ec148177769ba555797f8f79c235ded44212aafd87a",
+        "payloadSha256": "7bd702c62fe1074025ac0f969eeeff947e700bb66b997221546c183b16179fcb",
+        "previousHash": "3945a8cf179a117908d99d424d6a1286449cb5571050e810285422c98f3b4259",
+        "entryHash": "ebadd4b57d1e88a24df104f03918fb8b20e86f51fe17ab913b802f7f13bd31a7",
+        "hashSchemaVersion": 2
+      }
+    ]
+  },
+  "solanaAnchor": null,
+  "integrity": {
+    "algorithm": "sha256",
+    "canonicalization": "samaritan-stable-json-v1",
+    "domain": "samaritan.decision-receipt/v1",
+    "receiptHash": "5ecddb4707e2d95a231ac8039ea27c318f9f4159da77d4e33a88c4897bd21207"
+  }
+}

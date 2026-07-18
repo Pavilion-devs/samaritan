@@ -9,7 +9,11 @@ import {
   ClassificationMetrics,
   closingLineValue
 } from "../src/metrics/classification.js";
-import { mergeReplaySources, type ReplayClock } from "../src/replay/merge.js";
+import {
+  mergeCapturedSourcesByObservedTime,
+  mergeReplaySources,
+  type ReplayClock
+} from "../src/replay/merge.js";
 
 function event(source: EventSource, sourceTsMs: number, suffix: string): CanonicalEvent {
   return {
@@ -80,6 +84,37 @@ describe("timestamp-merged replay", () => {
       }
     };
     await expect(consume()).rejects.toThrow(/moved backward/);
+  });
+});
+
+describe("capture-order replay", () => {
+  it("interleaves by local observation while preserving regressing source timestamps", async () => {
+    const first = event("txline", 2_000, "a");
+    const regressing = { ...event("txline", 1_000, "c"), observedTsMs: 3_005 };
+    const middle = event("polymarket", 2_500, "b");
+    const merged: CanonicalEvent[] = [];
+    for await (const item of mergeCapturedSourcesByObservedTime(
+      [source([first, regressing]), source([middle])],
+      { speed: Number.POSITIVE_INFINITY }
+    )) {
+      merged.push(item);
+    }
+    expect(merged.map((item) => item.eventId)).toEqual(["txline-a", "polymarket-b", "txline-c"]);
+    expect(merged[2]?.sourceTsMs).toBe(1_000);
+  });
+
+  it("fails closed when a capture source observation time regresses", async () => {
+    const consume = async () => {
+      const later = event("txline", 1_000, "a");
+      const earlier = { ...event("txline", 2_000, "b"), observedTsMs: 500 };
+      for await (const _item of mergeCapturedSourcesByObservedTime(
+        [source([later, earlier])],
+        { speed: Number.POSITIVE_INFINITY }
+      )) {
+        // Drain the replay.
+      }
+    };
+    await expect(consume()).rejects.toThrow(/observation moved backward/);
   });
 });
 

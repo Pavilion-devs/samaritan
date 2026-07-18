@@ -91,6 +91,18 @@ export type PolymarketBookEvent = CanonicalEventBase & {
   tickSize: string | null;
 };
 
+export type PolymarketResolutionEvent = CanonicalEventBase & {
+  kind: "polymarket.resolution";
+  source: "polymarket";
+  fixtureId: string;
+  market: CanonicalMarket;
+  mappingStatus: MappingStatus;
+  conditionId: string;
+  assetIds: string[];
+  winningAssetId: string;
+  winningOutcomeLabel: string;
+};
+
 export type FeedEvent = CanonicalEventBase & {
   kind: "feed.heartbeat" | "feed.status";
   fixtureId: null;
@@ -104,6 +116,7 @@ export type CanonicalEvent =
   | ScoreEvent
   | PolymarketPriceEvent
   | PolymarketBookEvent
+  | PolymarketResolutionEvent
   | FeedEvent;
 
 export function marketKey(

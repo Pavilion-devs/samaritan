@@ -98,6 +98,13 @@ export type FetchResult = {
   attempts: number;
 };
 
+export type ExactSlugDiscoveryResult = {
+  discoveryId: string;
+  events: GammaEvent[];
+};
+
+export type GammaFetch = (url: string) => Promise<FetchResult>;
+
 export function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -113,16 +120,35 @@ function retryAfterMs(value: string | null): number | undefined {
 export async function fetchWithRetry(
   url: string,
   init: RequestInit = {},
-  options: { attempts?: number; baseDelayMs?: number; maxDelayMs?: number } = {}
+  options: {
+    attempts?: number;
+    baseDelayMs?: number;
+    maxDelayMs?: number;
+    attemptTimeoutMs?: number;
+    deadlineTsMs?: number;
+  } = {}
 ): Promise<FetchResult> {
   const attempts = Math.max(1, options.attempts ?? 6);
   const baseDelayMs = Math.max(50, options.baseDelayMs ?? 500);
   const maxDelayMs = Math.max(baseDelayMs, options.maxDelayMs ?? 20_000);
+  const attemptTimeoutMs = Math.max(100, options.attemptTimeoutMs ?? 15_000);
   let lastError = "";
 
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    const remainingMs = options.deadlineTsMs === undefined ? Number.POSITIVE_INFINITY : options.deadlineTsMs - Date.now();
+    if (remainingMs <= 0) {
+      lastError = "request deadline exhausted";
+      break;
+    }
+    const controller = new AbortController();
+    const timeout = setTimeout(
+      () => controller.abort(new Error("request attempt timed out")),
+      Math.max(1, Math.min(attemptTimeoutMs, remainingMs))
+    );
+    const parentSignal = init.signal;
+    const signal = parentSignal ? AbortSignal.any([parentSignal, controller.signal]) : controller.signal;
     try {
-      const response = await fetch(url, init);
+      const response = await fetch(url, { ...init, signal });
       const text = await response.text();
       if (response.ok || (response.status < 500 && response.status !== 429)) {
         return {
@@ -145,14 +171,22 @@ export async function fetchWithRetry(
       }
       const exponential = Math.min(maxDelayMs, baseDelayMs * 2 ** (attempt - 1));
       const jitter = Math.floor(Math.random() * Math.max(1, exponential * 0.35));
-      await sleep(retryAfterMs(response.headers.get("retry-after")) ?? exponential + jitter);
+      const requestedDelay = retryAfterMs(response.headers.get("retry-after")) ?? exponential + jitter;
+      const retryBudget = options.deadlineTsMs === undefined ? requestedDelay : Math.max(0, options.deadlineTsMs - Date.now());
+      if (retryBudget <= 0) break;
+      await sleep(Math.min(requestedDelay, retryBudget));
     } catch (error) {
       lastError = error instanceof Error ? error.message : String(error);
       if (attempt < attempts) {
         const exponential = Math.min(maxDelayMs, baseDelayMs * 2 ** (attempt - 1));
         const jitter = Math.floor(Math.random() * Math.max(1, exponential * 0.35));
-        await sleep(exponential + jitter);
+        const requestedDelay = exponential + jitter;
+        const retryBudget = options.deadlineTsMs === undefined ? requestedDelay : Math.max(0, options.deadlineTsMs - Date.now());
+        if (retryBudget <= 0) break;
+        await sleep(Math.min(requestedDelay, retryBudget));
       }
+    } finally {
+      clearTimeout(timeout);
     }
   }
   return { ok: false, status: 0, text: lastError, contentType: "", attempts };
@@ -172,6 +206,111 @@ export async function writeAtomicText(path: string, text: string): Promise<void>
 
 export async function writeAtomicJson(path: string, value: unknown): Promise<void> {
   await writeAtomicText(path, `${JSON.stringify(value, null, 2)}\n`);
+}
+
+function safePathSegment(value: string): string {
+  return value.replace(/[^a-zA-Z0-9._-]+/g, "-") || "event";
+}
+
+/**
+ * Fetches only explicitly approved Gamma event slugs. Each raw response and its
+ * request manifest are committed atomically before the response is trusted.
+ * This deliberately does not call /sports or /events/keyset.
+ */
+export async function discoverEventsByExactSlugs(options: {
+  outDir: string;
+  eventSlugs: Iterable<string>;
+  manifestLogPath?: string;
+  fetcher?: GammaFetch;
+  deadlineTsMs?: number;
+}): Promise<ExactSlugDiscoveryResult> {
+  const eventSlugs = [...new Set([...options.eventSlugs].map((slug) => slug.trim()).filter(Boolean))];
+  if (eventSlugs.length === 0) throw new Error("Exact-slug discovery requires at least one event slug");
+
+  const discoveryId = timestampSlug();
+  const rawDir = join(options.outDir, "exact-slug", discoveryId);
+  const fetcher = options.fetcher ?? ((url: string) => fetchWithRetry(url, {}, {
+    deadlineTsMs: options.deadlineTsMs,
+    attemptTimeoutMs: 15_000
+  }));
+  const events: GammaEvent[] = [];
+  await ensureDir(rawDir);
+
+  for (const [index, requestedSlug] of eventSlugs.entries()) {
+    const prefix = `${String(index).padStart(3, "0")}-${safePathSegment(requestedSlug)}`;
+    const url = `${GAMMA_ORIGIN}/events/slug/${encodeURIComponent(requestedSlug)}`;
+    let response: FetchResult;
+    try {
+      response = await fetcher(url);
+    } catch (fetchError) {
+      response = {
+        ok: false,
+        status: 0,
+        text: fetchError instanceof Error ? fetchError.stack ?? fetchError.message : String(fetchError),
+        contentType: "",
+        attempts: 1
+      };
+    }
+    const rawPath = join(rawDir, `${prefix}.response.json`);
+    const requestManifestPath = join(rawDir, `${prefix}.manifest.json`);
+    const capturedAt = new Date().toISOString();
+    await writeAtomicText(rawPath, response.text.endsWith("\n") ? response.text : `${response.text}\n`);
+
+    let event: GammaEvent | undefined;
+    let returnedSlug = "";
+    let error = "";
+    if (!response.ok) {
+      error = `Gamma exact event ${requestedSlug} failed ${response.status}`;
+    } else {
+      try {
+        const parsed = JSON.parse(response.text) as unknown;
+        if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+          error = `Gamma exact event ${requestedSlug} returned a non-object JSON body`;
+        } else {
+          event = parsed as GammaEvent;
+          returnedSlug = typeof event.slug === "string" ? event.slug : "";
+          if (returnedSlug !== requestedSlug) {
+            error = `Gamma exact event slug mismatch: requested ${requestedSlug}, received ${returnedSlug || "<missing>"}`;
+          }
+        }
+      } catch (parseError) {
+        error = `Gamma exact event ${requestedSlug} returned invalid JSON: ${parseError instanceof Error ? parseError.message : String(parseError)}`;
+      }
+    }
+
+    const manifestEntry = {
+      at: capturedAt,
+      action: "gamma-event-slug",
+      discoveryId,
+      requestedSlug,
+      returnedSlug: returnedSlug || null,
+      status: response.status,
+      attempts: response.attempts,
+      contentType: response.contentType,
+      path: rawPath,
+      url,
+      outcome: error ? "failed" : "captured",
+      error: error || null
+    };
+    await writeAtomicJson(requestManifestPath, manifestEntry);
+    if (options.manifestLogPath) await appendJsonl(options.manifestLogPath, manifestEntry);
+    if (error || !event) throw new Error(error || `Gamma exact event ${requestedSlug} was not captured`);
+
+    events.push(event);
+    const eventId = String(event.id ?? "event");
+    await writeAtomicJson(join(options.outDir, "events", `${safePathSegment(eventId)}-${safePathSegment(requestedSlug)}.json`), event);
+  }
+
+  await writeAtomicJson(join(options.outDir, "exact-slug-events.json"), events);
+  await writeAtomicJson(join(options.outDir, "exact-slug-discovery-metadata.json"), {
+    capturedAt: new Date().toISOString(),
+    discoveryId,
+    endpoint: "Gamma /events/slug/{slug}",
+    requestedSlugs: eventSlugs,
+    events: events.length,
+    relevantMarkets: relevantMarkets(events).length
+  });
+  return { discoveryId, events };
 }
 
 export function parseStringArray(value: unknown): string[] {
