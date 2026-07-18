@@ -17,8 +17,8 @@ Both semifinal paired captures failed closed and are inadmissible. France–Spai
 
 ## Public release links
 
-- **Hosted judge MVP:** [samaritan-txline-2026.asaborodaniel.chatgpt.site](https://samaritan-txline-2026.asaborodaniel.chatgpt.site/)
-- **One-call judge evidence:** [public read-only evidence endpoint](https://samaritan-txline-2026.asaborodaniel.chatgpt.site/api/judge/evidence)
+- **Hosted judge MVP:** [getsamaritan.xyz](https://getsamaritan.xyz/)
+- **One-call judge evidence:** [public read-only evidence endpoint](https://getsamaritan.xyz/api/judge/evidence)
 - **Demo video:** `[YOUTUBE_OR_LOOM_URL — pending recording and public playback verification]`
 - **Public repository:** [github.com/Pavilion-devs/samaritan](https://github.com/Pavilion-devs/samaritan)
 
@@ -70,7 +70,7 @@ The downloadable receipt is locally verified but **not Solana-anchored**. Offlin
 | Autonomous Operation | `pnpm demo` and **Proof** demonstrate deterministic end-to-end orchestration with model stubs—not an authentic Claude trading case; the forward-paper governance boundary is in [the v2 registration record](docs/10-paper-study-v2-registration.md) |
 | Clean, deterministic, defensible logic/code | Risk verdict and pre-action ledger in the downloadable receipt; detector/risk tests; identical canonical live/replay contracts |
 | Innovation/novelty | Strict Claude thesis boundary plus non-overridable deterministic authority, fail-closed evidence admission, and portable decision receipts |
-| Production readiness | `pnpm judge:check`, restart-safe portfolio reconstruction, public-artifact audit, security headers, explicit failure states, and the signed-out [hosted MVP](https://samaritan-txline-2026.asaborodaniel.chatgpt.site/) |
+| Production readiness | `pnpm judge:check`, restart-safe portfolio reconstruction, public-artifact audit, security headers, explicit failure states, and the signed-out [hosted MVP](https://getsamaritan.xyz/) |
 
 Every public surface separates **real captured retrospective evidence**, **historical sampled-price research**, and **synthetic engineering proof**. Registration is a governance fact, not a performance result.
 

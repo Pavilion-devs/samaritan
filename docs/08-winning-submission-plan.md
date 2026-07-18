@@ -22,7 +22,7 @@ The product is no longer an idea looking for a demo. The core judge story and pu
 | Decision proof | The deterministic synthetic lifecycle produces a v2 ledger and offline-verifiable receipt; exact final hashes must be recorded only after the public commit and bundle are frozen | **Ready, local integrity only; final hashes pending freeze** |
 | Claude invocation evidence | Separate append-only hash chain verifies hash-only run metadata locally; a receipt may carry a generation-time reference, but its offline verifier does not independently prove membership | **Local audit only; no provider attestation and no active v2 run** |
 | Public evidence bundle | A strict allowlist of derived artifacts passes the public-data audit during development; exact file count and bundle hash must come from the final frozen export | **Ready for final public-commit audit** |
-| Dashboard | Command, Matchroom, Casebook, Study, and Proof are deployed read-only at the [public judge MVP](https://samaritan-txline-2026.asaborodaniel.chatgpt.site/) | **Deployed; signed-out desktop/mobile routes and API methods verified** |
+| Dashboard | Command, Matchroom, Casebook, Study, and Proof are deployed read-only at the [public judge MVP](https://getsamaritan.xyz/) | **Deployed; signed-out desktop/mobile routes and API methods verified** |
 | Historical claim | Corrected causal/economic v4 reports 38 held-out normalized buys / 18 fixtures / `+132.7` bps after proxy / clustered interval `+14.3` to `+243.9` | **Signal research only; v2 registered July 18 for forward paper observation** |
 | External anchor | Offline devnet preparation and human-gated tooling exist; no signer, RPC submission, wallet action, or transaction is part of the bounty release | **Intentionally unanchored; no explorer claim** |
 | Capture expansion | France–Spain failed closed before kickoff. England–Argentina also failed closed after a watchdog-detected Polymarket stall and incomplete terminal manifests, so no semifinal paired capture is currently admissible | **No eligible semifinal paired capture; capture-only evidence remains blocked** |
@@ -70,7 +70,7 @@ The bounty submission addresses the five published criteria directly:
 2. **Autonomous Operation:** one synthetic, explicitly performance-excluded case completes the conductor end to end with deterministic stubs; an authentic Claude lifecycle is not claimed without an admitted fixture.
 3. **Clean, deterministic, defensible logic/code:** code owns eligibility, paper risk, pre-action ledgering, execution, and failure handling.
 4. **Innovation/novelty:** an LLM can contribute bounded judgment without receiving authority over money, while refusals and invalidated research remain first-class evidence.
-5. **Production readiness:** a stranger can open the [no-wallet judge path](https://samaritan-txline-2026.asaborodaniel.chatgpt.site/), inspect its failure boundaries, and independently verify disclosed decision ordering and paper results.
+5. **Production readiness:** a stranger can open the [no-wallet judge path](https://getsamaritan.xyz/), inspect its failure boundaries, and independently verify disclosed decision ordering and paper results.
 
 The submission will not depend on:
 
@@ -535,7 +535,7 @@ Required routes:
 Actions:
 
 - [x] Replace offline-only projection assumptions with the frozen public bundle plus runtime API.
-- [x] Bind the service to the validated platform interface and deploy the no-login [judge MVP](https://samaritan-txline-2026.asaborodaniel.chatgpt.site/).
+- [x] Bind the service to the validated platform interface and deploy the no-login [judge MVP](https://getsamaritan.xyz/).
 - [x] Correct detector and proof labels.
 - [x] Show zero-state, failure, veto, no-trade, and synthetic paper-fill states honestly and with persistent evidence-class labels.
 - [x] Surface model cost and execution latency in the captured case and downloadable receipt.
@@ -800,7 +800,7 @@ No Samaritan decision receipt is on-chain. TXLine access uses Solana-backed subs
 
 ### “Can I reproduce this?”
 
-Yes: use the public clean-clone command, verify the frozen receipt independently, or open the signed-out [hosted no-wallet path](https://samaritan-txline-2026.asaborodaniel.chatgpt.site/).
+Yes: use the public clean-clone command, verify the frozen receipt independently, or open the signed-out [hosted no-wallet path](https://getsamaritan.xyz/).
 
 ### “What failed?”
 
