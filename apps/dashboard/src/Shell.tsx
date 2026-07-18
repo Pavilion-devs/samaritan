@@ -50,6 +50,38 @@ export function BrandMark() {
   return <span className="brand-mark" aria-hidden="true"><i /><i /></span>;
 }
 
+export function EditorialNavigation({ active, modeLabel }: { active: ProductRoute; modeLabel: string }) {
+  const links: Array<{ id: ProductRoute; href: string; label: string }> = [
+    { id: "command", href: "/command", label: "Overview" },
+    { id: "matchroom", href: "/matchroom", label: "Live match" },
+    { id: "casebook", href: "/casebook", label: "Decisions" },
+    { id: "study", href: "/study", label: "Performance" },
+    { id: "proof", href: "/proof", label: "Proof" }
+  ];
+
+  return (
+    <header className="editorial-nav">
+      <a className="editorial-brand" href="/command" aria-label="Samaritan overview">
+        <BrandMark />
+        <span>Samaritan</span>
+      </a>
+      <nav className="editorial-links" aria-label="Product navigation">
+        {links.map((link) => (
+          <a
+            className={link.id === active ? "active" : undefined}
+            href={link.href}
+            aria-current={link.id === active ? "page" : undefined}
+            key={link.id}
+          >
+            {link.label}
+          </a>
+        ))}
+      </nav>
+      <div className="editorial-observer-state"><i aria-hidden="true" /><span>{modeLabel}</span></div>
+    </header>
+  );
+}
+
 export type ProvenanceTone = "capture" | "configured" | "historical" | "offline" | "synthetic";
 
 export function ProvenanceBadge({ label, tone }: { label: string; tone: ProvenanceTone }) {

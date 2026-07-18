@@ -1,7 +1,7 @@
 import { startTransition, useEffect, useMemo, useState } from "react";
 import type { CommandFixture, CommandSnapshot } from "../../../src/dash/public-contract";
 import { loadCommand, loadTxlinePulse, type TxlinePulse } from "./api";
-import { BrandMark, Icon } from "./Shell";
+import { BrandMark, EditorialNavigation, Icon } from "./Shell";
 
 function percent(value: number, digits = 2) {
   return `${(value * 100).toFixed(digits)}%`;
@@ -40,25 +40,6 @@ function fixturePosture(fixture: CommandFixture, nowMs: number) {
   }
   if (nowMs < Date.parse(fixture.captureStartUtc)) return "Capture window scheduled";
   return "Frozen capture window";
-}
-
-function EditorialHeader() {
-  return (
-    <header className="editorial-nav">
-      <a className="editorial-brand" href="/command" aria-label="Samaritan overview">
-        <BrandMark />
-        <span>Samaritan</span>
-      </a>
-      <nav className="editorial-links" aria-label="Product navigation">
-        <a className="active" href="/command" aria-current="page">Overview</a>
-        <a href="/matchroom">Live match</a>
-        <a href="/casebook">Decisions</a>
-        <a href="/study">Performance</a>
-        <a href="/proof">Proof</a>
-      </nav>
-      <div className="editorial-observer-state"><i aria-hidden="true" /><span>Observer mode · no real orders</span></div>
-    </header>
-  );
 }
 
 function useLivePulse() {
@@ -216,7 +197,7 @@ function CommandView({ snapshot }: { snapshot: CommandSnapshot }) {
   return (
     <div className="editorial-command">
       <div className="editorial-page">
-        <EditorialHeader />
+        <EditorialNavigation active="command" modeLabel="Observer mode · no real orders" />
         <main>
           <section className="editorial-hero" aria-labelledby="editorial-hero-title">
             <div className="editorial-hero-copy">
