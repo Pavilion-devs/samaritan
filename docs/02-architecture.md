@@ -91,7 +91,7 @@ No thesis, no trade. The thesis contains no stake, order, venue credential, wall
 
 **Ops watchdog ("Data Doctor") — target architecture.** A future scheduled agent pass would inspect SSE gaps, schema drift, latency, and missing fixtures. The current capture supervisor has deterministic preflight, stale-stream, process, and deadline guards; it does not claim the Data Doctor agent exists.
 
-**Demo constraint (binding, from verified hackathon terms):** judges must be able to evaluate with **zero cost and zero wallets**. The deployed [judge MVP](https://samaritan-txline-2026.asaborodaniel.chatgpt.site/) is a derived-only, read-only dashboard backed by frozen public artifacts and an aggregate operational pulse; it requires no credentials. There is no submitted Solana transaction or explorer link; anchoring stays optional and human-gated.
+**Demo constraint (binding, from verified hackathon terms):** judges must be able to evaluate with **zero cost and zero wallets**. The deployed [judge MVP](https://getsamaritan.xyz/) is a derived-only, read-only dashboard backed by frozen public artifacts and an aggregate operational pulse; it requires no credentials. There is no submitted Solana transaction or explorer link; anchoring stays optional and human-gated.
 
 ---
 

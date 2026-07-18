@@ -69,7 +69,7 @@ Then verify all of the following before pushing or deploying:
 
 ## Human release gates still open
 
-1. The approved GitHub remote is `Pavilion-devs/samaritan`; freeze and merge the exact release commit to default `main`. The [hosted deployment](https://samaritan-txline-2026.asaborodaniel.chatgpt.site/) has passed signed-out desktop/mobile route and API-method checks and must remain publicly reachable.
+1. The approved GitHub remote is `Pavilion-devs/samaritan`; freeze and merge the exact release commit to default `main`. The [hosted deployment](https://getsamaritan.xyz/) has passed signed-out desktop/mobile route and API-method checks and must remain publicly reachable.
 2. The bounty release is intentionally unanchored. Do not submit a devnet transaction or add an explorer link unless Deborah explicitly changes that scope in a separate authorization.
 3. Deborah sends and retains the sponsor clarification request; silence is not approval.
 4. Deborah rewrites/rehearses the narration, records the final video, verifies every public URL, and submits through Superteam Earn.
