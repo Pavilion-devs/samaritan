@@ -1,16 +1,15 @@
 import { startTransition, useEffect, useState } from "react";
 import {
   BrandMark,
+  EditorialNavigation,
   Icon,
   type IconName,
-  MobileNavigation,
-  Navigation,
-  ProvenanceBadge,
-  Topbar,
   formatUsdMicros
 } from "./Shell";
 
 const RECEIPT_PATH = "/artifacts/dashboard/synthetic-decision-receipt.json";
+const COMMAND_PATH = "/artifacts/dashboard/command.json";
+const MANIFEST_PATH = "/artifacts/dashboard/manifest.json";
 const VERIFY_COMMAND = "pnpm receipt:verify -- public/artifacts/dashboard/synthetic-decision-receipt.json";
 const RECEIPT_HASH_DOMAIN = "samaritan.decision-receipt/v1";
 
@@ -20,6 +19,16 @@ type ProofLedgerEntry = {
   kind: string;
   previousHash: string;
   sequence: number;
+};
+
+type ProofSourceEvidence = {
+  disclosure: string;
+  evidenceRefSha256: string;
+  observedAtTsMs: number;
+  payloadSha256: string;
+  role: string;
+  source: string;
+  sourceTsMs: number;
 };
 
 type ProofReceipt = {
@@ -66,6 +75,16 @@ type ProofReceipt = {
     rowsAtGeneration: number;
     verificationAtGeneration: string;
   };
+  build: {
+    codeSha256: string;
+    codeVersion: string;
+    configSha256: string;
+  };
+  disclosure: {
+    policy: string;
+    rawTxlineFieldsIncluded: boolean;
+  };
+  sourceEvidence: ProofSourceEvidence[];
   integrity: {
     algorithm: string;
     canonicalization: string;
@@ -75,18 +94,34 @@ type ProofReceipt = {
   solanaAnchor: unknown | null;
 };
 
+type ProofPublicContext = {
+  replay: {
+    canonicalEvents: number;
+    replayIdentityHash: string;
+    replayIdentityParity: boolean;
+    pairedBookReplays: number;
+  };
+  bundle: {
+    bundleId: string;
+    bundleSha256: string;
+    canonicalization: string;
+  };
+};
+
 export type BrowserProofVerification = {
   valid: boolean;
   canonicalHashValid: boolean;
   disclosedChainValid: boolean;
   lifecycleOrderValid: boolean;
   syntheticBoundaryValid: boolean;
+  sourceReferencesValid: boolean;
   anchorAbsent: boolean;
   issues: string[];
 };
 
 type ProofLoad = {
   receipt: ProofReceipt;
+  context: ProofPublicContext;
   verification: BrowserProofVerification;
 };
 
@@ -102,10 +137,44 @@ function parseProofReceipt(value: unknown): ProofReceipt {
   if (!isRecord(value.ledger) || !isRecord(value.integrity) || !Array.isArray(value.ledger.caseEntries)) {
     throw new Error("Receipt is missing its integrity or ledger envelope");
   }
+  if (!isRecord(value.build) || !isRecord(value.disclosure) || !Array.isArray(value.sourceEvidence)) {
+    throw new Error("Receipt is missing its build, disclosure, or source-reference envelope");
+  }
   if (!Array.isArray(value.agents.runs) || !Array.isArray(value.lifecycle.orderedEventKinds)) {
     throw new Error("Receipt is missing its disclosed agent or event sequence");
   }
   return value as unknown as ProofReceipt;
+}
+
+function parsePublicContext(commandValue: unknown, manifestValue: unknown): ProofPublicContext {
+  if (!isRecord(commandValue) || !isRecord(commandValue.data) || !isRecord(commandValue.data.proof)) {
+    throw new Error("Public replay proof is missing");
+  }
+  if (!isRecord(manifestValue)) throw new Error("Public bundle manifest is missing");
+  const proof = commandValue.data.proof;
+  const canonicalEvents = proof.canonicalEvents;
+  const replayIdentityHash = proof.replayIdentityHash;
+  const replayIdentityParity = proof.replayIdentityParity;
+  const pairedBookReplays = proof.pairedBookReplays;
+  if (
+    typeof canonicalEvents !== "number" ||
+    typeof replayIdentityHash !== "string" ||
+    typeof replayIdentityParity !== "boolean" ||
+    typeof pairedBookReplays !== "number" ||
+    typeof manifestValue.bundleId !== "string" ||
+    typeof manifestValue.bundleSha256 !== "string" ||
+    typeof manifestValue.canonicalization !== "string"
+  ) {
+    throw new Error("Public proof context is malformed");
+  }
+  return {
+    replay: { canonicalEvents, replayIdentityHash, replayIdentityParity, pairedBookReplays },
+    bundle: {
+      bundleId: manifestValue.bundleId,
+      bundleSha256: manifestValue.bundleSha256,
+      canonicalization: manifestValue.canonicalization
+    }
+  };
 }
 
 function stableJson(value: unknown): string {
@@ -130,9 +199,8 @@ async function sha256Hex(value: string): Promise<string> {
 }
 
 /**
- * Recomputes the portable receipt commitment and checks only the relationships
- * disclosed in the public artifact. The CLI below remains the strict schema and
- * semantic verifier; neither verifier replays private source payloads.
+ * Recomputes the portable receipt commitment and checks only relationships
+ * disclosed in the public artifact. It does not replay private source data.
  */
 export async function verifyBrowserProof(value: unknown): Promise<BrowserProofVerification> {
   const receipt = parseProofReceipt(value);
@@ -169,6 +237,20 @@ export async function verifyBrowserProof(value: unknown): Promise<BrowserProofVe
     receipt.agents.runs.every((run) => run.invocationClass === "synthetic_stub" && run.actualCostNanoUsd === 0);
   if (!syntheticBoundaryValid) issues.push("Synthetic or zero-external-model-call boundary changed");
 
+  const sha256Pattern = /^[a-f0-9]{64}$/u;
+  const sourceReferencesValid =
+    receipt.sourceEvidence.length > 0 &&
+    receipt.sourceEvidence.every((reference) =>
+      reference.disclosure === "hash_only" &&
+      sha256Pattern.test(reference.evidenceRefSha256) &&
+      sha256Pattern.test(reference.payloadSha256) &&
+      Number.isSafeInteger(reference.observedAtTsMs) &&
+      Number.isSafeInteger(reference.sourceTsMs)
+    ) &&
+    receipt.disclosure.policy === "hashes_and_derived_signals_only" &&
+    receipt.disclosure.rawTxlineFieldsIncluded === false;
+  if (!sourceReferencesValid) issues.push("Source-reference disclosure boundary changed");
+
   const anchorAbsent = receipt.solanaAnchor === null;
   if (!anchorAbsent) issues.push("This page only accepts the frozen unanchored proving receipt");
 
@@ -178,13 +260,14 @@ export async function verifyBrowserProof(value: unknown): Promise<BrowserProofVe
     disclosedChainValid,
     lifecycleOrderValid,
     syntheticBoundaryValid,
+    sourceReferencesValid,
     anchorAbsent,
     issues
   };
 }
 
 function compactHash(value: string) {
-  return `${value.slice(0, 14)}…${value.slice(-10)}`;
+  return `${value.slice(0, 13)}…${value.slice(-9)}`;
 }
 
 function formatTime(value: number) {
@@ -228,136 +311,209 @@ function eventDetail(receipt: ProofReceipt, kind: string) {
   return kind.replaceAll("_", " ");
 }
 
-function ProofHero({ receipt }: { receipt: ProofReceipt }) {
-  const risk = receipt.lifecycle.risk;
+function ProofHero({ receipt, verification }: ProofLoad) {
+  const passedChecks = [
+    verification.canonicalHashValid,
+    verification.disclosedChainValid,
+    verification.lifecycleOrderValid,
+    verification.syntheticBoundaryValid,
+    verification.sourceReferencesValid,
+    verification.anchorAbsent
+  ].filter(Boolean).length;
   return (
-    <section className="judge-proof-hero reveal r1" aria-labelledby="proof-heading">
-      <div className="judge-proof-hero-copy">
-        <ProvenanceBadge tone="synthetic" label="Synthetic proving fixture · performance excluded" />
-        <span className="judge-proof-kicker">A decision boundary, made inspectable</span>
-        <h2 id="proof-heading">THE MONEY PATH<br /><em>SAMARITAN REFUSED.</em></h2>
-        <p><strong>What was refused:</strong> every path from an agent recommendation to real money. A deterministic Opus-shaped stub recommended a paper trade; code-owned risk kept the money gate closed and exercised only the synthetic paper lifecycle.</p>
+    <section className="editorial-proof-hero" aria-labelledby="editorial-proof-title">
+      <div className="editorial-proof-hero-copy">
+        <span className="editorial-proof-kicker"><i aria-hidden="true" />Portable receipt · recomputed in this browser</span>
+        <h1 id="editorial-proof-title">Proof survives<br />the page.</h1>
+        <p>Samaritan does not ask a judge to trust a polished screen. It exposes a frozen receipt, an ordered decision chain, and the exact boundary of every verification claim.</p>
+        <div className="editorial-proof-hero-note"><Icon name="shield" /><span><b>Synthetic engineering proof.</b><small>Permanently excluded from performance, profitability, and real-fill evidence.</small></span></div>
       </div>
-      <div className="judge-proof-refusal" aria-label="Agent recommendation and deterministic decision">
-        <header><span><i />Decision boundary</span><em>Zero real orders</em></header>
-        <div className="judge-proof-refusal-flow">
-          <div><small>01 · Agent-shaped thesis</small><b>{receipt.lifecycle.thesis?.recommendation.replaceAll("_", " ") ?? "No thesis"}</b><span>May recommend. Cannot size or execute.</span></div>
-          <i><Icon name="arrow" /></i>
-          <div className="authority"><small>02 · Deterministic authority</small><b>{risk?.decision ?? "closed"} paper</b><span>{risk?.stakeMicroUsd ? formatUsdMicros(risk.stakeMicroUsd) : "$0.00"} fixed · real money {risk?.realMoneyGate ?? "closed"}</span></div>
-          <i><Icon name="arrow" /></i>
-          <div className="refused"><small>03 · Money boundary</small><b>REFUSED</b><span>Paper adapter only · no wallet or venue order</span></div>
-        </div>
-        <footer><Icon name="shield" /><span><b>An LLM never touches money here.</b><small>The synthetic case continues after the refusal solely to prove paper execution, close, settlement, and receipt wiring.</small></span></footer>
+      <div className={`editorial-proof-seal${verification.valid ? " valid" : " invalid"}`}>
+        <header><span>Portable evidence check</span><em>{verification.valid ? "Complete" : "Failed closed"}</em></header>
+        <div className="editorial-proof-seal-mark"><Icon name={verification.valid ? "proof" : "minus"} /><strong>{verification.valid ? "RECONCILED" : "INVALID"}</strong><small>{passedChecks} / 6 disclosed checks</small></div>
+        <div className="editorial-proof-seal-hash"><span>Receipt commitment</span><code title={receipt.integrity.receiptHash}>{compactHash(receipt.integrity.receiptHash)}</code></div>
+        <footer><span><i />Local SHA-256 verification</span><span>Generated {new Date(receipt.generatedAtTsMs).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric", timeZone: "UTC" })}</span></footer>
       </div>
     </section>
   );
 }
 
-function ProofTruthStrip({ receipt }: { receipt: ProofReceipt }) {
+function AssuranceLadder({ receipt, context, verification }: ProofLoad) {
   return (
-    <section className="judge-proof-truth surface reveal r2" aria-label="Proof claim boundary">
-      <div><span>Evidence class</span><b>Synthetic proving fixture</b><small>No real match or licensed feed record</small></div>
-      <div><span>Models</span><b>{receipt.agents.runs.length} deterministic stubs</b><small>Zero Anthropic API cost or calls</small></div>
-      <div><span>Performance use</span><b>Excluded</b><small>Not alpha, P&amp;L, or fill evidence</small></div>
-      <div><span>Execution</span><b>Paper only</b><small>Zero real orders · gate closed</small></div>
-      <div><span>Solana</span><b>Not submitted</b><small>No anchor or network verification</small></div>
+    <section className="editorial-proof-assurance" aria-labelledby="editorial-proof-assurance-title">
+      <header className="editorial-proof-section-heading">
+        <span><small>Assurance ladder</small><h2 id="editorial-proof-assurance-title">Three truths. Three different guarantees.</h2></span>
+        <em>Claims stay separate</em>
+      </header>
+      <div className="editorial-proof-assurance-grid">
+        <article className="verified">
+          <span className="editorial-proof-assurance-index">01</span>
+          <div><small>Portable receipt</small><h3>Verified locally</h3><p>The browser recomputed the canonical receipt and reconciled its disclosed ledger links.</p></div>
+          <footer><Icon name="check" /><b>{verification.valid ? "All disclosed checks passed" : "Verification failed"}</b></footer>
+        </article>
+        <article className="captured">
+          <span className="editorial-proof-assurance-index">02</span>
+          <div><small>Separate captured replay</small><h3>{context.replay.replayIdentityParity ? "Identity matched" : "Identity mismatch"}</h3><p>{context.replay.canonicalEvents.toLocaleString("en-US")} canonical events preserve the real Spain–Belgium replay identity.</p></div>
+          <footer><Icon name="replay" /><b>{context.replay.pairedBookReplays} paired-book replay</b></footer>
+        </article>
+        <article className="unsubmitted">
+          <span className="editorial-proof-assurance-index">03</span>
+          <div><small>External timestamp</small><h3>{receipt.solanaAnchor === null ? "Not submitted" : "Unexpected anchor"}</h3><p>No Solana transaction exists for this receipt. There is no explorer link and no network-verification claim.</p></div>
+          <footer><Icon name="lock" /><b>Human-gated roadmap item</b></footer>
+        </article>
+      </div>
+      <footer className="editorial-proof-assurance-boundary"><Icon name="shield" /><p><b>Guarantee boundary:</b> local verification is not a Solana timestamp. Replay identity is not TXLine on-chain validation. Neither is evidence of profitability.</p></footer>
+    </section>
+  );
+}
+
+function DecisionBoundary({ receipt }: { receipt: ProofReceipt }) {
+  const risk = receipt.lifecycle.risk;
+  return (
+    <section className="editorial-proof-decision" aria-labelledby="editorial-proof-decision-title">
+      <header className="editorial-proof-section-heading">
+        <span><small>Decision boundary</small><h2 id="editorial-proof-decision-title">The recommendation stops before money.</h2></span>
+        <em>Zero real orders</em>
+      </header>
+      <div className="editorial-proof-decision-path">
+        <article><span>01</span><small>Agent-shaped thesis</small><h3>{receipt.lifecycle.thesis?.recommendation.replaceAll("_", " ") ?? "No thesis"}</h3><p>May recommend. Cannot size or execute.</p></article>
+        <i><Icon name="arrow" /></i>
+        <article className="authority"><span>02</span><small>Deterministic authority</small><h3>{risk?.decision ?? "closed"} paper</h3><p>{risk?.stakeMicroUsd ? formatUsdMicros(risk.stakeMicroUsd) : "$0.00"} fixed · code owns limits.</p></article>
+        <i><Icon name="arrow" /></i>
+        <article className="refused"><span>03</span><small>Real-money path</small><h3>Refused</h3><p>Paper adapter only. No wallet or venue order.</p></article>
+      </div>
+      <footer><Icon name="lock" /><span><b>An LLM never touches money here.</b><small>The synthetic lifecycle continues only to prove paper execution, close, settlement, and receipt wiring.</small></span></footer>
+    </section>
+  );
+}
+
+function VerificationPanel({ receipt, verification }: ProofLoad) {
+  const checks = [
+    { label: "Canonical receipt hash", detail: "Recomputed in this browser", pass: verification.canonicalHashValid },
+    { label: "Disclosed ledger links", detail: "Sequences, links, and final head reconcile", pass: verification.disclosedChainValid },
+    { label: "Lifecycle ordering", detail: "Event kinds match committed row order", pass: verification.lifecycleOrderValid },
+    { label: "Synthetic boundary", detail: "Stubs, zero model cost, performance excluded", pass: verification.syntheticBoundaryValid },
+    { label: "Source references", detail: `${receipt.sourceEvidence.length} hash-only commitments · no raw TXLine`, pass: verification.sourceReferencesValid },
+    { label: "External anchor", detail: "Absent; no network verification claimed", pass: verification.anchorAbsent }
+  ];
+  return (
+    <section className="editorial-proof-verification" aria-labelledby="editorial-proof-verification-title">
+      <header className="editorial-proof-section-heading">
+        <span><small>Browser verification</small><h2 id="editorial-proof-verification-title">Every visible check has a boundary.</h2></span>
+        <em className={verification.valid ? "pass" : "fail"}><Icon name={verification.valid ? "check" : "minus"} />{verification.valid ? "Reconciled" : "Failed"}</em>
+      </header>
+      <div className="editorial-proof-check-grid">
+        {checks.map((check, index) => (
+          <div className={check.pass ? "pass" : "fail"} key={check.label}>
+            <span>{String(index + 1).padStart(2, "0")}</span><i><Icon name={check.pass ? "check" : "minus"} /></i><span><b>{check.label}</b><small>{check.detail}</small></span>
+          </div>
+        ))}
+      </div>
+      <footer><Icon name="proof" /><span><small>Ledger state at receipt generation</small><b>{receipt.ledger.verificationAtGeneration.replaceAll("_", " ")}</b></span></footer>
     </section>
   );
 }
 
 function ProofLedger({ receipt }: { receipt: ProofReceipt }) {
   return (
-    <section className="judge-proof-ledger surface reveal r3" aria-labelledby="proof-ledger-heading">
-      <header className="judge-proof-panel-head">
-        <div><span>Append-only · ordered before action</span><h2 id="proof-ledger-heading">Decision ledger</h2></div>
-        <span>{receipt.ledger.caseEntries.length} disclosed case events</span>
+    <section className="editorial-proof-ledger" aria-labelledby="editorial-proof-ledger-title">
+      <header className="editorial-proof-section-heading">
+        <span><small>Append-only · ordered before action</small><h2 id="editorial-proof-ledger-title">The decision ledger</h2></span>
+        <em>{receipt.ledger.caseEntries.length} disclosed events</em>
       </header>
-      <div className="judge-proof-ledger-head"><span>Seq.</span><span>Boundary</span><span>Committed event</span><span>UTC</span><span>Entry hash</span></div>
-      <div className="judge-proof-ledger-rows">
+      <div className="editorial-proof-ledger-table">
+        <div className="editorial-proof-ledger-head"><span>Seq.</span><span>Boundary</span><span>Committed event</span><span>UTC</span><span>Entry hash</span></div>
         {receipt.ledger.caseEntries.map((entry) => {
           const presentation = eventPresentation[entry.kind] ?? { label: entry.kind, eyebrow: "Committed event", icon: "proof" as const };
           return (
-            <div className={`judge-proof-ledger-row${entry.kind === "risk_verdict" ? " risk" : ""}`} key={entry.entryHash}>
-              <span className="judge-proof-sequence">{String(entry.sequence).padStart(2, "0")}</span>
-              <span className="judge-proof-event-icon"><Icon name={presentation.icon} /></span>
-              <span className="judge-proof-event-copy"><small>{presentation.eyebrow}</small><b>{presentation.label}</b><em>{eventDetail(receipt, entry.kind)}</em></span>
+            <div className={`editorial-proof-ledger-row${entry.kind === "risk_verdict" ? " risk" : ""}`} key={entry.entryHash}>
+              <span className="editorial-proof-sequence">{String(entry.sequence).padStart(2, "0")}</span>
+              <span className="editorial-proof-event-icon"><Icon name={presentation.icon} /></span>
+              <span className="editorial-proof-event-copy"><small>{presentation.eyebrow}</small><b>{presentation.label}</b><em>{eventDetail(receipt, entry.kind)}</em></span>
               <time dateTime={new Date(entry.atTsMs).toISOString()}>{formatTime(entry.atTsMs)}</time>
               <code title={entry.entryHash}>{compactHash(entry.entryHash)}</code>
             </div>
           );
         })}
       </div>
-      <footer><Icon name="lock" /><span><b>{receipt.ledger.rowsAtGeneration} total ledger rows at generation</b><small>The case events above follow the study-initialization commitment; each row links to the previous disclosed hash.</small></span></footer>
+      <footer><Icon name="lock" /><span><b>{receipt.ledger.rowsAtGeneration} total ledger rows at generation</b><small>Each disclosed row points to the previous committed hash. The final row resolves to the displayed ledger head.</small></span></footer>
     </section>
   );
 }
 
-function VerificationInspector({ receipt, verification }: ProofLoad) {
-  const checks = [
-    { label: "Canonical receipt hash", detail: "Recomputed in this browser", pass: verification.canonicalHashValid },
-    { label: "Disclosed ledger links", detail: "Sequences, links, and final head reconcile", pass: verification.disclosedChainValid },
-    { label: "Lifecycle ordering", detail: "Event kinds match committed row order", pass: verification.lifecycleOrderValid },
-    { label: "Synthetic boundary", detail: "Stubs, zero model cost, performance excluded", pass: verification.syntheticBoundaryValid },
-    { label: "External anchor", detail: "Absent; no network verification claimed", pass: verification.anchorAbsent }
+function CommitmentRegistry({ receipt, context }: ProofLoad) {
+  const commitments = [
+    { label: "Receipt hash", value: receipt.integrity.receiptHash, note: "Recomputed locally" },
+    { label: "Ledger head", value: receipt.ledger.finalHeadHash, note: "Disclosed chain head" },
+    { label: "Replay identity", value: context.replay.replayIdentityHash, note: "Separate captured replay" },
+    { label: "Public bundle", value: context.bundle.bundleSha256, note: context.bundle.bundleId },
+    { label: "Frozen config", value: receipt.build.configSha256, note: receipt.build.codeVersion },
+    { label: "Build code", value: receipt.build.codeSha256, note: "Synthetic fixture build" }
   ];
   return (
-    <aside className="judge-proof-inspector reveal r4" aria-labelledby="proof-inspector-heading">
-      <section className="judge-proof-verify surface">
-        <header><span className={verification.valid ? "valid" : "invalid"}><Icon name={verification.valid ? "proof" : "minus"} /></span><div><small>Portable evidence check</small><h2 id="proof-inspector-heading">{verification.valid ? "Receipt reconciled" : "Verification failed"}</h2><p>{verification.valid ? "The frozen commitment and disclosed chain match in this browser." : verification.issues.join(" · ")}</p></div></header>
-        <div className="judge-proof-checks">
-          {checks.map((check) => <div key={check.label}><span className={check.pass ? "pass" : "fail"}><Icon name={check.pass ? "check" : "minus"} /></span><span><b>{check.label}</b><small>{check.detail}</small></span></div>)}
-        </div>
-        <div className="judge-proof-generation-status"><Icon name="proof" /><span><small>Ledger verification at generation</small><b>{receipt.ledger.verificationAtGeneration.replaceAll("_", " ")}</b></span></div>
-      </section>
-      <section className="judge-proof-hashes surface">
-        <header><span>Portable commitments</span><Icon name="lock" /></header>
-        <div><small>Receipt hash</small><code title={receipt.integrity.receiptHash}>{receipt.integrity.receiptHash}</code></div>
-        <div><small>Committed ledger head</small><code title={receipt.ledger.finalHeadHash}>{receipt.ledger.finalHeadHash}</code></div>
-        <div><small>Receipt ID</small><code title={receipt.receiptId}>{receipt.receiptId}</code></div>
-        <footer><span><b>SHA-256</b><small>{receipt.integrity.canonicalization}</small></span><span><b>Local</b><small>not externally timestamped</small></span></footer>
-      </section>
-      <a className="judge-proof-download" href={RECEIPT_PATH} download>
-        <span><Icon name="case" /><span><small>Licence-safe public artifact</small><b>Download receipt JSON</b></span></span><Icon name="arrow" />
-      </a>
-    </aside>
+    <section className="editorial-proof-commitments" aria-labelledby="editorial-proof-commitments-title">
+      <header className="editorial-proof-section-heading">
+        <span><small>Portable commitments</small><h2 id="editorial-proof-commitments-title">What can be carried away.</h2></span>
+        <em>SHA-256 · stable JSON</em>
+      </header>
+      <div className="editorial-proof-commitment-grid">
+        {commitments.map((commitment) => <div key={commitment.label}><small>{commitment.label}</small><code title={commitment.value}>{commitment.value}</code><span>{commitment.note}</span></div>)}
+      </div>
+      <div className="editorial-proof-sources">
+        <header><span><small>Source-reference registry</small><h3>Hash-only by design</h3></span><em>{receipt.sourceEvidence.length} references</em></header>
+        {receipt.sourceEvidence.map((reference, index) => (
+          <div key={reference.evidenceRefSha256}>
+            <span>{String(index + 1).padStart(2, "0")}</span><span><small>{reference.source} · {reference.role}</small><b>{new Date(reference.observedAtTsMs).toISOString()}</b></span><code title={reference.evidenceRefSha256}>{compactHash(reference.evidenceRefSha256)}</code><em>{reference.disclosure.replaceAll("_", " ")}</em>
+          </div>
+        ))}
+        <footer><Icon name="shield" /><p>Raw TXLine fields are not included. These references prove commitment consistency inside the synthetic receipt; they do not expose or independently validate private source payloads.</p></footer>
+      </div>
+    </section>
   );
 }
 
 function ReproduceProof() {
   return (
-    <section className="judge-proof-reproduce surface reveal r5" aria-labelledby="proof-reproduce-heading">
-      <div className="judge-proof-reproduce-copy"><span><Icon name="system" /></span><div><small>Do not trust the screenshot</small><h2 id="proof-reproduce-heading">Verify the frozen receipt offline.</h2><p>The repository verifier enforces the strict schema, recomputes the canonical receipt hash, and checks disclosed lifecycle relationships. It does not query TXLine, Polymarket, Anthropic, a wallet, or Solana.</p></div></div>
-      <div className="judge-proof-command"><span>Exact command · repository root</span><code>{VERIFY_COMMAND}</code><a href={RECEIPT_PATH}>Open evidence JSON <Icon name="arrow" /></a></div>
+    <section className="editorial-proof-reproduce" aria-labelledby="editorial-proof-reproduce-title">
+      <div className="editorial-proof-reproduce-copy"><span><Icon name="system" /></span><div><small>Do not trust the screenshot</small><h2 id="editorial-proof-reproduce-title">Verify the frozen receipt offline.</h2><p>The repository verifier enforces the strict schema, recomputes the canonical receipt hash, and checks disclosed lifecycle relationships without contacting a feed, model provider, wallet, or blockchain.</p></div></div>
+      <div className="editorial-proof-command"><span>Exact command · repository root</span><code>{VERIFY_COMMAND}</code><a href={RECEIPT_PATH} download>Download evidence JSON <Icon name="arrow" /></a></div>
       <footer><Icon name="shield" /><p><b>Assurance boundary:</b> this verifies portable commitments and disclosed relationships. It does not replay private source payloads, prove a real model invocation, establish profitability, or claim an external timestamp.</p></footer>
     </section>
   );
 }
 
-function ProofView({ receipt, verification }: ProofLoad) {
+function ProofView(load: ProofLoad) {
   return (
-    <div className="app-shell judge-proof-shell">
-      <Navigation active="proof" />
-      <main className="workspace" id="proof">
-        <Topbar title="Proof" modeLabel="Offline artifact" modeClass="offline" />
-        <div className="judge-proof-content">
-          <ProofHero receipt={receipt} />
-          <ProofTruthStrip receipt={receipt} />
-          <div className="judge-proof-workbench"><ProofLedger receipt={receipt} /><VerificationInspector receipt={receipt} verification={verification} /></div>
+    <div className="editorial-proof">
+      <div className="editorial-page editorial-proof-page">
+        <EditorialNavigation active="proof" modeLabel="Offline receipt · local verification" />
+        <main id="proof">
+          <ProofHero {...load} />
+          <AssuranceLadder {...load} />
+          <DecisionBoundary receipt={load.receipt} />
+          <VerificationPanel {...load} />
+          <ProofLedger receipt={load.receipt} />
+          <CommitmentRegistry {...load} />
           <ReproduceProof />
-          <footer className="judge-proof-final-boundary reveal r5"><Icon name="lock" /><span><b>Synthetic engineering proof. Permanently excluded from every performance claim.</b><small>No external model call · no real order · no wallet · no submitted Solana anchor.</small></span></footer>
-        </div>
-        <MobileNavigation active="proof" />
-      </main>
+          <footer className="editorial-proof-final"><Icon name="lock" /><span><b>Synthetic engineering proof. Permanently excluded from every performance claim.</b><small>No external model call · no real order · no wallet · no submitted Solana anchor.</small></span></footer>
+        </main>
+      </div>
     </div>
   );
 }
 
 function ProofLoading() {
-  return <main className="load-screen"><BrandMark /><span className="load-kicker">Samaritan / Proof</span><h1>Recomputing the receipt</h1><div className="load-line"><i /></div><p>Checking the frozen canonical commitment, disclosed ledger links, event order, provenance, and anchor boundary.</p></main>;
+  return <main className="editorial-proof-state"><BrandMark /><span>Proof / local verification</span><h1>Recomputing the receipt.</h1><div><i /></div><p>Checking the frozen commitment, disclosed ledger links, source references, provenance, and anchor boundary.</p></main>;
 }
 
 function ProofError({ retry }: { retry: () => void }) {
-  return <main className="load-screen error-screen"><span className="error-mark"><Icon name="shield" /></span><span className="load-kicker">Fail-closed evidence boundary</span><h1>Proof did not reconcile</h1><p>The frozen receipt could not be loaded or its public commitments changed. Samaritan will not show a partial verification result.</p><button type="button" onClick={retry}>Retry proof load</button></main>;
+  return <main className="editorial-proof-state error"><span className="editorial-proof-state-icon"><Icon name="shield" /></span><span>Fail-closed evidence boundary</span><h1>Proof did not reconcile.</h1><p>The frozen public evidence could not be loaded or one of its commitments changed. Samaritan will not show a partial success state.</p><button type="button" onClick={retry}>Retry proof load</button></main>;
+}
+
+async function fetchJson(path: string, signal: AbortSignal) {
+  const response = await fetch(path, { headers: { accept: "application/json" }, signal });
+  if (!response.ok) throw new Error(`Evidence request failed with status ${response.status}`);
+  return response.json() as Promise<unknown>;
 }
 
 export function ProofApp() {
@@ -368,18 +524,23 @@ export function ProofApp() {
   useEffect(() => {
     const controller = new AbortController();
     setFailure(false);
-    fetch(RECEIPT_PATH, { headers: { accept: "application/json" }, signal: controller.signal })
-      .then(async (response) => {
-        if (!response.ok) throw new Error(`Receipt request failed with status ${response.status}`);
-        const value = await response.json() as unknown;
-        const receipt = parseProofReceipt(value);
+    Promise.all([
+      fetchJson(RECEIPT_PATH, controller.signal),
+      fetchJson(COMMAND_PATH, controller.signal),
+      fetchJson(MANIFEST_PATH, controller.signal)
+    ])
+      .then(async ([receiptValue, commandValue, manifestValue]) => {
+        const receipt = parseProofReceipt(receiptValue);
         const verification = await verifyBrowserProof(receipt);
         if (!verification.valid) throw new Error(verification.issues.join("; "));
-        return { receipt, verification };
+        const context = parsePublicContext(commandValue, manifestValue);
+        if (!context.replay.replayIdentityParity) throw new Error("Captured replay identity did not reconcile");
+        return { receipt, verification, context };
       })
       .then((next) => startTransition(() => setLoaded(next)))
       .catch((error: unknown) => {
-        if (error instanceof DOMException && error.name === "AbortError") return;
+        if (controller.signal.aborted) return;
+        console.error(error);
         setFailure(true);
       });
     return () => controller.abort();
