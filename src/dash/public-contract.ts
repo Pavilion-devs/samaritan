@@ -1,8 +1,20 @@
+import {
+  PAPER_STUDY_FROZEN_CONFIG_SHA256,
+  PAPER_STUDY_PROTOCOL_VERSION,
+  PAPER_STUDY_REGISTERED_AT
+} from "../harness/paper-study-ledger.js";
+
 export const SPAIN_BELGIUM_MATCHROOM_ID = "paired-spain-belgium-2026-07-10";
 export const COMMAND_SNAPSHOT_ID = "command-2026-world-cup";
 export const CASEBOOK_SNAPSHOT_ID = "casebook-2026-world-cup";
 export const STUDY_SNAPSHOT_ID = "paper-study-2026-world-cup";
 export const TXLINE_PUBLIC_MOVEMENT_BUCKET_BPS = 25;
+
+// Human-approved protocol identity. These constants intentionally describe the
+// immutable registration event; observation counts remain evidence-derived.
+export const FORWARD_PAPER_PROTOCOL_ID = PAPER_STUDY_PROTOCOL_VERSION;
+export const FORWARD_PAPER_REGISTERED_AT = PAPER_STUDY_REGISTERED_AT;
+export const FORWARD_PAPER_CONFIG_HASH = PAPER_STUDY_FROZEN_CONFIG_SHA256;
 
 export type ReplayStepId = "pre" | "goal" | "post";
 
@@ -32,6 +44,7 @@ export type PublicDataPolicy = {
   derivedOnly: true;
   txlineProbabilityDisplay: "bucketed_movement_only";
   txlineMovementBucketBps: typeof TXLINE_PUBLIC_MOVEMENT_BUCKET_BPS;
+  txlineFixtureIdentifiersExposed: false;
   credentialsRequired: false;
   walletControlsExposed: false;
 };
@@ -71,7 +84,7 @@ export type MatchroomSnapshot = {
   realMoneyGate: "closed";
   tradeable: false;
   match: {
-    fixtureId: string;
+    fixtureRef: typeof SPAIN_BELGIUM_MATCHROOM_ID;
     eventSlug: string;
     competition: "World Cup";
     stage: "Captured fixture";
@@ -156,7 +169,7 @@ export type CommandFeedState = {
 };
 
 export type CommandFixture = {
-  fixtureId: string;
+  captureId: string;
   home: { name: string; code: string };
   away: { name: string; code: string };
   kickoffUtc: string;
@@ -170,7 +183,7 @@ export type CommandFixture = {
   statusSource: "analysis_manifest" | "supervisor_status" | "reviewed_config" | "none";
   statusUpdatedAt: string | null;
   terminalEvidence: CommandCaptureTerminalEvidence | null;
-  identityStatus: "exact_match_confirmed";
+  identityStatus: "exact_match_confirmed" | "historical_reviewed_config";
   captureOnly: true;
   tradeable: false;
 };
@@ -178,7 +191,7 @@ export type CommandFixture = {
 export type CommandCase = {
   caseId: string;
   matchroomId: typeof SPAIN_BELGIUM_MATCHROOM_ID;
-  fixtureId: string;
+  fixtureRef: typeof SPAIN_BELGIUM_MATCHROOM_ID;
   fixtureLabel: string;
   home: MatchroomSnapshot["match"]["home"];
   away: MatchroomSnapshot["match"]["away"];
@@ -200,7 +213,7 @@ export type CommandCase = {
 };
 
 export type CommandSnapshot = {
-  schemaVersion: 2;
+  schemaVersion: 3;
   snapshotId: typeof COMMAND_SNAPSHOT_ID;
   generatedAt: string;
   mode: "offline_artifact";
@@ -226,23 +239,31 @@ export type CommandSnapshot = {
   recentCases: CommandCase[];
   additionalCaseState: {
     status: "waiting_for_eligible_capture";
-    label: "No active study can admit cases";
+    label: "Registered v2 awaits fresh eligible evidence";
     detail: string;
   };
   study: {
-    protocolVersion: string;
-    protocolStatus: "invalidated_suspended";
-    configHash: string;
-    startedAt: string;
-    status: "suspended";
-    statusLabel: "V1 suspended";
-    filledMatches: number;
+    protocolVersion: typeof FORWARD_PAPER_PROTOCOL_ID;
+    protocolStatus: "registered";
+    configHash: typeof FORWARD_PAPER_CONFIG_HASH;
+    registeredAt: typeof FORWARD_PAPER_REGISTERED_AT;
+    status: "active_forward_paper";
+    statusLabel: "V2 registered";
+    observationStatus: "awaiting_fresh_evidence" | "collecting_forward_evidence";
+    qualifyingCounts: StudyCounts;
     requiredFilledMatches: number;
-    fills: number;
     requiredFills: number;
     bountyStatus: "exploratory";
-    stoppingRuleMet: false;
+    stoppingRuleMet: boolean;
+    realMoneyGate: "closed";
     reason: string;
+    historicalV1: {
+      protocolVersion: string;
+      protocolStatus: "invalidated_suspended";
+      configHash: string;
+      startedAt: string;
+      zeroObservationAudit: true;
+    };
   };
   proof: {
     replayIdentityParity: true;
@@ -275,7 +296,7 @@ export type CasebookCaseSummary = {
   goalOrdinal: number;
   goalClockSeconds: number;
   occurredAt: string;
-  fixtureId: string;
+  fixtureRef: typeof SPAIN_BELGIUM_MATCHROOM_ID;
   fixtureLabel: string;
   homeCode: string;
   awayCode: string;
@@ -381,7 +402,7 @@ export type StudyCounts = {
 };
 
 export type StudyMatchRow = {
-  fixtureId: string;
+  fixtureRef: string;
   kickoffUtc: string;
   selectedLine: number;
   signals: number;
@@ -423,8 +444,8 @@ export type CorrectedHistoricalCandidate = {
   protocolId: "historical-gate-causal-economic-v4-2026-07-14";
   configurationHash: string;
   status: "historical_signal_candidate_for_forward_paper_review";
-  registration: "engineering_candidate_unregistered";
-  activeStudy: false;
+  sourceRegistrationAtGeneration: "engineering_candidate_unregistered";
+  activeStudyAtGeneration: false;
   detector: "CONSENSUS_MOVE";
   marketFamily: "Full-time totals";
   trainingNormalizedCases: 135;
@@ -441,7 +462,7 @@ export type CorrectedHistoricalCandidate = {
   evidenceClass: "historical_sampled_price_signal_research";
   executionEvidence: "not_established_no_historical_bid_ask_or_depth";
   executable: false;
-  claimBoundary: "Forward paper review candidate only; not alpha, profitability, fill proof, or permission to trade.";
+  claimBoundary: "Historical sampled-price evidence justified review only; the separate v2 registration does not turn it into alpha, fill proof, profitability, or permission for real money.";
 };
 
 export type SyntheticProofReceipt = {
@@ -456,7 +477,7 @@ export type SyntheticProofReceipt = {
 };
 
 export type StudySnapshot = {
-  schemaVersion: 2;
+  schemaVersion: 3;
   snapshotId: typeof STUDY_SNAPSHOT_ID;
   generatedAt: string;
   mode: "offline_artifact";
@@ -464,11 +485,16 @@ export type StudySnapshot = {
   realMoneyGate: "closed";
   tradeable: false;
   protocol: {
-    version: string;
-    status: "invalidated_suspended";
-    active: false;
-    configHash: string;
-    startedAt: string;
+    version: typeof FORWARD_PAPER_PROTOCOL_ID;
+    status: "registered";
+    activity: "active_forward_paper";
+    active: true;
+    registeredAt: typeof FORWARD_PAPER_REGISTERED_AT;
+    configHash: typeof FORWARD_PAPER_CONFIG_HASH;
+    realMoneyGate: "closed";
+    observationStatus: "awaiting_fresh_evidence" | "collecting_forward_evidence";
+    evidencePolicy: "fresh_forward_only";
+    qualifyingCounts: StudyCounts;
     candidate: {
       detector: "CONSENSUS_MOVE";
       marketFamily: "Full-time totals only";
@@ -503,25 +529,39 @@ export type StudySnapshot = {
       selectedDepthRequired: true;
     };
   };
-  lanes: {
-    bounty: {
-      label: "Preserved v1 bounty ledger";
-      status: "exploratory";
-      statusLabel: "Exploratory";
-      reason: string;
-      counts: StudyCounts;
-      chain: { valid: true; rows: number; headHash: string };
-      canSatisfyGate: false;
+  historicalV1: {
+    protocolVersion: string;
+    status: "invalidated_suspended";
+    active: false;
+    invalidatedBeforeObservations: true;
+    configHash: string;
+    startedAt: string;
+    lanes: {
+      bounty: {
+        label: "Preserved invalidated v1 bounty ledger";
+        sourceStatus: "exploratory";
+        statusLabel: "V1 invalidated";
+        reason: string;
+        counts: StudyCounts;
+        chain: { valid: true; rows: number; headHash: string };
+        canSatisfyGate: false;
+      };
+      longRun: {
+        label: "Preserved invalidated v1 long-run ledger";
+        sourceStatus: "sealed";
+        statusLabel: "V1 invalidated";
+        reason: string;
+        counts: StudyCounts;
+        stoppingRuleMet: false;
+        chain: { valid: true; rows: number; headHash: string };
+        canSatisfyGate: false;
+      };
     };
-    longRun: {
-      label: "Preserved v1 long-run ledger";
-      status: "sealed" | "accept" | "reject" | "inconclusive";
-      statusLabel: string;
-      reason: string;
-      counts: StudyCounts;
-      stoppingRuleMet: boolean;
-      chain: { valid: true; rows: number; headHash: string };
-      canSatisfyGate: false;
+    results: {
+      visibility: "sealed";
+      rows: null;
+      endpoints: null;
+      guardrails: null;
     };
   };
   results: {

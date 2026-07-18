@@ -6,7 +6,12 @@ import {
   type PaperStudyEvidenceArtifact
 } from "../metrics/paper-study-report.js";
 import type { PaperFixtureUniverse } from "./paper-fixture-universe.js";
-import { initializePaperStudyLedger } from "./paper-study-ledger.js";
+import {
+  PAPER_STUDY_FROZEN_CONFIG_SHA256,
+  PAPER_STUDY_PROTOCOL_STATUS,
+  PAPER_STUDY_PROTOCOL_VERSION,
+  initializePaperStudyLedger
+} from "./paper-study-ledger.js";
 
 function argument(name: string, fallback: string): string {
   const index = process.argv.indexOf(`--${name}`);
@@ -14,16 +19,25 @@ function argument(name: string, fallback: string): string {
 }
 
 const manifest = JSON.parse(
-  await readFile(resolve(argument("manifest", "data/paper/study-ledgers.json")), "utf8")
+  await readFile(resolve(argument("manifest", "data/paper/v2/study-ledgers.json")), "utf8")
 ) as {
   protocolVersion: string;
+  protocolStatus: string;
   configHash: string;
   realMoneyGate: "closed";
   bounty: { path: string; startedAtTsMs: number };
   longRun: { path: string; startedAtTsMs: number };
 };
+if (
+  manifest.protocolVersion !== PAPER_STUDY_PROTOCOL_VERSION ||
+  manifest.protocolStatus !== PAPER_STUDY_PROTOCOL_STATUS ||
+  manifest.configHash !== PAPER_STUDY_FROZEN_CONFIG_SHA256 ||
+  manifest.realMoneyGate !== "closed"
+) {
+  throw new Error("Paper-study report requires the registered v2 paper-study manifest");
+}
 const universe = JSON.parse(
-  await readFile(resolve(argument("universe", "data/research/paper-fixture-universe.json")), "utf8")
+  await readFile(resolve(argument("universe", "data/paper/v2/fixture-universe.json")), "utf8")
 ) as PaperFixtureUniverse;
 const bounty = initializePaperStudyLedger({
   path: resolve(manifest.bounty.path),
@@ -58,8 +72,8 @@ try {
       }
     }
   };
-  const jsonPath = resolve(argument("output", "data/paper/reports/current.json"));
-  const markdownPath = resolve(argument("report", "docs/research/paper-study-current.md"));
+  const jsonPath = resolve(argument("output", "data/paper/v2/reports/current.json"));
+  const markdownPath = resolve(argument("report", "data/paper/v2/reports/current.md"));
   await Promise.all([
     mkdir(dirname(jsonPath), { recursive: true }),
     mkdir(dirname(markdownPath), { recursive: true })

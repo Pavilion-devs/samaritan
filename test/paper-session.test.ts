@@ -54,7 +54,8 @@ function persistentRuntime(overrides: Partial<Pick<
   const handle = initializePaperStudyLedger({
     path: ":memory:",
     lane: "bounty",
-    startedAtTsMs: 1_000
+    startedAtTsMs: 1_000,
+    testOnlyAllowPreRegistrationStart: true
   });
   return {
     lane: createPersistentPaperLaneRuntime({

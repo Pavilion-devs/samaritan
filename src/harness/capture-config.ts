@@ -63,9 +63,35 @@ const captureConfigSchema = z.object({
       message: "Maximum startup skew cannot exceed the artifact startup grace"
     });
   }
+  if (
+    config.txline.home !== config.polymarket.home ||
+    config.txline.away !== config.polymarket.away ||
+    config.txline.kickoffUtc !== config.polymarket.kickoffUtc
+  ) {
+    context.addIssue({
+      code: "custom",
+      path: ["polymarket", "kickoffUtc"],
+      message: "Capture config teams or kickoff disagree across sources"
+    });
+  }
+  if (startTsMs !== Date.parse(config.txline.kickoffUtc) - 3 * 60 * 60_000) {
+    context.addIssue({
+      code: "custom",
+      path: ["capture", "scheduledStartUtc"],
+      message: "Paired capture must start exactly three hours before kickoff"
+    });
+  }
 });
 
 export type CaptureConfig = z.infer<typeof captureConfigSchema>;
+
+/**
+ * Parses the immutable reviewed config without claiming that its historical
+ * fixture still appears in today's rolling TXLine or Polymarket snapshots.
+ */
+export function parseCaptureConfig(value: unknown): CaptureConfig {
+  return captureConfigSchema.parse(value);
+}
 
 type TxLineFixture = {
   FixtureId?: string | number;
@@ -152,15 +178,8 @@ export function validateCaptureConfig(input: {
   scheduleGraceMs?: number;
 }): CaptureValidation {
   const repoRoot = resolve(input.repoRoot);
-  const config = captureConfigSchema.parse(input.config);
+  const config = parseCaptureConfig(input.config);
   const kickoffTsMs = Date.parse(config.txline.kickoffUtc);
-  if (
-    config.txline.home !== config.polymarket.home ||
-    config.txline.away !== config.polymarket.away ||
-    config.txline.kickoffUtc !== config.polymarket.kickoffUtc
-  ) {
-    throw new Error("Capture config teams or kickoff disagree across sources");
-  }
   const fixture = input.txlineFixtures.find((candidate) => String(candidate.FixtureId ?? "") === config.txline.fixtureId);
   if (
     !fixture ||
@@ -190,9 +209,6 @@ export function validateCaptureConfig(input: {
     totals: true
   });
   const scheduledStartTsMs = Date.parse(config.capture.scheduledStartUtc);
-  if (scheduledStartTsMs !== kickoffTsMs - 3 * 60 * 60_000) {
-    throw new Error("Paired capture must start exactly three hours before kickoff");
-  }
   const nowTsMs = input.nowTsMs ?? Date.now();
   const scheduleGraceMs = Math.max(0, input.scheduleGraceMs ?? 0);
   const schedulePassed = nowTsMs > scheduledStartTsMs + scheduleGraceMs;

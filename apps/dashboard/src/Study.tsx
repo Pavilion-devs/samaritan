@@ -30,41 +30,42 @@ function ProgressMeter({ value, target, label }: { value: number; target: number
 }
 
 function StudyHero({ snapshot }: { snapshot: StudySnapshot }) {
-  const longRun = snapshot.lanes.longRun;
-  const evaluation = snapshot.protocol.evaluation;
+  const protocol = snapshot.protocol;
+  const evaluation = protocol.evaluation;
+  const counts = protocol.qualifyingCounts;
   return (
     <section className="study-hero reveal r1" aria-labelledby="study-heading">
       <div className="study-hero-copy">
-        <ProvenanceBadge tone="historical" label="Historical audit · invalidated v1" />
-        <h2 id="study-heading">The claim<br /><em>was withdrawn.</em></h2>
-        <p>A causal audit found future-informed market selection before v1 admitted a single observation. Samaritan preserved the empty ledgers, suspended the protocol, and blocked model spend.</p>
-        <div className="study-primary-question"><span><Icon name="chart" /></span><span><small>Former endpoint · inactive</small><b>{evaluation.primaryEndpoint}</b></span></div>
+        <ProvenanceBadge tone="configured" label="Registered protocol · forward paper" />
+        <h2 id="study-heading">V2 is registered.<br /><em>Evidence starts fresh.</em></h2>
+        <p>Deborah activated the corrected protocol for forward paper observation only. Historical, retrospective, and synthetic cases remain excluded; zero observations currently qualify.</p>
+        <div className="study-primary-question"><span><Icon name="chart" /></span><span><small>Registered primary endpoint</small><b>{evaluation.primaryEndpoint}</b></span></div>
       </div>
       <div className="study-clock">
-        <header><span><i />{longRun.statusLabel}</span><em>Preserved since {new Date(snapshot.protocol.startedAt).toISOString().slice(0, 10)}</em></header>
+        <header><span><i />Registered · active forward paper</span><em>Since {new Date(protocol.registeredAt).toISOString().slice(0, 10)}</em></header>
         <div className="study-clock-main">
           <span className="study-clock-lock"><Icon name="lock" /></span>
-          <div><small>Preserved observations</small><strong><b>{longRun.counts.filledMatches}</b><em>/</em>0</strong><span>qualifying matches</span></div>
-          <div><small>Preserved fills</small><strong><b>{longRun.counts.fills}</b><em>/</em>0</strong><span>qualifying fills</span></div>
+          <div><small>Fresh observations</small><strong><b>{counts.filledMatches}</b><em>/</em>{evaluation.minimumFilledMatches}</strong><span>qualifying matches</span></div>
+          <div><small>Fresh fills</small><strong><b>{counts.fills}</b><em>/</em>{evaluation.minimumFills}</strong><span>qualifying fills</span></div>
         </div>
         <div className="study-clock-progress">
-          <ProgressMeter value={longRun.counts.filledMatches} target={evaluation.minimumFilledMatches} label="Former match threshold · inactive" />
-          <ProgressMeter value={longRun.counts.fills} target={evaluation.minimumFills} label="Former fill threshold · inactive" />
+          <ProgressMeter value={counts.filledMatches} target={evaluation.minimumFilledMatches} label="Filled-match threshold" />
+          <ProgressMeter value={counts.fills} target={evaluation.minimumFills} label="Fill threshold" />
         </div>
-        <footer><span>Status <b>invalidated</b></span><span>Replacement <b>v2 candidate</b></span><span><Icon name="shield" />No admissions</span></footer>
+        <footer><span>Status <b>registered</b></span><span>Evidence <b>fresh only</b></span><span><Icon name="shield" />Real money closed</span></footer>
       </div>
     </section>
   );
 }
 
 function LaneStrip({ snapshot }: { snapshot: StudySnapshot }) {
-  const bounty = snapshot.lanes.bounty;
-  const longRun = snapshot.lanes.longRun;
+  const bounty = snapshot.historicalV1.lanes.bounty;
+  const longRun = snapshot.historicalV1.lanes.longRun;
   return (
-    <section className="study-lanes surface reveal r2" aria-label="Paper study lanes">
-      <div className="study-lane long-run"><span className="lane-mark"><Icon name="lock" /></span><span><small>Decision lane</small><b>{longRun.label}</b><em>{longRun.reason}</em></span><strong>{longRun.statusLabel}</strong></div>
-      <div className="study-lane bounty"><span className="lane-mark"><Icon name="spark" /></span><span><small>Demo lane</small><b>{bounty.label}</b><em>{bounty.reason}</em></span><strong>{bounty.statusLabel}</strong></div>
-      <div className="lane-boundary"><Icon name="shield" /><span><b>Neither preserved v1 lane can satisfy a gate</b><small>Fresh v2 ledgers require Deborah's corrected registration first.</small></span></div>
+    <section className="study-lanes surface reveal r2" aria-label="Preserved v1 paper-study audit">
+      <div className="study-lane long-run"><span className="lane-mark"><Icon name="lock" /></span><span><small>Historical decision lane</small><b>{longRun.label}</b><em>{longRun.reason}</em></span><strong>{longRun.statusLabel}</strong></div>
+      <div className="study-lane bounty"><span className="lane-mark"><Icon name="spark" /></span><span><small>Historical demo lane</small><b>{bounty.label}</b><em>{bounty.reason}</em></span><strong>{bounty.statusLabel}</strong></div>
+      <div className="lane-boundary"><Icon name="shield" /><span><b>V1 remains invalidated audit history</b><small>Both zero-observation chains are preserved and can never satisfy registered v2.</small></span></div>
     </section>
   );
 }
@@ -75,7 +76,7 @@ function CorrectedHistoricalEvidence({ snapshot }: { snapshot: StudySnapshot }) 
     <section className="study-corrected-evidence surface reveal r3" aria-labelledby="corrected-evidence-title">
       <header className="study-panel-head">
         <div><span>Historical derived · not performance</span><h2 id="corrected-evidence-title">Historical signal candidate</h2></div>
-        <span className="study-unregistered-chip"><Icon name="lock" />V2 unregistered</span>
+        <span className="study-unregistered-chip"><Icon name="lock" />Historical v4 artifact · predates v2 registration</span>
       </header>
       <div className="corrected-evidence-grid">
         <div className="corrected-evidence-primary"><small>Held-out mean after {candidate.costProxyBps} bps proxy</small><b>{bps(candidate.meanNetAfterCostProxyBps)}</b><em>95% fixture-clustered CI {bps(candidate.matchClustered95Bps.low)} to {bps(candidate.matchClustered95Bps.high)}</em></div>
@@ -83,7 +84,7 @@ function CorrectedHistoricalEvidence({ snapshot }: { snapshot: StudySnapshot }) 
         <div><small>Held-out cases</small><b>{candidate.heldoutNormalizedCases}</b><em>Across {candidate.heldoutFixtures} fixtures</em></div>
         <div><small>Evidence class</small><b>Sampled prices</b><em>No historical bid, ask, depth, or fill proof</em></div>
       </div>
-      <div className="corrected-evidence-boundary"><Icon name="shield" /><span><b>Research evidence, not an active study</b><small>{candidate.claimBoundary}</small></span></div>
+      <div className="corrected-evidence-boundary"><Icon name="shield" /><span><b>Historical source status preserved</b><small>{candidate.claimBoundary}</small></span></div>
       <footer><span>Protocol <code>{candidate.protocolId}</code></span><span>Configuration <code title={candidate.configurationHash}>{compactHash(candidate.configurationHash)}</code></span></footer>
     </section>
   );
@@ -113,20 +114,22 @@ function SyntheticReceiptProof({ snapshot }: { snapshot: StudySnapshot }) {
       <div className="synthetic-proof-flow" aria-label="Synthetic proving lifecycle">
         {steps.map((step, index) => <span key={step}><b>{step}</b>{index < steps.length - 1 ? <i><Icon name="arrow" /></i> : null}</span>)}
       </div>
-      <footer><span><Icon name="lock" /><b>Synthetic and permanently excluded from historical, paper, and profitability claims.</b></span><a href={proof.path}>Open synthetic receipt · JSON <Icon name="arrow" /></a></footer>
+      <footer><span><Icon name="lock" /><b>Synthetic and permanently excluded from historical, forward-study, and profitability/performance claims.</b></span><a href={proof.path}>Open synthetic receipt · JSON <Icon name="arrow" /></a></footer>
     </section>
   );
 }
 
 function SealedEndpoint({ snapshot }: { snapshot: StudySnapshot }) {
   const evaluation = snapshot.protocol.evaluation;
+  const counts = snapshot.protocol.qualifyingCounts;
+  const countLabel = `${counts.signals} qualifying signal${counts.signals === 1 ? "" : "s"}`;
   return (
     <section className="study-endpoint surface reveal r3" aria-labelledby="endpoint-title">
-      <header className="study-panel-head"><div><span>Withdrawn endpoint</span><h2 id="endpoint-title">No qualifying CLV decision</h2></div><span className="study-sealed-chip"><Icon name="lock" />Suspended</span></header>
+      <header className="study-panel-head"><div><span>Registered endpoint · sealed</span><h2 id="endpoint-title">Awaiting the registered stopping rule</h2></div><span className="study-sealed-chip"><Icon name="lock" />{countLabel}</span></header>
       <div className="sealed-endpoint-stage">
         <div className="endpoint-axis-labels"><span>Reject zone</span><span>0 bps</span><span>Accept zone</span></div>
         <div className="endpoint-axis"><i /><em /><span /></div>
-        <div className="endpoint-vault"><span><Icon name="lock" /></span><div><small>No valid endpoint</small><b>V1 stopped at zero observations</b><p>The selector defect invalidated the protocol before a qualifying paper result could exist.</p></div></div>
+        <div className="endpoint-vault"><span><Icon name="lock" /></span><div><small>No current endpoint</small><b>{counts.filledMatches} / {evaluation.minimumFilledMatches} filled matches · {counts.fills} / {evaluation.minimumFills} fills</b><p>Only fresh post-registration evidence may open the registered endpoint; old research, v1 rows, and synthetic proof are excluded.</p></div></div>
         <div className="endpoint-method"><span><small>Bootstrap</small><b>{evaluation.bootstrapIterations.toLocaleString("en-US")} iterations</b></span><span><small>Resampling block</small><b>Whole matches</b></span><span><small>Control</small><b>{evaluation.randomDirectionControl}</b></span></div>
       </div>
       <div className="study-accept-criteria">
@@ -141,7 +144,7 @@ function OpenEndpoint({ snapshot }: { snapshot: StudySnapshot }) {
   const endpoints = snapshot.results.endpoints;
   return (
     <section className="study-endpoint surface reveal r3" aria-labelledby="endpoint-title">
-      <header className="study-panel-head"><div><span>Gating endpoint</span><h2 id="endpoint-title">Executable CLV decision</h2></div><span className={`study-result-chip ${snapshot.lanes.longRun.status}`}>{snapshot.lanes.longRun.statusLabel}</span></header>
+      <header className="study-panel-head"><div><span>Gating endpoint</span><h2 id="endpoint-title">Executable CLV decision</h2></div><span className="study-result-chip registered">Registered v2</span></header>
       {endpoints ? <div className="study-open-endpoints">
         <div className="study-endpoint-primary"><span>Mean net executable CLV</span><b>{bps(endpoints.meanNetClvBps)}</b><small>95% CI [{bps(endpoints.netClvInterval.low)}, {bps(endpoints.netClvInterval.high)}]</small></div>
         <div><span>Settlement P&amp;L</span><b>{money(endpoints.meanSettlementPnlMicroUsd)}</b><small>Mean resolved result</small></div>
@@ -183,7 +186,7 @@ function CandidatePanel({ snapshot }: { snapshot: StudySnapshot }) {
   const candidate = snapshot.protocol.candidate;
   return (
     <section className="study-candidate surface reveal r5" aria-labelledby="candidate-title">
-      <header className="study-panel-head"><div><span>Preserved for audit</span><h2 id="candidate-title">Invalidated v1 configuration</h2></div><span className="config-frozen"><i />Withdrawn</span></header>
+      <header className="study-panel-head"><div><span>Registered configuration</span><h2 id="candidate-title">Forward-paper v2</h2></div><span className="config-frozen"><i />Frozen</span></header>
       <div className="candidate-lead"><span><Icon name="pulse" /></span><span><small>Enabled detector</small><b>{candidate.detector}</b><em>{candidate.marketFamily}</em></span></div>
       <div className="candidate-parameters">
         <span><small>Move Z</small><b>{candidate.moveAbsZ.toFixed(1)}</b></span>
@@ -192,6 +195,7 @@ function CandidatePanel({ snapshot }: { snapshot: StudySnapshot }) {
         <span><small>Updates</small><b>{candidate.minimumUpdates}</b></span>
       </div>
       <div className="candidate-selector"><span><Icon name="chart" /></span><span><small>Dynamic total selector</small><b>{candidate.selector}</b><em>≥ {candidate.minimumCoveragePoints.toLocaleString("en-US")} points · within {percentage(candidate.maximumDistanceFromEven)} of even</em></span></div>
+      <div className="candidate-hash"><span>Registered at</span><code>{snapshot.protocol.registeredAt}</code></div>
       <div className="candidate-hash"><span>Configuration identity</span><code title={snapshot.protocol.configHash}>{compactHash(snapshot.protocol.configHash)}</code></div>
     </section>
   );
@@ -207,7 +211,7 @@ function RiskPanel({ snapshot }: { snapshot: StudySnapshot }) {
         <span className="risk-ring one" /><span className="risk-ring two" />
       </div>
       <div className="risk-grid"><span><small>Per trade</small><b>{money(risk.perTradeStakeMicroUsd)}</b></span><span><small>Max exposure</small><b>{money(risk.aggregateExposureMicroUsd)}</b></span><span><small>Drawdown stop</small><b>{money(risk.drawdownStopMicroUsd)}</b></span></div>
-      <footer><Icon name="shield" /><span><b>Deterministic limits</b><small>No agent can increase stake, exposure, or drawdown.</small></span></footer>
+      <footer><Icon name="shield" /><span><b>Deterministic limits</b><small>No agent can increase stake or exposure, or override the drawdown stop.</small></span></footer>
     </section>
   );
 }
@@ -216,12 +220,12 @@ function EvidenceQueue({ snapshot }: { snapshot: StudySnapshot }) {
   const universe = snapshot.fixtureUniverse;
   return (
     <section className="study-queue surface reveal r7" aria-labelledby="queue-title">
-      <header className="study-panel-head"><div><span>Admission boundary</span><h2 id="queue-title">Evidence queue</h2></div><span>{universe.longRunEligible} eligible</span></header>
+      <header className="study-panel-head"><div><span>Fresh-forward admission boundary</span><h2 id="queue-title">Evidence queue</h2></div><span>{snapshot.protocol.qualifyingCounts.matches} qualified</span></header>
       <div className="queue-flow">
-        <div><b>{universe.evidenceFixtures}</b><span>Evidence fixtures</span></div><i><Icon name="arrow" /></i><div><b>{universe.pairedBookReplays}</b><span>Paired replay</span></div><i><Icon name="arrow" /></i><div className="eligible"><b>{universe.longRunEligible}</b><span>Long-run admitted</span></div>
+        <div><b>{universe.evidenceFixtures}</b><span>Historical evidence fixtures</span></div><i><Icon name="arrow" /></i><div><b>{universe.pairedBookReplays}</b><span>Retrospective paired replay</span></div><i><Icon name="arrow" /></i><div className="eligible"><b>{snapshot.protocol.qualifyingCounts.matches}</b><span>V2 qualifying</span></div>
       </div>
       <div className="queue-rejection"><span><Icon name="minus" /></span><span><b>{universe.signalResearchOnly} sampled-history fixtures remain research-only</b><small>They lack synchronized executable depth and cannot count toward the long-run gate.</small></span></div>
-      <a href="/command"><span>Inspect upcoming captures</span><Icon name="arrow" /></a>
+      <a href="/command"><span>Inspect fresh capture status</span><Icon name="arrow" /></a>
     </section>
   );
 }
@@ -234,9 +238,9 @@ function DecisionRules({ snapshot }: { snapshot: StudySnapshot }) {
   ];
   return (
     <section className="study-rules surface reveal r8" aria-labelledby="rules-title">
-      <header className="study-panel-head"><div><span>Historical rules · inactive</span><h2 id="rules-title">Why no verdict can be issued</h2></div><span className="rules-note">V2 not registered</span></header>
+      <header className="study-panel-head"><div><span>Registered rules · active</span><h2 id="rules-title">How v2 will reach a verdict</h2></div><span className="rules-note">Fresh evidence only</span></header>
       <div className="study-rule-grid">{groups.map((group) => <div className={group.className} key={group.label}><header><span><Icon name={group.icon} /></span><b>{group.label}</b></header>{group.rules.map((rule) => <p key={rule}>{rule}</p>)}</div>)}</div>
-      <footer><Icon name="shield" /><b>No v1 outcome can unlock anything. The real-money gate is closed, and v2 requires Deborah's registration before observations.</b></footer>
+      <footer><Icon name="shield" /><b>Registration authorizes forward paper observation only. No study result can unlock real money without a separate future decision.</b></footer>
     </section>
   );
 }
@@ -245,9 +249,9 @@ function StudyProof({ snapshot }: { snapshot: StudySnapshot }) {
   return (
     <footer className="study-proof reveal r9">
       <span className="study-proof-status"><Icon name="proof" /><span><b>Both preserved v1 chains verify</b><small>Local append-only audit history · not an external anchor</small></span></span>
-      <span><small>Long-run head</small><code title={snapshot.lanes.longRun.chain.headHash}>{compactHash(snapshot.lanes.longRun.chain.headHash)}</code></span>
-      <span><small>Bounty head</small><code title={snapshot.lanes.bounty.chain.headHash}>{compactHash(snapshot.lanes.bounty.chain.headHash)}</code></span>
-      <span><small>Protocol</small><code>{snapshot.protocol.version}</code></span>
+      <span><small>V1 long-run head</small><code title={snapshot.historicalV1.lanes.longRun.chain.headHash}>{compactHash(snapshot.historicalV1.lanes.longRun.chain.headHash)}</code></span>
+      <span><small>V1 bounty head</small><code title={snapshot.historicalV1.lanes.bounty.chain.headHash}>{compactHash(snapshot.historicalV1.lanes.bounty.chain.headHash)}</code></span>
+      <span><small>Current protocol</small><code>{snapshot.protocol.version}</code></span>
       <span className="study-proof-boundary"><Icon name="lock" />Derived evidence only</span>
     </footer>
   );
@@ -258,7 +262,7 @@ function StudyRows({ snapshot }: { snapshot: StudySnapshot }) {
   return (
     <section className="study-rows surface" aria-labelledby="study-rows-title">
       <header className="study-panel-head"><div><span>Opened after stopping rule</span><h2 id="study-rows-title">Per-match evidence</h2></div><span>{snapshot.results.rows.length} rows</span></header>
-      <div className="study-row-table"><div className="study-row-head"><span>Fixture</span><span>Total</span><span>Signals</span><span>Fills</span><span>Fill rate</span><span>Slippage</span><span>Net CLV</span><span>P&amp;L</span></div>{snapshot.results.rows.map((row) => <div className="study-row" key={`${row.fixtureId}:${row.kickoffUtc}`}><span><b>{row.fixtureId}</b><small>{row.kickoffUtc.slice(0, 10)}</small></span><span>{row.selectedLine.toFixed(1)}</span><span>{row.signals}</span><span>{row.fills}</span><span>{percentage(row.fillRate, 1)}</span><span>{bps(row.meanSlippageBps)}</span><span>{bps(row.netClvBps)}</span><span>{row.settlementPnlMicroUsd === null ? "—" : money(row.settlementPnlMicroUsd)}</span></div>)}</div>
+      <div className="study-row-table"><div className="study-row-head"><span>Fixture</span><span>Total</span><span>Signals</span><span>Fills</span><span>Fill rate</span><span>Slippage</span><span>Net CLV</span><span>P&amp;L</span></div>{snapshot.results.rows.map((row) => <div className="study-row" key={`${row.fixtureRef}:${row.kickoffUtc}`}><span><b>{row.fixtureRef}</b><small>{row.kickoffUtc.slice(0, 10)}</small></span><span>{row.selectedLine.toFixed(1)}</span><span>{row.signals}</span><span>{row.fills}</span><span>{percentage(row.fillRate, 1)}</span><span>{bps(row.meanSlippageBps)}</span><span>{bps(row.netClvBps)}</span><span>{row.settlementPnlMicroUsd === null ? "—" : money(row.settlementPnlMicroUsd)}</span></div>)}</div>
     </section>
   );
 }
@@ -287,7 +291,7 @@ function StudyView({ snapshot }: { snapshot: StudySnapshot }) {
 }
 
 function StudyLoading() {
-  return <main className="load-screen"><BrandMark /><span className="load-kicker">Samaritan / Study</span><h1>Reconstructing the protocol audit</h1><div className="load-line"><i /></div><p>Verifying the preserved zero-observation v1 ledgers and their invalidation boundary.</p></main>;
+  return <main className="load-screen"><BrandMark /><span className="load-kicker">Samaritan / Study</span><h1>Reconstructing study governance</h1><div className="load-line"><i /></div><p>Verifying current v2 registration and the separate preserved zero-observation v1 audit.</p></main>;
 }
 
 function StudyError({ retry }: { retry: () => void }) {

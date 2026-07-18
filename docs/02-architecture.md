@@ -1,6 +1,6 @@
 # 02 — Architecture: The Samaritan Harness
 
-*Design doc, v0.3 (July 14, 2026). Status: target architecture plus an explicitly identified bounty slice.*
+*Design doc, v0.4 (July 18, 2026). Status: target architecture plus an explicitly identified bounty slice. Corrected v2 is registered for forward paper observation only; no qualifying v2 fixture or real-Claude lifecycle has yet been admitted.*
 
 > **Implementation boundary:** the bounty build currently ships the canonical live/replay data path, three deterministic detectors, single-turn Haiku triage, a single-turn Opus structured evaluator over a code-assembled signal bundle, deterministic paper risk/execution, a v2 local decision ledger, and offline-safe receipt/anchor tooling. The read-only analyst tools, risk-agent judgment pass, strategy tournament, real-money adapter, Data Doctor, and submitted Solana anchor remain roadmap work and must not be described as implemented.
 
@@ -60,7 +60,7 @@ Polymarket Match Result is represented as three binary conditions per match (hom
 
 ## Layer 2 — Claude reasoning
 
-**Triage agent — `claude-haiku-4-5` target runtime.** First contact for every admitted signal: dedupe (the same move seen through multiple outcomes = one case), classify against known context, kill obvious noise. Output: drop / escalate, with a one-line rationale. The public complete-lifecycle case uses a deterministic Haiku-shaped stub; current real Anthropic admission is blocked while v2 is unregistered.
+**Triage agent — `claude-haiku-4-5` target runtime.** First contact for every admitted signal: dedupe (the same move seen through multiple outcomes = one case), classify against known context, kill obvious noise. Output: drop / escalate, with a one-line rationale. The public complete-lifecycle case uses a deterministic Haiku-shaped stub. Corrected v2 is registered, but real Anthropic admission still fails closed unless a fresh fixture passes every mapping, capture, lifecycle, timing, and immutable-input gate.
 
 **Analyst agent — implemented bounty slice.** `claude-opus-4-8` receives the strict triage decision plus one code-assembled detector signal/evidence bundle and may emit only `submit_thesis`. It has adaptive thinking, fixed input/output/time bounds, schema validation, identity checks, deterministic timestamps, and append-only cost accounting. It does **not** currently expose `query_series`, `get_match_state`, `web_search`, `get_polymarket_book`, or episodic-search tools. Those remain a post-bounty extension unless implemented and demonstrated before release.
 

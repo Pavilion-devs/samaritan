@@ -1,7 +1,6 @@
 import type { Message } from "@anthropic-ai/sdk/resources/messages/messages";
 import { describe, expect, it, vi } from "vitest";
 import {
-  createAnthropicMessagesClient,
   type ClaudeInvocationEvidence,
   type ClaudeMessagesClient
 } from "../src/agents/claude.js";
@@ -11,7 +10,6 @@ import type { DetectorSignal } from "../src/detectors/types.js";
 import { createPersistentClaudePaperStudy } from "../src/harness/claude-paper-study.js";
 import type { PaperFixtureUniverse } from "../src/harness/paper-fixture-universe.js";
 import { initializePaperStudyLedger } from "../src/harness/paper-study-ledger.js";
-import type { PaperStudyInitialization } from "../src/harness/paper-study-ledger.js";
 
 const fixtureId = "future-fixture";
 const marketKey = `${fixtureId}:total_goals:full_time:2500`;
@@ -170,23 +168,14 @@ function triageDropMessage(): Message {
 }
 
 describe("persistent Claude paper study composition", () => {
-  it("refuses real Anthropic clients while the corrected protocol is unregistered", () => {
-    const bounty = initializePaperStudyLedger({ path: ":memory:", lane: "bounty", startedAtTsMs: 1_000 });
-    const longRun = initializePaperStudyLedger({ path: ":memory:", lane: "long_run", startedAtTsMs: 1_000 });
+  it("admits registered Anthropic composition without spending or calling at construction", () => {
+    const bounty = initializePaperStudyLedger({ path: ":memory:", lane: "bounty", startedAtTsMs: 1_000, testOnlyAllowPreRegistrationStart: true });
+    const longRun = initializePaperStudyLedger({ path: ":memory:", lane: "long_run", startedAtTsMs: 1_000, testOnlyAllowPreRegistrationStart: true });
     const spendLedger = new ClaudeSpendLedger(":memory:");
     const evidenceLedger = new ClaudeInvocationEvidenceLedger(":memory:");
     try {
-      expect(() => createPersistentClaudePaperStudy({
+      const study = createPersistentClaudePaperStudy({
         apiKey: "not-a-real-key",
-        spendLedger,
-        bounty,
-        longRun,
-        universe: universe(),
-        feeResolver: async () => { throw new Error("unused"); },
-        maximumPendingMs: 5_000
-      })).toThrow(/API use is disabled.*engineering_candidate_unregistered/);
-      expect(() => createPersistentClaudePaperStudy({
-        client: createAnthropicMessagesClient("not-a-real-key"),
         spendLedger,
         bounty,
         longRun,
@@ -194,7 +183,8 @@ describe("persistent Claude paper study composition", () => {
         feeResolver: async () => { throw new Error("unused"); },
         evidenceLedger,
         maximumPendingMs: 5_000
-      })).toThrow(/API use is disabled.*engineering_candidate_unregistered/);
+      });
+      expect(study.invocationEvidence).not.toBeNull();
       expect(spendLedger.verifyChain()).toMatchObject({ valid: true, rows: 0 });
       expect(evidenceLedger.verifyChain()).toMatchObject({ valid: true, rows: 0 });
     } finally {
@@ -206,19 +196,15 @@ describe("persistent Claude paper study composition", () => {
   });
 
   it("requires a durable evidence ledger instead of a callback for a real client", () => {
-    const bounty = initializePaperStudyLedger({ path: ":memory:", lane: "bounty", startedAtTsMs: 1_000 });
-    const longRun = initializePaperStudyLedger({ path: ":memory:", lane: "long_run", startedAtTsMs: 1_000 });
+    const bounty = initializePaperStudyLedger({ path: ":memory:", lane: "bounty", startedAtTsMs: 1_000, testOnlyAllowPreRegistrationStart: true });
+    const longRun = initializePaperStudyLedger({ path: ":memory:", lane: "long_run", startedAtTsMs: 1_000, testOnlyAllowPreRegistrationStart: true });
     const spendLedger = new ClaudeSpendLedger(":memory:");
-    const asRegistered = (value: PaperStudyInitialization): PaperStudyInitialization => ({
-      ...value,
-      protocolStatus: "registered"
-    } as unknown as PaperStudyInitialization);
     try {
       expect(() => createPersistentClaudePaperStudy({
         apiKey: "not-a-real-key",
         spendLedger,
-        bounty: { ...bounty, initialization: asRegistered(bounty.initialization) },
-        longRun: { ...longRun, initialization: asRegistered(longRun.initialization) },
+        bounty,
+        longRun,
         universe: universe(),
         feeResolver: async () => { throw new Error("unused"); },
         evidenceSink: () => undefined,
@@ -233,8 +219,8 @@ describe("persistent Claude paper study composition", () => {
   });
 
   it("rejects a closed persistent invocation-evidence ledger at construction", () => {
-    const bounty = initializePaperStudyLedger({ path: ":memory:", lane: "bounty", startedAtTsMs: 1_000 });
-    const longRun = initializePaperStudyLedger({ path: ":memory:", lane: "long_run", startedAtTsMs: 1_000 });
+    const bounty = initializePaperStudyLedger({ path: ":memory:", lane: "bounty", startedAtTsMs: 1_000, testOnlyAllowPreRegistrationStart: true });
+    const longRun = initializePaperStudyLedger({ path: ":memory:", lane: "long_run", startedAtTsMs: 1_000, testOnlyAllowPreRegistrationStart: true });
     const spendLedger = new ClaudeSpendLedger(":memory:");
     const evidenceLedger = new ClaudeInvocationEvidenceLedger(":memory:");
     evidenceLedger.close();
@@ -258,8 +244,8 @@ describe("persistent Claude paper study composition", () => {
   });
 
   it("shares one bounded client and spend chain across isolated paper lanes", async () => {
-    const bounty = initializePaperStudyLedger({ path: ":memory:", lane: "bounty", startedAtTsMs: 1_000 });
-    const longRun = initializePaperStudyLedger({ path: ":memory:", lane: "long_run", startedAtTsMs: 1_000 });
+    const bounty = initializePaperStudyLedger({ path: ":memory:", lane: "bounty", startedAtTsMs: 1_000, testOnlyAllowPreRegistrationStart: true });
+    const longRun = initializePaperStudyLedger({ path: ":memory:", lane: "long_run", startedAtTsMs: 1_000, testOnlyAllowPreRegistrationStart: true });
     const spendLedger = new ClaudeSpendLedger(":memory:");
     const create = vi.fn(async () => triageDropMessage());
     const client: ClaudeMessagesClient = { create };
@@ -315,8 +301,8 @@ describe("persistent Claude paper study composition", () => {
   });
 
   it("rejects a spend ledger configured above the locked project ceiling", () => {
-    const bounty = initializePaperStudyLedger({ path: ":memory:", lane: "bounty", startedAtTsMs: 1_000 });
-    const longRun = initializePaperStudyLedger({ path: ":memory:", lane: "long_run", startedAtTsMs: 1_000 });
+    const bounty = initializePaperStudyLedger({ path: ":memory:", lane: "bounty", startedAtTsMs: 1_000, testOnlyAllowPreRegistrationStart: true });
+    const longRun = initializePaperStudyLedger({ path: ":memory:", lane: "long_run", startedAtTsMs: 1_000, testOnlyAllowPreRegistrationStart: true });
     const spendLedger = new ClaudeSpendLedger(":memory:", 300_000_000_001);
     try {
       expect(() => createPersistentClaudePaperStudy({

@@ -10,7 +10,7 @@ The v1 historical lane does not currently support promoting any detector. Its dy
 
 | Lane | Evidence decision | Reason |
 |---|---|---|
-| `CONSENSUS_MOVE`, dynamic total | **Historical signal candidate for forward paper review** | Corrected v4: 38 held-out normalized Total Goals buys / 18 fixtures; `+132.7 bps` after the 100 bps proxy; fixture-clustered 95% CI `+14.3` to `+243.9 bps`. Sampled prices still cannot prove fills or profitability; v2 remains unregistered |
+| `CONSENSUS_MOVE`, dynamic total | **Registered for forward paper observation** | Corrected v4: 38 held-out normalized Total Goals buys / 18 fixtures; `+132.7 bps` after the 100 bps proxy; fixture-clustered 95% CI `+14.3` to `+243.9 bps`. Sampled prices still cannot prove fills or profitability; Deborah registered v2 on July 18 under a closed real-money gate |
 | `CONSENSUS_MOVE`, Match Result | No-go for v1 | 34 heldout signals; mean after-cost CLV `-67.0 bps` |
 | `XMARKET_DIVERGENCE` | No-go for v1 | Overall mean after-cost CLV `-2.1 bps`; Match Result was `-15.2 bps`. The positive total slice does not justify promoting a detector whose sealed aggregate result failed |
 | `FADER_CANDIDATE` | No-go for v1 | Overall mean after-cost CLV `-46.0 bps`, with both market families negative |

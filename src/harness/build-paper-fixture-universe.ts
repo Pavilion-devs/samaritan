@@ -12,6 +12,11 @@ import {
   pairedCaptureEvidenceFromManifest,
   parseVerifiedPairedAnalysisManifest
 } from "./paired-capture-manifest.js";
+import {
+  PAPER_STUDY_FROZEN_CONFIG_SHA256,
+  PAPER_STUDY_PROTOCOL_STATUS,
+  PAPER_STUDY_PROTOCOL_VERSION
+} from "./paper-study-ledger.js";
 
 function argument(name: string, fallback: string): string {
   const index = process.argv.indexOf(`--${name}`);
@@ -44,12 +49,27 @@ const mappingsPath = resolve(argument("mappings", "data/live/gamma-discovery/can
 const evidencePath = resolve(argument("total-evidence", "data/research/main-total-line-evidence.json"));
 const historiesDir = resolve(argument("histories", "samples/polymarket-history/world-cup-2026-v1/histories"));
 const liveRoot = resolve(argument("live-root", "data/live"));
-const outputPath = resolve(argument("output", "data/research/paper-fixture-universe.json"));
-const reportPath = resolve(argument("report", "docs/research/paper-fixture-universe.md"));
-const ledgerManifestPath = resolve(argument("ledger-manifest", "data/paper/study-ledgers.json"));
+const outputPath = resolve(argument("output", "data/paper/v2/fixture-universe.json"));
+const reportPath = resolve(argument("report", "data/paper/v2/reports/fixture-universe.md"));
+const ledgerManifestPath = resolve(argument("ledger-manifest", "data/paper/v2/study-ledgers.json"));
 const laneStartArgument = optionalArgument("lane-start");
+const ledgerManifest = JSON.parse(await readFile(ledgerManifestPath, "utf8")) as {
+  protocolVersion: string;
+  protocolStatus: string;
+  configHash: string;
+  realMoneyGate: string;
+  longRun: { startedAtTsMs: number };
+};
+if (
+  ledgerManifest.protocolVersion !== PAPER_STUDY_PROTOCOL_VERSION ||
+  ledgerManifest.protocolStatus !== PAPER_STUDY_PROTOCOL_STATUS ||
+  ledgerManifest.configHash !== PAPER_STUDY_FROZEN_CONFIG_SHA256 ||
+  ledgerManifest.realMoneyGate !== "closed"
+) {
+  throw new Error("Paper fixture universe requires the registered v2 paper-study manifest");
+}
 const laneStartTsMs = laneStartArgument === null
-  ? (JSON.parse(await readFile(ledgerManifestPath, "utf8")) as { longRun: { startedAtTsMs: number } }).longRun.startedAtTsMs
+  ? ledgerManifest.longRun.startedAtTsMs
   : Date.parse(laneStartArgument);
 const generatedAt = new Date().toISOString();
 const [mappingFile, evidenceFile, historyFiles, captures] = await Promise.all([

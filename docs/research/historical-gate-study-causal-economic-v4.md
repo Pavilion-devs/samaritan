@@ -40,7 +40,7 @@ The prespecified paper family is **Total Goals only**. Its frozen `CONSENSUS_MOV
 
 Held-out Total Goals: 38 normalized buy cases across 18 fixtures; mean after the 100.0 bps cost proxy 132.7 bps; fixture-clustered 95% CI [14.3, 243.9] bps.
 
-Status: `historical_signal_candidate_for_forward_paper_review`. This is a **historical signal candidate for a fresh forward paper review**, not alpha, profitability, or executable-fill evidence. Inputs are sampled Polymarket prices without bid/ask depth; the v2 paper protocol remains `engineering_candidate_unregistered` and cannot admit observations or spend Claude tokens before Deborah registers it.
+Status at generation: `historical_signal_candidate_for_forward_paper_review`. This is **historical signal evidence**, not alpha, profitability, or executable-fill evidence. Inputs are sampled Polymarket prices without bid/ask depth. Deborah subsequently registered the exact v2 candidate for forward paper observation only on July 18; this historical artifact remains unchanged evidence and does not itself count as a v2 observation.
 
 ## Held-Out Results
 

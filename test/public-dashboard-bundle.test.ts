@@ -19,9 +19,11 @@ import { verifyDecisionReceipt } from "../src/proof/decision-receipt-schema.js";
 
 const repoRoot = resolve(import.meta.dirname, "..");
 const trackedBundle = resolve(repoRoot, PUBLIC_DASHBOARD_BUNDLE_RELATIVE_DIR);
-const privateProjectionEvidenceAvailable = process.env.SAMARITAN_TEST_NO_PRIVATE_DATA !== "1" && existsSync(
-  resolve(repoRoot, "data/research/historical-gate-study-causal-economic-v4.json")
-);
+const privateProjectionEvidenceAvailable = process.env.SAMARITAN_TEST_NO_PRIVATE_DATA !== "1" && [
+  "data/research/historical-gate-study-causal-economic-v4.json",
+  "data/paper/v2/reports/current.json",
+  "data/paper/v2/fixture-universe.json"
+].every((path) => existsSync(resolve(repoRoot, path)));
 const directories: string[] = [];
 
 afterEach(() => {
@@ -59,7 +61,10 @@ describe("tracked public dashboard bundle", () => {
     }
     const audit = await auditPublicArtifacts({ allowlistedPaths: [trackedBundle], cwd: repoRoot });
     expect(audit.ok, JSON.stringify(audit.violations, null, 2)).toBe(true);
-    const receipt = JSON.parse(readFileSync(resolve(trackedBundle, PUBLIC_SYNTHETIC_RECEIPT_FILENAME), "utf8"));
+    const receipt = JSON.parse(readFileSync(resolve(trackedBundle, PUBLIC_SYNTHETIC_RECEIPT_FILENAME), "utf8")) as {
+      generatedAtTsMs: number;
+    };
+    expect(Date.parse(manifest.generatedAt)).toBeGreaterThanOrEqual(receipt.generatedAtTsMs);
     expect(verifyDecisionReceipt(receipt)).toMatchObject({
       valid: true,
       synthetic: true,
@@ -73,6 +78,14 @@ describe("tracked public dashboard bundle", () => {
         performanceUse: "excluded_synthetic"
       })
     ]);
+
+    const dashboardPayload = PUBLIC_DASHBOARD_FILES
+      .map((entry) => readFileSync(resolve(trackedBundle, entry.file), "utf8"))
+      .join("\n");
+    expect(dashboardPayload).not.toContain('"fixtureId"');
+    for (const txlineFixtureId of ["18218149", "18237038", "18241006", "18257865", "18257739"]) {
+      expect(dashboardPayload).not.toContain(txlineFixtureId);
+    }
   });
 
   it("serves from a clean-clone-shaped root containing no ignored data directory", async () => {
@@ -84,16 +97,30 @@ describe("tracked public dashboard bundle", () => {
     expect(response).toMatchObject({ status: 200, headers: { "x-samaritan-public-bundle": expect.stringMatching(/^[a-f0-9]{64}$/) } });
     expect(JSON.parse(response!.body)).toMatchObject({
       data: {
-        protocol: { status: "invalidated_suspended", active: false },
+        protocol: {
+          version: "paper-study-v2-2026-07-18",
+          status: "registered",
+          activity: "active_forward_paper",
+          active: true,
+          registeredAt: "2026-07-18T07:03:55Z",
+          qualifyingCounts: { matches: 0, signals: 0, filledMatches: 0, fills: 0, settledFills: 0 },
+          realMoneyGate: "closed"
+        },
+        historicalV1: {
+          protocolVersion: "paper-study-v1-2026-07-12",
+          status: "invalidated_suspended",
+          active: false,
+          invalidatedBeforeObservations: true
+        },
         correctedHistoricalCandidate: {
           trainingNormalizedCases: 135,
           heldoutNormalizedCases: 38,
           heldoutFixtures: 18,
           meanNetAfterCostProxyBps: 132.7,
           matchClustered95Bps: { low: 14.3, high: 243.9 },
-          activeStudy: false,
+          activeStudyAtGeneration: false,
           executable: false,
-          registration: "engineering_candidate_unregistered"
+          sourceRegistrationAtGeneration: "engineering_candidate_unregistered"
         },
         syntheticProof: {
           lifecycleStatus: "filled_settled",

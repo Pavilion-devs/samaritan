@@ -7,8 +7,8 @@ import {
 } from "../src/metrics/paper-study-report.js";
 
 function artifact(): PaperStudyEvidenceArtifact {
-  const bounty = initializePaperStudyLedger({ path: ":memory:", lane: "bounty", startedAtTsMs: 1_000 });
-  const longRun = initializePaperStudyLedger({ path: ":memory:", lane: "long_run", startedAtTsMs: 1_000 });
+  const bounty = initializePaperStudyLedger({ path: ":memory:", lane: "bounty", startedAtTsMs: 1_000, testOnlyAllowPreRegistrationStart: true });
+  const longRun = initializePaperStudyLedger({ path: ":memory:", lane: "long_run", startedAtTsMs: 1_000, testOnlyAllowPreRegistrationStart: true });
   try {
     return {
       generatedAt: "2026-07-12T12:00:00.000Z",

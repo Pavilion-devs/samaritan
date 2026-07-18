@@ -76,7 +76,7 @@ function MatchMasthead({ snapshot }: { snapshot: MatchroomSnapshot }) {
     <section className="match-masthead surface reveal r1" aria-labelledby="fixture-heading">
       <div className="match-meta">
         <ProvenanceBadge tone="capture" label="Real capture · retrospective" />
-        <span className="fixture-number">Fixture {snapshot.match.fixtureId}</span>
+        <span className="fixture-number">Captured replay · public reference</span>
       </div>
       <div className="team home-team">
         <span className={`crest ${snapshot.match.home.code.toLowerCase()}`}>{snapshot.match.home.code}</span>

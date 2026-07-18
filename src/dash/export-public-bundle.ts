@@ -75,13 +75,19 @@ export async function exportPublicDashboardBundle(
   const repoRoot = resolve(options.repoRoot);
   const outputDir = resolve(options.outputDir ?? resolve(repoRoot, PUBLIC_DASHBOARD_BUNDLE_RELATIVE_DIR));
 
-  // The corrected study and local capture-outcome artifacts supply a stable as-of
-  // time. This preserves deterministic bytes without hiding a terminal capture
-  // outcome merely because it was recorded after the historical study report.
+  // The corrected study, local capture outcomes, and bundled receipt supply a
+  // stable as-of time. The manifest must never predate an artifact it commits to.
+  const syntheticReport = await runSyntheticJudgeCase();
+  const syntheticReceipt = syntheticReport.receipt;
+  if (!Number.isSafeInteger(syntheticReceipt.generatedAtTsMs)) {
+    throw new Error("Synthetic decision receipt has an invalid generation timestamp");
+  }
+  const syntheticReceiptGeneratedAt = new Date(syntheticReceipt.generatedAtTsMs).toISOString();
   const study = await buildStudyDashboardResponse(repoRoot);
   const outcomeProbe = await buildCommandDashboardResponse(repoRoot, Date.parse("2100-01-01T00:00:00.000Z"));
   const generatedAt = [
     study.data.correctedHistoricalCandidate.generatedAt,
+    syntheticReceiptGeneratedAt,
     ...outcomeProbe.data.fixtureSchedule.map((fixture) => fixture.statusUpdatedAt).filter((value): value is string => value !== null)
   ].sort((left, right) => Date.parse(left) - Date.parse(right)).at(-1)!;
   const asOfTsMs = Date.parse(generatedAt);
@@ -122,8 +128,6 @@ export async function exportPublicDashboardBundle(
   // Export the receipt produced by the same production-component proving path
   // exposed through `pnpm demo`, so the CLI and downloadable judge artifact
   // commit to one case rather than two merely similar synthetic fixtures.
-  const syntheticReport = await runSyntheticJudgeCase();
-  const syntheticReceipt = syntheticReport.receipt;
   const receiptVerification = verifyDecisionReceipt(syntheticReceipt);
   const syntheticProof = study.data.syntheticProof;
   if (
@@ -170,7 +174,8 @@ export async function exportPublicDashboardBundle(
       txlineProbabilityDisplay: "bucketed_movement_only",
       txlineMovementBucketBps: TXLINE_PUBLIC_MOVEMENT_BUCKET_BPS,
       credentialsRequired: false,
-      walletControlsExposed: false
+      walletControlsExposed: false,
+      txlineFixtureIdentifiersExposed: false
     }
   });
   const manifestBody = canonicalJson(manifest);

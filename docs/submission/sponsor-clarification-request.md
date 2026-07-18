@@ -36,5 +36,6 @@ Human participant and project owner, Samaritan
 - Deborah must send this request herself and retain the complete written response.
 - Do not paraphrase silence as approval.
 - Until an affirmative response is received, keep exact normalized TXLine probability series and reconstructive replay data out of public artifacts.
+- Until fixture/market-identifier display is affirmatively approved, omit TXLine-specific identifiers from hosted UI/API output, downloadable evidence, receipts, screenshots, video, and submission copy unless their public provenance is independently documented; keep the judge story on derived decisions, buckets, aggregates, and hashes. Opaque request selectors may remain in reproducibility-oriented source/capture configuration because they are not raw or reconstructive feed payloads.
 - If the answer narrows permissible use, update the dashboard, repository bundle, video, and submission copy before publication.
 - This draft is an operational clarification request, not legal advice.

@@ -137,7 +137,7 @@ export type SpainBelgiumFeasibilityCorpus = {
   corpusCommitment: string;
   corpusAssurance: "local_file_sha256_not_capture_manifest_membership";
   generatedAt: string;
-  fixtureId: string;
+  fixtureRef: typeof SPAIN_BELGIUM_MATCHROOM_ID;
   home: { name: string; code: string };
   away: { name: string; code: string };
   goalEvents: number;
@@ -222,9 +222,9 @@ function marketLabel(market: ParsedMarket): string {
   return `Full-time total · O/U ${(market.lineMilli / 1_000).toFixed(1)}`;
 }
 
-function marketCaseId(fixtureId: string, goalOrdinal: number, market: ParsedMarket): string {
+function marketCaseId(goalOrdinal: number, market: ParsedMarket): string {
   const marketCode = market.family === "match_result" ? "MR" : `TG-${market.lineMilli ?? "UNKNOWN"}`;
-  return `FX-${fixtureId}-G${goalOrdinal.toString().padStart(2, "0")}-${marketCode}`;
+  return `SB-20260710-G${goalOrdinal.toString().padStart(2, "0")}-${marketCode}`;
 }
 
 function orderedGoals(study: ParsedStudy): ParsedGoal[] {
@@ -410,10 +410,10 @@ export async function buildSpainBelgiumFeasibilityCorpus(repoRoot: string): Prom
   const goals = orderedGoals(study);
   const exemplar = selectExemplar(study);
   const codes = teamCodes(manifest.eventSlug);
-  const selectedCaseId = marketCaseId(study.fixtureId, exemplar.goalOrdinal, exemplar.market);
+  const selectedCaseId = marketCaseId(exemplar.goalOrdinal, exemplar.market);
   const cases = goals.flatMap((goal, goalIndex) => orderedMarkets(goal).map((market) => {
     const goalOrdinal = goalIndex + 1;
-    const caseId = marketCaseId(study.fixtureId, goalOrdinal, market);
+    const caseId = marketCaseId(goalOrdinal, market);
     return {
       caseId,
       goalOrdinal,
@@ -437,7 +437,7 @@ export async function buildSpainBelgiumFeasibilityCorpus(repoRoot: string): Prom
     corpusCommitment,
     corpusAssurance: "local_file_sha256_not_capture_manifest_membership",
     generatedAt: study.generatedAt,
-    fixtureId: study.fixtureId,
+    fixtureRef: SPAIN_BELGIUM_MATCHROOM_ID,
     home: { name: config.txline.home, code: codes.home },
     away: { name: config.txline.away, code: codes.away },
     goalEvents: goals.length,
@@ -497,7 +497,7 @@ export async function buildSpainBelgiumMatchroomSnapshot(repoRoot: string): Prom
   return {
     schemaVersion: 2,
     snapshotId: SPAIN_BELGIUM_MATCHROOM_ID,
-    caseId: marketCaseId(study.fixtureId, exemplar.goalOrdinal, exemplar.market),
+    caseId: marketCaseId(exemplar.goalOrdinal, exemplar.market),
     casebookCaseCount: study.gateReadout.marketEventCases,
     generatedAt: study.generatedAt,
     mode: "captured_replay",
@@ -505,7 +505,7 @@ export async function buildSpainBelgiumMatchroomSnapshot(repoRoot: string): Prom
     realMoneyGate: "closed",
     tradeable: false,
     match: {
-      fixtureId: study.fixtureId,
+      fixtureRef: SPAIN_BELGIUM_MATCHROOM_ID,
       eventSlug: manifest.eventSlug,
       competition: "World Cup",
       stage: "Captured fixture",
@@ -578,6 +578,7 @@ export async function buildSpainBelgiumMatchroomSnapshot(repoRoot: string): Prom
       derivedOnly: true,
       txlineProbabilityDisplay: "bucketed_movement_only",
       txlineMovementBucketBps: TXLINE_PUBLIC_MOVEMENT_BUCKET_BPS,
+      txlineFixtureIdentifiersExposed: false,
       credentialsRequired: false,
       walletControlsExposed: false
     }

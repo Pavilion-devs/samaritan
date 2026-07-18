@@ -15,7 +15,10 @@ import { createPersistentPaperLaneRuntime } from "../harness/paper-lane-runtime.
 import type { PaperFixtureUniverse } from "../harness/paper-fixture-universe.js";
 import type { PaperRuntimeBatch } from "../harness/paper-runtime.js";
 import { runPaperSession } from "../harness/paper-session.js";
-import { initializePaperStudyLedger } from "../harness/paper-study-ledger.js";
+import {
+  PAPER_STUDY_PROTOCOL_STATUS,
+  initializePaperStudyLedger
+} from "../harness/paper-study-ledger.js";
 import {
   generateDecisionReceipt,
   hashJsonEvidence,
@@ -30,7 +33,9 @@ import {
   type ReceiptAgentRun
 } from "../proof/decision-receipt-schema.js";
 
-const BASE_TS_MS = Date.UTC(2026, 6, 1, 0, 0, 0);
+// The proving fixture is synthetic, but its registered-v2 clock must still obey
+// the same prospective registration boundary as every persistent study lane.
+const BASE_TS_MS = Date.UTC(2026, 6, 18, 8, 0, 0);
 const FIXTURE_ID = "synthetic-judge-fixture-v1";
 const CONDITION_ID = "synthetic-judge-condition-v1";
 const OVER_ASSET_ID = "synthetic-judge-over-asset-v1";
@@ -39,7 +44,7 @@ const LINE_MILLI = 2_500;
 const DECISION_LATENCY_MS = 300;
 const MAXIMUM_PENDING_MS = 60_000;
 const KICKOFF_TS_MS = BASE_TS_MS + 4 * 60 * 60_000;
-const DEMO_PROCESSING_TS_MS = Date.UTC(2026, 6, 14, 10, 0, 0);
+const DEMO_PROCESSING_TS_MS = Date.UTC(2026, 6, 18, 15, 0, 0);
 const DEMO_RECEIPT_GENERATED_AT_TS_MS = DEMO_PROCESSING_TS_MS + 60_000;
 
 const MARKET: CanonicalMarket = Object.freeze({
@@ -68,7 +73,7 @@ export type SyntheticJudgeCaseReport = {
   label: typeof LABEL;
   synthetic: true;
   performanceUse: "excluded_synthetic";
-  protocolStatus: "engineering_candidate_unregistered";
+  protocolStatus: typeof PAPER_STUDY_PROTOCOL_STATUS;
   realMoneyGate: "closed";
   boundaries: SyntheticBoundaryAudit;
   runtime: {

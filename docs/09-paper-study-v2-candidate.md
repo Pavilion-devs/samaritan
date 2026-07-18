@@ -1,6 +1,8 @@
 # Paper Study V2 Candidate — Deborah Review Draft
 
-**Status:** `engineering_candidate_unregistered`<br>
+> **Resolved July 18, 2026:** Deborah registered this exact frozen candidate for forward paper observation only. The immutable decision record is [`10-paper-study-v2-registration.md`](10-paper-study-v2-registration.md). This draft remains preserved as the pre-decision review artifact; it is not the current operational status.
+
+**Draft status at preparation:** `engineering_candidate_unregistered`<br>
 **Code protocol:** `paper-study-v2-candidate-2026-07-14`<br>
 **Frozen candidate config SHA-256:** `93e61c1903d0a13bbeb1dbbd3ad9b11af0335b96c82bd2ca7aa9ddedeeabf3ce`<br>
 **Prepared:** July 14, 2026<br>
@@ -93,19 +95,19 @@ This is not alpha, profitability, or fill evidence. Historical Polymarket observ
 - [x] Observation-time readiness and venue delay implemented.
 - [x] Restart rehydration implemented for dedupe, pending cases, positions, exposure, P&L, peak, and drawdown.
 - [x] Full v2 decision hash envelope and tamper tests implemented.
-- [ ] Deborah confirms the proposed paper risk values above.
-- [ ] Deborah confirms the stopping/decision rules above.
-- [ ] Deborah confirms that the corrected historical result is sufficient only to begin forward paper observation—not to claim alpha or unlock money.
-- [ ] Fresh v2 bounty and long-run ledgers are initialized after signature; preserved v1 ledgers remain untouched.
-- [ ] The operational protocol status changes from `engineering_candidate_unregistered` to a new explicit registered identifier in code and documentation.
+- [x] Deborah confirmed the proposed paper risk values above on July 18, 2026.
+- [x] Deborah confirmed the stopping/decision rules above on July 18, 2026.
+- [x] Deborah confirmed that the corrected historical result is sufficient only to begin forward paper observation—not to claim alpha or unlock money.
+- [x] Fresh v2 bounty and long-run ledgers were initialized after registration; preserved v1 ledgers remain untouched.
+- [x] The operational protocol status changed from `engineering_candidate_unregistered` to `paper-study-v2-2026-07-18` in code and current-status documentation.
 
-## Deborah decision — intentionally unsigned
+## Deborah decision — resolved by the registration record
 
-- [ ] **REGISTER V2 FOR FORWARD PAPER ONLY** under the exact config hash above.
+- [x] **REGISTER V2 FOR FORWARD PAPER ONLY** under the exact config hash above.
 - [ ] **DO NOT REGISTER**; revise or shelve the candidate.
 
 Name: Deborah<br>
-Decision date/time (UTC): ____________________<br>
-Signature/confirmation reference: ____________________
+Decision date/time (UTC): `2026-07-18T07:03:55Z`<br>
+Signature/confirmation reference: explicit written authorization retained in [`10-paper-study-v2-registration.md`](10-paper-study-v2-registration.md)
 
 Registration, if granted, authorizes only a paper study and bounded model spend under existing project controls. It does not authorize Polymarket authentication, a wallet, token approval, deposit, order placement, real-money trading, or any risk-limit change.

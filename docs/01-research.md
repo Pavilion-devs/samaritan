@@ -1,6 +1,6 @@
 # 01 — Research: The Bounty, The Data, The Battlefield
 
-*Research conducted July 3–4 and updated from Phase 0/0.5 captures through July 10, 2026. Captured samples override documentation when they disagree.*
+*Research conducted July 3–4 and updated from Phase 0/0.5 captures through July 10, with bounty/competition status refreshed July 18, 2026. Captured samples override documentation when they disagree.*
 
 ---
 
@@ -13,7 +13,7 @@
 | Track prize | **16,000 USDT** — 10,000 / 4,000 / 2,000 |
 | Hackathon window | June 24 – **July 19, 2026** (submission deadline; final match day) |
 | Winners announced | July 29, 2026 |
-| Competition | **51 submissions shown on the live track page as of July 14**; the number is volatile and must be rechecked before submission |
+| Competition | **76 submissions reported by the official listing count endpoint as of July 18**; the number is volatile and must be rechecked at submission |
 | Eligibility | Global listing; the brief mentions AI agents, while the binding terms restrict participation/submission to natural persons. Deborah is the sole participant and owner. |
 | Other tracks | Prediction Markets & Settlement; Consumer & Fan Experiences (not ours) |
 | Contact | Telegram: TxLINEChat |
@@ -86,6 +86,8 @@ Both include **full historical replay access**. Free tier is explicitly allowed 
 | GET | `/api/fixtures/validation`, `/api/odds/validation`, `/api/scores/stat-validation`, `/api/fixtures/batch-validation` | **Merkle proofs** — validate any data point on-chain |
 
 SSE notes: standard `id`/`event`/`data`/`retry` format; heartbeat events; resumable via `Last-Event-ID`; `Accept-Encoding: gzip` cuts bandwidth 70–80%.
+
+**July 18 repository/docs drift:** the current official `txodds/tx-on-chain` repository includes runnable mainnet and devnet examples for `GET /api/scores/stat-validation-v3` plus the on-chain `validateStatV3` multiproof method. Its payload uses `statsToProve`, `multiproof.indices`, and `multiproof.hashes`. The hosted validation prose and checked OpenAPI still emphasize the legacy/V2 surface, so Samaritan records V3 as a discovered sponsor capability, not as an endpoint already integrated or demonstrated. Do not claim V3 proof support until a real response is captured and its exact network-matched IDL path passes locally. [Official validation guide](https://github.com/txodds/tx-on-chain/blob/main/documentation/examples/onchain-validation.mdx) · [official mainnet V3 example](https://github.com/txodds/tx-on-chain/blob/main/examples/mainnet/scripts/subscription_scores_v3c.ts)
 
 ### 2.4 Data models
 

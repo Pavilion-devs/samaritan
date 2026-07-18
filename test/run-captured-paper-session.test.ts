@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
-  CapturedPaperSessionAuthorizationError,
+  assertCapturedPaperSessionAuthorized,
   parseCapturedPaperSessionArgs,
   preflightCapturedPaperSession,
   runCapturedPaperSessionCli
@@ -115,6 +115,18 @@ describe("captured paper-session CLI", () => {
     ], "/tmp/samaritan-causal-default");
     expect(options.speed).toBe(1);
     expect(options.runLabel).toBe("paired-causal-test");
+    expect(options.fixtureUniversePath).toBe(
+      "/tmp/samaritan-causal-default/data/paper/v2/fixture-universe.json"
+    );
+    expect(options.studyLedgerManifestPath).toBe(
+      "/tmp/samaritan-causal-default/data/paper/v2/study-ledgers.json"
+    );
+    expect(options.spendLedgerPath).toBe(
+      "/tmp/samaritan-causal-default/data/paper/v2/agents/claude-spend.sqlite"
+    );
+    expect(options.invocationEvidenceLedgerPath).toBe(
+      "/tmp/samaritan-causal-default/data/paper/v2/agents/claude-invocation-evidence.sqlite"
+    );
   });
 
   it("accepts pnpm 11's leading script-argument separator", () => {
@@ -130,18 +142,19 @@ describe("captured paper-session CLI", () => {
     });
   });
 
-  it("denies the current unregistered protocol before preflight, ledgers, or execution", async () => {
+  it("recognizes registered v2 before read-only preflight without opening durable state", async () => {
     const directory = mkdtempSync(join(tmpdir(), "samaritan-captured-auth-"));
     directories.push(directory);
     const spendPath = join(directory, "spend.sqlite");
     const invocationPath = join(directory, "invocations.sqlite");
     const execute = vi.fn();
 
+    expect(assertCapturedPaperSessionAuthorized).not.toThrow();
     await expect(runCapturedPaperSessionCli([
       "--spend-ledger", spendPath,
       "--invocation-evidence-ledger", invocationPath,
       "--env", join(directory, "must-not-be-read.env")
-    ], execute)).rejects.toBeInstanceOf(CapturedPaperSessionAuthorizationError);
+    ], execute)).rejects.toThrow(/--run-label is required/);
     expect(execute).not.toHaveBeenCalled();
     expect(existsSync(spendPath)).toBe(false);
     expect(existsSync(invocationPath)).toBe(false);

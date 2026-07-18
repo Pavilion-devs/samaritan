@@ -136,8 +136,9 @@ test("absolute capture windows cannot be shifted by discovery duration", () => {
   }), /requires both/);
 });
 
-test("supported asset selection is deterministic and never truncates required strategy markets", () => {
+test("supported asset selection is deterministic and never truncates required strategy markets", (context) => {
   const kickoff = "2026-07-15T19:00:00.000Z";
+  context.mock.method(Date, "now", () => Date.parse(kickoff) - 60 * 60_000);
   const market = (id: string, sportsMarketType: "moneyline" | "totals", line?: number) => ({
     id,
     conditionId: `condition-${id}`,

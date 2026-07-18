@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-export type ProductRoute = "command" | "matchroom" | "casebook" | "study";
+export type ProductRoute = "command" | "matchroom" | "casebook" | "study" | "proof";
 
 export type IconName =
   | "arrow"
@@ -75,7 +75,7 @@ export function Navigation({ active, caseCount }: { active: ProductRoute; caseCo
         <a className={active === "matchroom" ? "active" : undefined} href="/matchroom" aria-current={active === "matchroom" ? "page" : undefined}><Icon name="replay" /><span>Matchroom</span></a>
         <a className={active === "casebook" ? "active" : undefined} href="/casebook" aria-current={active === "casebook" ? "page" : undefined}><Icon name="case" /><span>Casebook</span>{caseCount === undefined ? null : <em>{caseCount}</em>}</a>
         <a className={active === "study" ? "active" : undefined} href="/study" aria-current={active === "study" ? "page" : undefined}><Icon name="chart" /><span>Study</span></a>
-        <a href="/command#proof"><Icon name="proof" /><span>Proof</span></a>
+        <a className={active === "proof" ? "active" : undefined} href="/proof" aria-current={active === "proof" ? "page" : undefined}><Icon name="proof" /><span>Proof</span></a>
         <span className="nav-group system-group">Read only</span>
         <a href="/command#system"><Icon name="system" /><span>System</span><i className="feed-dot" aria-label="Offline evidence snapshot available" /></a>
       </nav>
@@ -100,7 +100,7 @@ export function MobileNavigation({ active }: { active: ProductRoute }) {
       <a className={active === "matchroom" ? "active" : undefined} href="/matchroom"><Icon name="replay" /><span>Match</span></a>
       <a className={active === "casebook" ? "active" : undefined} href="/casebook"><Icon name="case" /><span>Cases</span></a>
       <a className={active === "study" ? "active" : undefined} href="/study"><Icon name="chart" /><span>Study</span></a>
-      <a href="/command#proof"><Icon name="proof" /><span>Proof</span></a>
+      <a className={active === "proof" ? "active" : undefined} href="/proof"><Icon name="proof" /><span>Proof</span></a>
     </nav>
   );
 }

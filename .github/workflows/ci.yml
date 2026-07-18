@@ -37,7 +37,7 @@ jobs:
       - name: Install locked dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Reject high or critical judge-runtime advisories
+      - name: Reject moderate or greater judge-runtime advisories
         run: pnpm security:audit
 
       - name: Verify the complete clean-clone judge path

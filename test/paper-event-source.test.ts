@@ -215,7 +215,8 @@ describe("paper event sources", () => {
     const handle = initializePaperStudyLedger({
       path: ":memory:",
       lane: "bounty",
-      startedAtTsMs: 1_000
+      startedAtTsMs: 1_000,
+      testOnlyAllowPreRegistrationStart: true
     });
     try {
       const runtime = createPersistentPaperLaneRuntime({

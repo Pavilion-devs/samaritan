@@ -1,13 +1,13 @@
 # TxLINE API Feedback Draft
 
-**Status:** Submission draft; verify links and current service metadata immediately before sending<br>
+**Status:** Submission draft refreshed July 18; verify links and current service metadata immediately before sending<br>
 **Project:** Samaritan<br>
 **Participant:** Deborah<br>
-**Basis:** Phase 0 through Phase 4 integration work using the OpenAPI specification, mainnet SL12, devnet subscription metadata, historical endpoints, snapshots, SSE, score data, and validation surfaces
+**Basis:** Phase 0 through Phase 4 integration work using the OpenAPI specification, mainnet SL12, devnet subscription metadata, historical endpoints, snapshots, SSE, and score data, plus a documentation review of validation surfaces. Samaritan does not integrate validation proofs into its current receipt.
 
 ## Executive summary
 
-TxLINE gave Samaritan an unusually strong foundation for building a reproducible sports-market system. Its most valuable combination is not merely low-latency odds: it is normalized de-vigged probabilities, historical access, live SSE, rich score events, and on-chain validation surfaces under one data model. That combination makes it possible to test the same deterministic decision logic in replay and live operation and to retain evidence for why a system acted or refused to act.
+TxLINE gave Samaritan an unusually strong foundation for building a reproducible sports-market system. Its most valuable combination is not merely low-latency odds: it is normalized de-vigged probabilities, historical access, live SSE, rich score events, and documented on-chain validation surfaces under one data model. The integrated data surfaces make it possible to test the same deterministic decision logic in replay and live operation and to retain local evidence for why a system acted or refused to act; Samaritan does not claim that its current receipt verifies a TXLine Merkle proof.
 
 The main integration cost came from places where the documented contract did not fully describe observed behavior: timestamp requirements, service-level metadata, empty quote transitions, array alignment, retention windows, score-state semantics, and authentication renewal. None is a request for more product scope. A tighter executable contract, explicit lifecycle semantics, and a small official SDK/conformance suite would remove most of the defensive reverse engineering required by a production consumer.
 
@@ -189,7 +189,13 @@ A tiny official TypeScript session helper would eliminate substantial repeated w
 
 An official “lossless reconnect” example should demonstrate snapshot backfill, `Last-Event-ID`, deduplication, and gap detection together.
 
-### 11. Provide a first-party validation verifier and canonical proof example
+### 11. Keep hosted validation docs and repository examples version-aligned
+
+**Observed friction:** A July 18 review of the official [`txodds/tx-on-chain`](https://github.com/txodds/tx-on-chain) repository found runnable `validateStatV3` examples using `/api/scores/stat-validation-v3` and compressed multiproof fields, while the hosted/OpenAPI-facing validation material still centered the legacy and V2 shapes. The repository, rather than one versioned hosted entry point, exposed that newer shape. Samaritan did not adopt the undocumented surface.
+
+**Suggestion:** Publish a version matrix linking each API proof route to its matching on-chain method, IDL release, network program address, payload schema, deprecation state, and runnable example. Mark V3 explicitly in the OpenAPI and hosted navigation when production-supported, and retain a migration note from V2's per-stat proofs to V3's `multiproof.indices` / `multiproof.hashes` representation.
+
+### 12. Provide a first-party validation verifier and canonical proof example
 
 **Observed friction:** The validation endpoints are strategically important, but consumers still need to understand canonical leaf serialization, proof ordering, on-chain account selection, network identity, and how to verify a returned proof independently.
 
@@ -203,7 +209,7 @@ An official “lossless reconnect” example should demonstrate snapshot backfil
 
 This would turn validation from an advanced integration surface into a feature every hackathon entry could demonstrate correctly.
 
-### 12. Add an executable conformance pack and changelog
+### 13. Add an executable conformance pack and changelog
 
 **Observed friction:** The OpenAPI specification is a strong starting point, but several important behaviors were discovered only through captured traffic. In a money-adjacent system, documentation drift forces every client to build its own interpretation layer.
 

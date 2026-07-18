@@ -30,6 +30,7 @@ const securityHeaders: Record<string, string> = {
   "cross-origin-opener-policy": "same-origin",
   "permissions-policy": "camera=(), geolocation=(), microphone=(), payment=(), usb=()",
   "referrer-policy": "no-referrer",
+  "x-content-type-options": "nosniff",
   "x-frame-options": "DENY"
 };
 
@@ -56,12 +57,12 @@ const server = createServer(async (request, response) => {
   try {
     for (const [name, value] of Object.entries(securityHeaders)) response.setHeader(name, value);
     if (request.method !== "GET" && request.method !== "HEAD") {
-      response.writeHead(405, { allow: "GET, HEAD", "content-type": "application/json; charset=utf-8" });
+      response.writeHead(405, { allow: "GET, HEAD", "cache-control": "no-store", "content-type": "application/json; charset=utf-8" });
       response.end(JSON.stringify({ error: "method_not_allowed" }));
       return;
     }
     const url = new URL(request.url ?? "/", "http://localhost");
-    const apiResult = await handleDashboardApi(url.pathname, repoRoot);
+    const apiResult = await handleDashboardApi(url.pathname, repoRoot, { method: request.method });
     if (apiResult) {
       writeApiResult(response, apiResult, request.method === "HEAD");
       return;

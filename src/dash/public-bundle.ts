@@ -6,6 +6,9 @@ import { stableJson } from "../domain/json.js";
 import {
   CASEBOOK_SNAPSHOT_ID,
   COMMAND_SNAPSHOT_ID,
+  FORWARD_PAPER_CONFIG_HASH,
+  FORWARD_PAPER_PROTOCOL_ID,
+  FORWARD_PAPER_REGISTERED_AT,
   SPAIN_BELGIUM_MATCHROOM_ID,
   STUDY_SNAPSHOT_ID,
   TXLINE_PUBLIC_MOVEMENT_BUCKET_BPS
@@ -34,13 +37,24 @@ export type PublicDashboardFilename = typeof PUBLIC_DASHBOARD_FILES[number]["fil
 const isoSchema = z.string().datetime();
 const hashSchema = z.string().regex(/^[a-f0-9]{64}$/);
 const probabilitySchema = z.number().finite().min(0).max(1);
-const finiteSchema = z.number().finite();
 const nonnegativeIntegerSchema = z.number().int().nonnegative().safe();
+const studyCountsSchema = z.object({
+  matches: nonnegativeIntegerSchema,
+  signals: nonnegativeIntegerSchema,
+  filledMatches: nonnegativeIntegerSchema,
+  fills: nonnegativeIntegerSchema,
+  settledFills: nonnegativeIntegerSchema
+}).strict().superRefine((counts, context) => {
+  if (counts.filledMatches > counts.matches || counts.fills > counts.signals || counts.settledFills > counts.fills) {
+    context.addIssue({ code: "custom", message: "Study counts do not reconcile" });
+  }
+});
 
 export const publicDataPolicySchema = z.object({
   derivedOnly: z.literal(true),
   txlineProbabilityDisplay: z.literal("bucketed_movement_only"),
   txlineMovementBucketBps: z.literal(TXLINE_PUBLIC_MOVEMENT_BUCKET_BPS),
+  txlineFixtureIdentifiersExposed: z.literal(false),
   credentialsRequired: z.literal(false),
   walletControlsExposed: z.literal(false)
 }).strict();
@@ -86,7 +100,7 @@ const evidenceRowSchema = z.object({
 }).strict();
 
 const matchSchema = z.object({
-  fixtureId: z.string().min(1),
+  fixtureRef: z.literal(SPAIN_BELGIUM_MATCHROOM_ID),
   eventSlug: z.string().min(1),
   competition: z.literal("World Cup"),
   stage: z.literal("Captured fixture"),
@@ -134,7 +148,7 @@ export const matchroomApiResponseSchema = z.object({
   data: z.object({
     schemaVersion: z.literal(2),
     snapshotId: z.literal(SPAIN_BELGIUM_MATCHROOM_ID),
-    caseId: z.string().regex(/^FX-[A-Za-z0-9_-]+-G\d{2}-(?:MR|TG-\d+)$/),
+    caseId: z.string().regex(/^SB-20260710-G\d{2}-(?:MR|TG-\d+)$/),
     casebookCaseCount: z.number().int().positive().safe(),
     generatedAt: isoSchema,
     mode: z.literal("captured_replay"),
@@ -180,7 +194,7 @@ export const matchroomApiResponseSchema = z.object({
 const commandCaseSchema = z.object({
   caseId: z.string().min(1),
   matchroomId: z.literal(SPAIN_BELGIUM_MATCHROOM_ID),
-  fixtureId: z.string().min(1),
+  fixtureRef: z.literal(SPAIN_BELGIUM_MATCHROOM_ID),
   fixtureLabel: z.string().min(1),
   home: matchSchema.shape.home,
   away: matchSchema.shape.away,
@@ -203,7 +217,7 @@ const commandCaseSchema = z.object({
 
 export const commandApiResponseSchema = z.object({
   data: z.object({
-    schemaVersion: z.literal(2),
+    schemaVersion: z.literal(3),
     snapshotId: z.literal(COMMAND_SNAPSHOT_ID),
     generatedAt: isoSchema,
     mode: z.literal("offline_artifact"),
@@ -232,7 +246,7 @@ export const commandApiResponseSchema = z.object({
       chart: z.array(publicBookPointSchema).min(1)
     }).strict(),
     fixtureSchedule: z.array(z.object({
-      fixtureId: z.string().min(1),
+      captureId: z.string().regex(/^paired-[a-z0-9-]+$/),
       home: z.object({ name: z.string().min(1), code: z.string().min(2) }).strict(),
       away: z.object({ name: z.string().min(1), code: z.string().min(2) }).strict(),
       kickoffUtc: isoSchema,
@@ -252,30 +266,38 @@ export const commandApiResponseSchema = z.object({
         synchronizedEndUtc: isoSchema,
         streamCount: z.literal(3)
       }).strict().nullable(),
-      identityStatus: z.literal("exact_match_confirmed"),
+      identityStatus: z.enum(["exact_match_confirmed", "historical_reviewed_config"]),
       captureOnly: z.literal(true),
       tradeable: z.literal(false)
     }).strict()).min(1),
     recentCases: z.array(commandCaseSchema).length(1),
     additionalCaseState: z.object({
       status: z.literal("waiting_for_eligible_capture"),
-      label: z.literal("No active study can admit cases"),
+      label: z.literal("Registered v2 awaits fresh eligible evidence"),
       detail: z.string().min(1)
     }).strict(),
     study: z.object({
-      protocolVersion: z.string().min(1),
-      protocolStatus: z.literal("invalidated_suspended"),
-      configHash: hashSchema,
-      startedAt: isoSchema,
-      status: z.literal("suspended"),
-      statusLabel: z.literal("V1 suspended"),
-      filledMatches: z.literal(0),
+      protocolVersion: z.literal(FORWARD_PAPER_PROTOCOL_ID),
+      protocolStatus: z.literal("registered"),
+      configHash: z.literal(FORWARD_PAPER_CONFIG_HASH),
+      registeredAt: z.literal(FORWARD_PAPER_REGISTERED_AT),
+      status: z.literal("active_forward_paper"),
+      statusLabel: z.literal("V2 registered"),
+      observationStatus: z.enum(["awaiting_fresh_evidence", "collecting_forward_evidence"]),
+      qualifyingCounts: studyCountsSchema,
       requiredFilledMatches: z.number().int().positive(),
-      fills: z.literal(0),
       requiredFills: z.number().int().positive(),
       bountyStatus: z.literal("exploratory"),
-      stoppingRuleMet: z.literal(false),
-      reason: z.string().min(1)
+      stoppingRuleMet: z.boolean(),
+      realMoneyGate: z.literal("closed"),
+      reason: z.string().min(1),
+      historicalV1: z.object({
+        protocolVersion: z.literal("paper-study-v1-2026-07-12"),
+        protocolStatus: z.literal("invalidated_suspended"),
+        configHash: hashSchema,
+        startedAt: isoSchema,
+        zeroObservationAudit: z.literal(true)
+      }).strict()
     }).strict(),
     proof: z.object({
       replayIdentityParity: z.literal(true),
@@ -299,13 +321,13 @@ export const commandApiResponseSchema = z.object({
 }).strict();
 
 const casebookSummarySchema = z.object({
-  caseId: z.string().regex(/^FX-[A-Za-z0-9_-]+-G\d{2}-(?:MR|TG-\d+)$/),
+  caseId: z.string().regex(/^SB-20260710-G\d{2}-(?:MR|TG-\d+)$/),
   matchroomId: z.literal(SPAIN_BELGIUM_MATCHROOM_ID).nullable(),
   selectedExemplar: z.boolean(),
   goalOrdinal: z.number().int().positive().safe(),
   goalClockSeconds: nonnegativeIntegerSchema,
   occurredAt: isoSchema,
-  fixtureId: z.string().min(1),
+  fixtureRef: z.literal(SPAIN_BELGIUM_MATCHROOM_ID),
   fixtureLabel: z.string().min(1),
   homeCode: z.string().min(2),
   awayCode: z.string().min(2),
@@ -426,69 +448,14 @@ export const casebookApiResponseSchema = z.object({
   }
 });
 
-const studyCountsSchema = z.object({
-  matches: nonnegativeIntegerSchema,
-  signals: nonnegativeIntegerSchema,
-  filledMatches: z.literal(0),
-  fills: z.literal(0),
-  settledFills: z.literal(0)
-}).strict();
-
-const studyIntervalSchema = z.object({
-  iterations: z.number().int().positive(),
-  seed: z.number().int(),
-  matches: z.number().int().positive(),
-  signals: z.number().int().positive(),
-  low: finiteSchema,
-  median: finiteSchema,
-  high: finiteSchema
-}).strict();
-
-const studyEndpointsSchema = z.object({
-  meanNetClvBps: finiteSchema,
-  netClvInterval: studyIntervalSchema,
-  meanSettlementPnlMicroUsd: z.number().int(),
-  settlementPnlInterval: studyIntervalSchema,
-  noTradeBaselineClvBps: z.literal(0),
-  randomDirectionControlClvBps: finiteSchema,
-  fractionSettledMatchesNetPositive: probabilitySchema
-}).strict();
-
-const studyGuardrailsSchema = z.object({
-  fillRate: probabilitySchema,
-  fillRatePassed: z.boolean(),
-  meanSlippageBps: finiteSchema.nonnegative().nullable(),
-  slippagePassed: z.boolean(),
-  maxDrawdownMicroUsd: nonnegativeIntegerSchema,
-  drawdownPassed: z.boolean(),
-  selectedDepthComplete: z.boolean(),
-  closeMarksComplete: z.boolean(),
-  settlementComplete: z.boolean()
-}).strict();
-
-const studyRowSchema = z.object({
-  fixtureId: z.string().min(1),
-  kickoffUtc: isoSchema,
-  selectedLine: finiteSchema,
-  signals: nonnegativeIntegerSchema,
-  fills: nonnegativeIntegerSchema,
-  fillRate: probabilitySchema,
-  meanHalfSpreadBps: finiteSchema.nonnegative().nullable(),
-  meanSlippageBps: finiteSchema.nonnegative().nullable(),
-  grossClvBps: finiteSchema.nullable(),
-  netClvBps: finiteSchema.nullable(),
-  settlementPnlMicroUsd: z.number().int().nullable(),
-  netReturnBps: finiteSchema.nullable()
-}).strict();
-
 export const correctedHistoricalCandidateSchema = z.object({
   schemaVersion: z.literal(4),
   generatedAt: isoSchema,
   protocolId: z.literal("historical-gate-causal-economic-v4-2026-07-14"),
   configurationHash: hashSchema,
   status: z.literal("historical_signal_candidate_for_forward_paper_review"),
-  registration: z.literal("engineering_candidate_unregistered"),
-  activeStudy: z.literal(false),
+  sourceRegistrationAtGeneration: z.literal("engineering_candidate_unregistered"),
+  activeStudyAtGeneration: z.literal(false),
   detector: z.literal("CONSENSUS_MOVE"),
   marketFamily: z.literal("Full-time totals"),
   trainingNormalizedCases: z.literal(135),
@@ -505,7 +472,7 @@ export const correctedHistoricalCandidateSchema = z.object({
   evidenceClass: z.literal("historical_sampled_price_signal_research"),
   executionEvidence: z.literal("not_established_no_historical_bid_ask_or_depth"),
   executable: z.literal(false),
-  claimBoundary: z.literal("Forward paper review candidate only; not alpha, profitability, fill proof, or permission to trade.")
+  claimBoundary: z.literal("Historical sampled-price evidence justified review only; the separate v2 registration does not turn it into alpha, fill proof, profitability, or permission for real money.")
 }).strict();
 
 export const syntheticProofReceiptSchema = z.object({
@@ -521,7 +488,7 @@ export const syntheticProofReceiptSchema = z.object({
 
 export const studyApiResponseSchema = z.object({
   data: z.object({
-    schemaVersion: z.literal(2),
+    schemaVersion: z.literal(3),
     snapshotId: z.literal(STUDY_SNAPSHOT_ID),
     generatedAt: isoSchema,
     mode: z.literal("offline_artifact"),
@@ -529,75 +496,91 @@ export const studyApiResponseSchema = z.object({
     realMoneyGate: z.literal("closed"),
     tradeable: z.literal(false),
     protocol: z.object({
-      version: z.string().min(1),
-      status: z.literal("invalidated_suspended"),
-      active: z.literal(false),
-      configHash: hashSchema,
-      startedAt: isoSchema,
+      version: z.literal(FORWARD_PAPER_PROTOCOL_ID),
+      status: z.literal("registered"),
+      activity: z.literal("active_forward_paper"),
+      active: z.literal(true),
+      registeredAt: z.literal(FORWARD_PAPER_REGISTERED_AT),
+      configHash: z.literal(FORWARD_PAPER_CONFIG_HASH),
+      realMoneyGate: z.literal("closed"),
+      observationStatus: z.enum(["awaiting_fresh_evidence", "collecting_forward_evidence"]),
+      evidencePolicy: z.literal("fresh_forward_only"),
+      qualifyingCounts: studyCountsSchema,
       candidate: z.object({
         detector: z.literal("CONSENSUS_MOVE"),
         marketFamily: z.literal("Full-time totals only"),
-        moveAbsZ: finiteSchema.positive(),
-        cusumThresholdBps: finiteSchema.positive(),
-        minimumGapBps: finiteSchema.positive(),
-        minimumUpdates: z.number().int().positive(),
+        moveAbsZ: z.literal(1),
+        cusumThresholdBps: z.literal(10),
+        minimumGapBps: z.literal(100),
+        minimumUpdates: z.literal(5),
         selector: z.literal("Closest to even"),
-        minimumCoveragePoints: z.number().int().positive(),
-        maximumDistanceFromEven: probabilitySchema
+        minimumCoveragePoints: z.literal(1_000),
+        maximumDistanceFromEven: z.literal(0.15)
       }).strict(),
       evaluation: z.object({
         unitOfAnalysis: z.literal("match"),
         primaryEndpoint: z.literal("Executable CLV net of measured costs"),
-        minimumFilledMatches: z.number().int().positive(),
-        minimumFills: z.number().int().positive(),
+        minimumFilledMatches: z.literal(20),
+        minimumFills: z.literal(40),
         targetMatches: z.literal(30),
-        bootstrapIterations: z.number().int().positive(),
-        bootstrapSeed: z.number().int(),
+        bootstrapIterations: z.literal(10_000),
+        bootstrapSeed: z.literal(20_260_714),
         randomDirectionControl: z.literal("Seeded matched-cost sign flip")
       }).strict(),
       risk: z.object({
-        bankrollMicroUsd: z.number().int().positive(),
-        perTradeStakeMicroUsd: z.number().int().positive(),
-        aggregateExposureMicroUsd: z.number().int().positive(),
-        drawdownStopMicroUsd: z.number().int().positive()
+        bankrollMicroUsd: z.literal(50_000_000),
+        perTradeStakeMicroUsd: z.literal(3_000_000),
+        aggregateExposureMicroUsd: z.literal(15_000_000),
+        drawdownStopMicroUsd: z.literal(20_000_000)
       }).strict(),
       guardrailThresholds: z.object({
-        minimumFillRate: probabilitySchema,
-        maximumMeanSlippageBps: finiteSchema.positive(),
-        maximumDrawdownMicroUsd: z.number().int().positive(),
+        minimumFillRate: z.literal(0.6),
+        maximumMeanSlippageBps: z.literal(100),
+        maximumDrawdownMicroUsd: z.literal(20_000_000),
         selectedDepthRequired: z.literal(true)
       }).strict()
     }).strict(),
-    lanes: z.object({
-      bounty: z.object({
-        label: z.literal("Preserved v1 bounty ledger"),
-        status: z.literal("exploratory"),
-        statusLabel: z.literal("Exploratory"),
-        reason: z.string().min(1),
-        counts: studyCountsSchema,
-        chain: z.object({ valid: z.literal(true), rows: z.number().int().positive(), headHash: hashSchema }).strict(),
-        canSatisfyGate: z.literal(false)
+    historicalV1: z.object({
+      protocolVersion: z.literal("paper-study-v1-2026-07-12"),
+      status: z.literal("invalidated_suspended"),
+      active: z.literal(false),
+      invalidatedBeforeObservations: z.literal(true),
+      configHash: hashSchema,
+      startedAt: isoSchema,
+      lanes: z.object({
+        bounty: z.object({
+          label: z.literal("Preserved invalidated v1 bounty ledger"),
+          sourceStatus: z.literal("exploratory"),
+          statusLabel: z.literal("V1 invalidated"),
+          reason: z.string().min(1),
+          counts: studyCountsSchema,
+          chain: z.object({ valid: z.literal(true), rows: z.number().int().positive(), headHash: hashSchema }).strict(),
+          canSatisfyGate: z.literal(false)
+        }).strict(),
+        longRun: z.object({
+          label: z.literal("Preserved invalidated v1 long-run ledger"),
+          sourceStatus: z.literal("sealed"),
+          statusLabel: z.literal("V1 invalidated"),
+          reason: z.string().min(1),
+          counts: studyCountsSchema,
+          stoppingRuleMet: z.literal(false),
+          chain: z.object({ valid: z.literal(true), rows: z.number().int().positive(), headHash: hashSchema }).strict(),
+          canSatisfyGate: z.literal(false)
+        }).strict()
       }).strict(),
-      longRun: z.object({
-        label: z.literal("Preserved v1 long-run ledger"),
-        status: z.enum(["sealed", "accept", "reject", "inconclusive"]),
-        statusLabel: z.string().min(1),
-        reason: z.string().min(1),
-        counts: studyCountsSchema,
-        stoppingRuleMet: z.boolean(),
-        chain: z.object({ valid: z.literal(true), rows: z.number().int().positive(), headHash: hashSchema }).strict(),
-        canSatisfyGate: z.literal(false)
+      results: z.object({
+        visibility: z.literal("sealed"),
+        rows: z.null(),
+        endpoints: z.null(),
+        guardrails: z.null()
       }).strict()
     }).strict(),
-    results: z.discriminatedUnion("visibility", [
-      z.object({ visibility: z.literal("sealed"), rows: z.null(), endpoints: z.null(), guardrails: z.null() }).strict(),
-      z.object({
-        visibility: z.literal("open"),
-        rows: z.array(studyRowSchema),
-        endpoints: studyEndpointsSchema.nullable(),
-        guardrails: studyGuardrailsSchema
-      }).strict()
-    ]),
+    results: z.object({
+      visibility: z.literal("sealed"),
+      rows: z.null(),
+      endpoints: z.null(),
+      guardrails: z.null()
+    }).strict(),
     correctedHistoricalCandidate: correctedHistoricalCandidateSchema,
     syntheticProof: syntheticProofReceiptSchema,
     fixtureUniverse: z.object({
@@ -673,7 +656,8 @@ export function publicDashboardBundleHash(
       txlineProbabilityDisplay: "bucketed_movement_only",
       txlineMovementBucketBps: TXLINE_PUBLIC_MOVEMENT_BUCKET_BPS,
       credentialsRequired: false,
-      walletControlsExposed: false
+      walletControlsExposed: false,
+      txlineFixtureIdentifiersExposed: false
     }
   })}`);
 }

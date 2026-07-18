@@ -2,13 +2,19 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { z } from "zod";
 import {
+  PAPER_STUDY_DETECTOR_CONFIG,
+  PAPER_STUDY_TOTAL_SELECTOR_CONFIG
+} from "../config/paper-study.js";
+import { PAPER_STUDY_EVALUATION_CANDIDATE } from "../metrics/paper-study.js";
+import { APPROVED_PAPER_RISK_CONFIG } from "../risk/paper.js";
+import {
+  FORWARD_PAPER_CONFIG_HASH,
+  FORWARD_PAPER_PROTOCOL_ID,
+  FORWARD_PAPER_REGISTERED_AT,
   STUDY_SNAPSHOT_ID,
   TXLINE_PUBLIC_MOVEMENT_BUCKET_BPS,
   type CorrectedHistoricalCandidate,
   type StudyApiResponse,
-  type StudyEndpoints,
-  type StudyGuardrails,
-  type StudyMatchRow,
   type StudySnapshot
 } from "./public-contract.js";
 
@@ -81,8 +87,18 @@ const reportSchema = z.object({
 const initializationSchema = z.object({
   configHash: z.string().regex(/^[a-f0-9]{64}$/),
   protocolVersion: z.string().min(1),
+  protocolStatus: z.literal("registered").optional(),
   realMoneyGate: z.literal("closed"),
+  startedAtTsMs: z.number().int().nonnegative(),
   startedAt: z.string().datetime(),
+  registration: z.object({
+    protocolId: z.literal(FORWARD_PAPER_PROTOCOL_ID),
+    status: z.literal("registered"),
+    registeredBy: z.literal("Deborah"),
+    registeredAt: z.literal(FORWARD_PAPER_REGISTERED_AT),
+    scope: z.literal("forward_paper_only"),
+    realMoneyGate: z.literal("closed")
+  }).strict().optional(),
   frozenConfig: z.object({
     detector: z.object({
       consensusCusumThreshold: z.number().finite().positive(),
@@ -111,7 +127,7 @@ const initializationSchema = z.object({
       minimumCoveragePoints: z.number().int().positive()
     })
   })
-});
+}).passthrough();
 
 const laneSchema = z.object({
   initialization: initializationSchema,
@@ -182,23 +198,6 @@ function validCounts(counts: z.infer<typeof countsSchema>): boolean {
   return counts.filledMatches <= counts.matches && counts.fills <= counts.signals && counts.settledFills <= counts.fills;
 }
 
-function mapRows(rows: z.infer<typeof rowSchema>[]): StudyMatchRow[] {
-  return rows.map((row) => ({
-    fixtureId: row.fixtureId,
-    kickoffUtc: new Date(row.kickoffTsMs).toISOString(),
-    selectedLine: row.selectedLineMilli / 1_000,
-    signals: row.signals,
-    fills: row.fills,
-    fillRate: row.fillRate,
-    meanHalfSpreadBps: row.meanHalfSpreadBps,
-    meanSlippageBps: row.meanSlippageBps,
-    grossClvBps: row.grossClvBps,
-    netClvBps: row.netClvBps,
-    settlementPnlMicroUsd: row.settlementPnlMicroUsd,
-    netReturnBps: row.netReturnBps
-  }));
-}
-
 function probabilityToOneDecimalBps(value: number): number {
   return Math.round(value * 100_000) / 10;
 }
@@ -220,8 +219,8 @@ function buildCorrectedHistoricalCandidate(
     protocolId: source.protocolId,
     configurationHash: source.configurationHash,
     status: candidate.status,
-    registration: candidate.registration,
-    activeStudy: false,
+    sourceRegistrationAtGeneration: candidate.registration,
+    activeStudyAtGeneration: false,
     detector: candidate.detector,
     marketFamily: "Full-time totals",
     trainingNormalizedCases: candidate.trainingNormalizedCases,
@@ -238,23 +237,27 @@ function buildCorrectedHistoricalCandidate(
     evidenceClass: "historical_sampled_price_signal_research",
     executionEvidence: "not_established_no_historical_bid_ask_or_depth",
     executable: false,
-    claimBoundary: "Forward paper review candidate only; not alpha, profitability, fill proof, or permission to trade."
+    claimBoundary: "Historical sampled-price evidence justified review only; the separate v2 registration does not turn it into alpha, fill proof, profitability, or permission for real money."
   };
 }
 
 export async function buildStudySnapshot(repoRoot: string): Promise<StudySnapshot> {
-  const [artifactValue, universeValue, correctedCandidateValue] = await Promise.all([
+  const [artifactValue, universeValue, registeredArtifactValue, registeredUniverseValue, correctedCandidateValue] = await Promise.all([
     readFile(resolve(repoRoot, "data/paper/reports/current.json"), "utf8").then(JSON.parse),
     readFile(resolve(repoRoot, "data/research/paper-fixture-universe.json"), "utf8").then(JSON.parse),
+    readFile(resolve(repoRoot, "data/paper/v2/reports/current.json"), "utf8").then(JSON.parse),
+    readFile(resolve(repoRoot, "data/paper/v2/fixture-universe.json"), "utf8").then(JSON.parse),
     readFile(resolve(repoRoot, "data/research/historical-gate-study-causal-economic-v4.json"), "utf8").then(JSON.parse)
   ]);
   const artifact = artifactSchema.parse(artifactValue);
   const universe = universeSchema.parse(universeValue);
+  const registeredArtifact = artifactSchema.parse(registeredArtifactValue);
+  const registeredUniverse = universeSchema.parse(registeredUniverseValue);
   const correctedCandidateSource = correctedHistoricalCandidateSourceSchema.parse(correctedCandidateValue);
   const bounty = artifact.lanes.bounty;
   const longRun = artifact.lanes.longRun;
   if (artifact.protocolVersion !== "paper-study-v1-2026-07-12") {
-    throw new Error("Study projection failed closed: no registered corrected protocol is approved for public display");
+    throw new Error("Study projection failed closed: preserved v1 audit identity changed");
   }
   if (
     bounty.report.lane !== "bounty" ||
@@ -276,111 +279,143 @@ export async function buildStudySnapshot(repoRoot: string): Promise<StudySnapsho
   ) {
     throw new Error("Study projection failed closed: invalidated v1 ledger contains observations");
   }
-  const sealed = longRun.report.status === "sealed";
-  if (sealed && (longRun.report.stoppingRuleMet || longRun.report.rows !== null || longRun.report.endpoints !== null || longRun.report.guardrails !== null)) {
-    throw new Error("Study projection failed closed: sealed long-run results leaked");
-  }
-  if (!sealed && (!longRun.report.stoppingRuleMet || longRun.report.rows === null || longRun.report.guardrails === null)) {
-    throw new Error("Study projection failed closed: long-run results opened before the stopping rule");
-  }
-  if (longRun.report.status === "accept") {
-    const endpoints = longRun.report.endpoints;
-    const guardrails = longRun.report.guardrails;
-    if (
-      endpoints === null || guardrails === null ||
-      endpoints.meanNetClvBps <= 0 || endpoints.netClvInterval.low <= 0 ||
-      endpoints.meanSettlementPnlMicroUsd <= 0 ||
-      endpoints.meanNetClvBps <= endpoints.noTradeBaselineClvBps ||
-      endpoints.meanNetClvBps <= endpoints.randomDirectionControlClvBps ||
-      !guardrails.fillRatePassed || !guardrails.slippagePassed || !guardrails.drawdownPassed ||
-      !guardrails.selectedDepthComplete || !guardrails.closeMarksComplete || !guardrails.settlementComplete
-    ) {
-      throw new Error("Study projection failed closed: ACCEPT does not satisfy the registered decision rule");
-    }
+  if (
+    longRun.report.status !== "sealed" ||
+    longRun.report.stoppingRuleMet ||
+    longRun.report.rows !== null ||
+    longRun.report.endpoints !== null ||
+    longRun.report.guardrails !== null
+  ) {
+    throw new Error("Study projection failed closed: invalidated v1 long-run evidence is not sealed");
   }
 
-  const frozen = longRun.initialization.frozenConfig;
-  const evaluation = frozen.evaluation;
-  const results: StudySnapshot["results"] = sealed ? {
+  const registeredBounty = registeredArtifact.lanes.bounty;
+  const registeredLongRun = registeredArtifact.lanes.longRun;
+  const registeredAtTsMs = Date.parse(FORWARD_PAPER_REGISTERED_AT);
+  if (
+    registeredArtifact.protocolVersion !== FORWARD_PAPER_PROTOCOL_ID ||
+    registeredArtifact.configHash !== FORWARD_PAPER_CONFIG_HASH ||
+    registeredArtifact.fixtureUniverseGeneratedAt !== registeredUniverse.generatedAt ||
+    registeredBounty.initialization.protocolVersion !== FORWARD_PAPER_PROTOCOL_ID ||
+    registeredLongRun.initialization.protocolVersion !== FORWARD_PAPER_PROTOCOL_ID ||
+    registeredBounty.initialization.protocolStatus !== "registered" ||
+    registeredLongRun.initialization.protocolStatus !== "registered" ||
+    registeredBounty.initialization.registration?.registeredAt !== FORWARD_PAPER_REGISTERED_AT ||
+    registeredLongRun.initialization.registration?.registeredAt !== FORWARD_PAPER_REGISTERED_AT ||
+    registeredBounty.initialization.configHash !== FORWARD_PAPER_CONFIG_HASH ||
+    registeredLongRun.initialization.configHash !== FORWARD_PAPER_CONFIG_HASH ||
+    registeredBounty.initialization.startedAtTsMs < registeredAtTsMs ||
+    registeredLongRun.initialization.startedAtTsMs < registeredAtTsMs ||
+    registeredBounty.initialization.startedAt !== new Date(registeredBounty.initialization.startedAtTsMs).toISOString() ||
+    registeredLongRun.initialization.startedAt !== new Date(registeredLongRun.initialization.startedAtTsMs).toISOString() ||
+    !validCounts(registeredBounty.report.counts) ||
+    !validCounts(registeredLongRun.report.counts)
+  ) {
+    throw new Error("Study projection failed closed: registered v2 report does not match the frozen forward protocol");
+  }
+  if (
+    registeredLongRun.report.status !== "sealed" ||
+    registeredLongRun.report.stoppingRuleMet ||
+    registeredLongRun.report.rows !== null ||
+    registeredLongRun.report.endpoints !== null ||
+    registeredLongRun.report.guardrails !== null
+  ) {
+    throw new Error("Study projection failed closed: v2 crossed its stopping gate without a refreshed public result contract");
+  }
+
+  const results: StudySnapshot["results"] = {
     visibility: "sealed",
     rows: null,
     endpoints: null,
     guardrails: null
-  } : {
-    visibility: "open",
-    rows: mapRows(longRun.report.rows!),
-    endpoints: longRun.report.endpoints as StudyEndpoints | null,
-    guardrails: longRun.report.guardrails as StudyGuardrails
   };
+  const qualifyingCounts = registeredLongRun.report.counts;
+  const observationStatus = qualifyingCounts.signals === 0
+    ? "awaiting_fresh_evidence" as const
+    : "collecting_forward_evidence" as const;
 
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     snapshotId: STUDY_SNAPSHOT_ID,
-    generatedAt: artifact.generatedAt,
+    generatedAt: registeredArtifact.generatedAt,
     mode: "offline_artifact",
     executionMode: "paper",
     realMoneyGate: "closed",
     tradeable: false,
     protocol: {
-      version: artifact.protocolVersion,
-      status: "invalidated_suspended",
-      active: false,
-      configHash: artifact.configHash,
-      startedAt: longRun.initialization.startedAt,
+      version: FORWARD_PAPER_PROTOCOL_ID,
+      status: "registered",
+      activity: "active_forward_paper",
+      active: true,
+      registeredAt: FORWARD_PAPER_REGISTERED_AT,
+      configHash: FORWARD_PAPER_CONFIG_HASH,
+      realMoneyGate: "closed",
+      observationStatus,
+      evidencePolicy: "fresh_forward_only",
+      qualifyingCounts,
       candidate: {
         detector: "CONSENSUS_MOVE",
         marketFamily: "Full-time totals only",
-        moveAbsZ: frozen.detector.consensusMoveAbsZ,
-        cusumThresholdBps: frozen.detector.consensusCusumThreshold * 10_000,
-        minimumGapBps: frozen.detector.consensusMinimumRawGap * 10_000,
-        minimumUpdates: frozen.detector.consensusMinimumUpdates,
+        moveAbsZ: PAPER_STUDY_DETECTOR_CONFIG.consensusMoveAbsZ,
+        cusumThresholdBps: PAPER_STUDY_DETECTOR_CONFIG.consensusCusumThreshold * 10_000,
+        minimumGapBps: PAPER_STUDY_DETECTOR_CONFIG.consensusMinimumRawGap * 10_000,
+        minimumUpdates: PAPER_STUDY_DETECTOR_CONFIG.consensusMinimumUpdates,
         selector: "Closest to even",
-        minimumCoveragePoints: frozen.selector.minimumCoveragePoints,
-        maximumDistanceFromEven: frozen.selector.maximumDistanceFromEven
+        minimumCoveragePoints: PAPER_STUDY_TOTAL_SELECTOR_CONFIG.minimumCoveragePoints,
+        maximumDistanceFromEven: PAPER_STUDY_TOTAL_SELECTOR_CONFIG.maximumDistanceFromEven
       },
       evaluation: {
         unitOfAnalysis: "match",
         primaryEndpoint: "Executable CLV net of measured costs",
-        minimumFilledMatches: evaluation.minimumFilledMatches,
-        minimumFills: evaluation.minimumFills,
+        minimumFilledMatches: PAPER_STUDY_EVALUATION_CANDIDATE.minimumFilledMatches,
+        minimumFills: PAPER_STUDY_EVALUATION_CANDIDATE.minimumFills,
         targetMatches: 30,
-        bootstrapIterations: evaluation.bootstrapIterations,
-        bootstrapSeed: evaluation.bootstrapSeed,
+        bootstrapIterations: PAPER_STUDY_EVALUATION_CANDIDATE.bootstrapIterations,
+        bootstrapSeed: PAPER_STUDY_EVALUATION_CANDIDATE.bootstrapSeed,
         randomDirectionControl: "Seeded matched-cost sign flip"
       },
       risk: {
-        bankrollMicroUsd: frozen.risk.bankrollMicroUsd,
-        perTradeStakeMicroUsd: frozen.risk.perTradeStakeMicroUsd,
-        aggregateExposureMicroUsd: frozen.risk.aggregateExposureMicroUsd,
-        drawdownStopMicroUsd: frozen.risk.drawdownStopMicroUsd
+        bankrollMicroUsd: APPROVED_PAPER_RISK_CONFIG.bankrollMicroUsd,
+        perTradeStakeMicroUsd: APPROVED_PAPER_RISK_CONFIG.perTradeStakeMicroUsd,
+        aggregateExposureMicroUsd: APPROVED_PAPER_RISK_CONFIG.aggregateExposureMicroUsd,
+        drawdownStopMicroUsd: APPROVED_PAPER_RISK_CONFIG.drawdownStopMicroUsd
       },
       guardrailThresholds: {
-        minimumFillRate: evaluation.minimumFillRate,
-        maximumMeanSlippageBps: evaluation.maximumMeanSlippageBps,
-        maximumDrawdownMicroUsd: evaluation.maximumDrawdownMicroUsd,
+        minimumFillRate: PAPER_STUDY_EVALUATION_CANDIDATE.minimumFillRate,
+        maximumMeanSlippageBps: PAPER_STUDY_EVALUATION_CANDIDATE.maximumMeanSlippageBps,
+        maximumDrawdownMicroUsd: PAPER_STUDY_EVALUATION_CANDIDATE.maximumDrawdownMicroUsd,
         selectedDepthRequired: true
       }
     },
-    lanes: {
-      bounty: {
-        label: "Preserved v1 bounty ledger",
-        status: "exploratory",
-        statusLabel: "Exploratory",
-        reason: bounty.report.reason,
-        counts: bounty.report.counts,
-        chain: bounty.chain,
-        canSatisfyGate: false
+    historicalV1: {
+      protocolVersion: artifact.protocolVersion,
+      status: "invalidated_suspended",
+      active: false,
+      invalidatedBeforeObservations: true,
+      configHash: artifact.configHash,
+      startedAt: longRun.initialization.startedAt,
+      lanes: {
+        bounty: {
+          label: "Preserved invalidated v1 bounty ledger",
+          sourceStatus: "exploratory",
+          statusLabel: "V1 invalidated",
+          reason: bounty.report.reason,
+          counts: bounty.report.counts,
+          chain: bounty.chain,
+          canSatisfyGate: false
+        },
+        longRun: {
+          label: "Preserved invalidated v1 long-run ledger",
+          sourceStatus: "sealed",
+          statusLabel: "V1 invalidated",
+          reason: longRun.report.reason,
+          counts: longRun.report.counts,
+          stoppingRuleMet: false,
+          chain: longRun.chain,
+          canSatisfyGate: false
+        }
       },
-      longRun: {
-        label: "Preserved v1 long-run ledger",
-        status: longRun.report.status as StudySnapshot["lanes"]["longRun"]["status"],
-        statusLabel: "V1 suspended",
-        reason: longRun.report.reason,
-        counts: longRun.report.counts,
-        stoppingRuleMet: longRun.report.stoppingRuleMet,
-        chain: longRun.chain,
-        canSatisfyGate: false
-      }
+      results: { visibility: "sealed", rows: null, endpoints: null, guardrails: null }
     },
     results,
     correctedHistoricalCandidate: buildCorrectedHistoricalCandidate(correctedCandidateSource),
@@ -395,27 +430,27 @@ export async function buildStudySnapshot(repoRoot: string): Promise<StudySnapsho
       explanation: "Closed-world production-component demo; separate from historical evidence and excluded from every performance claim."
     },
     fixtureUniverse: {
-      generatedAt: universe.generatedAt,
-      evidenceFixtures: universe.summary.fixtures,
-      pairedBookReplays: universe.summary.pairedBookReplays,
-      executableBookReplays: universe.summary.executableBookReplays,
-      signalResearchOnly: universe.summary.signalResearchOnly,
-      longRunEligible: universe.summary.longRunEligible
+      generatedAt: registeredUniverse.generatedAt,
+      evidenceFixtures: registeredUniverse.summary.fixtures,
+      pairedBookReplays: registeredUniverse.summary.pairedBookReplays,
+      executableBookReplays: registeredUniverse.summary.executableBookReplays,
+      signalResearchOnly: registeredUniverse.summary.signalResearchOnly,
+      longRunEligible: registeredUniverse.summary.longRunEligible
     },
     decisionRules: {
       accept: [
-        "Inactive v1 rule retained for audit only; it cannot produce an acceptance decision.",
+        "Only fresh observations at or after v2 registration may count toward a decision.",
         "Mean net executable CLV is positive and its match-clustered 95% CI lower bound is above zero.",
         "Mean settlement P&L is positive and the strategy beats no-trade and random-direction baselines.",
         "Every registered fill, slippage, drawdown, and depth guardrail holds."
       ],
       reject: [
-        "V1 was invalidated before observations because upstream selection used future information.",
         "The executable CLV interval touches or falls below zero.",
+        "The strategy fails to beat no-trade or the seeded random-direction control.",
         "Any registered guardrail fails materially."
       ],
       inconclusive: [
-        "No active study exists; corrected v2 remains an engineering candidate until Deborah registers it.",
+        "The registered v2 study has not yet reached 20 filled matches and 40 fills from fresh evidence.",
         "Capture-only evidence cannot authorize model spend, paper admission, or real money."
       ]
     },
@@ -423,6 +458,7 @@ export async function buildStudySnapshot(repoRoot: string): Promise<StudySnapsho
       derivedOnly: true,
       txlineProbabilityDisplay: "bucketed_movement_only",
       txlineMovementBucketBps: TXLINE_PUBLIC_MOVEMENT_BUCKET_BPS,
+      txlineFixtureIdentifiersExposed: false,
       credentialsRequired: false,
       walletControlsExposed: false
     }

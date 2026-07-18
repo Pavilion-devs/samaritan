@@ -11,7 +11,7 @@ function dashboardApi(): Plugin {
     configureServer(server) {
       server.middlewares.use(async (request, response, next) => {
         const url = new URL(request.url ?? "/", "http://localhost");
-        const result = await handleDashboardApi(url.pathname, repoRoot);
+        const result = await handleDashboardApi(url.pathname, repoRoot, { method: request.method ?? "GET" });
         if (!result) {
           next();
           return;

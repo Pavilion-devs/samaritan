@@ -6,49 +6,53 @@
 **Hard deadline:** July 19, 2026 at 23:59:59 UTC<br>
 **Real-money gate:** **CLOSED**
 
-This document converts the July 14 product, code, evidence, competition, legal, and submission audit into the shortest credible path to a winning TxODDS Trading Tools and Agents submission.
+This document converts the July 18 product, code, evidence, competition, legal, and submission audit into the shortest credible path to a winning TxODDS Trading Tools and Agents submission.
 
 It is a bounty-critical overlay on `plan.md`, not a replacement for the long-term Samaritan roadmap. It does not authorize real-money trading, relax any risk invariant, or permit raw TXLine data to be published.
 
-## 0. July 15 winner-ready checkpoint
+## 0. July 18 winner-ready checkpoint
 
-The product is no longer an idea looking for a demo. The current local release candidate has the core judge story implemented and verified:
+The product is no longer an idea looking for a demo. The working tree has the core judge story implemented, while the exact public commit, hosted URL, and final media package remain release gates:
 
 | Surface | Current evidence | Status |
 |---|---|---|
 | Real TXLine use | Mainnet SL12 ingestion and a synchronized Spain–Belgium replay are documented; the public case ends in a disciplined no-trade | **Ready, narrowly claimed** |
 | Shared paper conductor | Live and captured-replay adapters feed the same `runPaperSession` canonical-event conductor without exposing a mode flag to strategies | **Implemented; not a 24/7 deployment claim** |
 | Complete judge lifecycle | `pnpm demo` sends 20 invented canonical events through `runPaperSession` and completes signal → deterministic agent stubs → hard risk → paper fill → close → settlement | **Ready, synthetic and performance-excluded** |
-| Decision proof | 12 v2 ledger rows; ledger head `a034cd86…1575dc4`; receipt hash `130f1ee7…883f265`; offline verification passes | **Ready, local integrity only** |
+| Decision proof | The deterministic synthetic lifecycle produces a v2 ledger and offline-verifiable receipt; exact final hashes must be recorded only after the public commit and bundle are frozen | **Ready, local integrity only; final hashes pending freeze** |
 | Claude invocation evidence | Separate append-only hash chain verifies hash-only run metadata locally; a receipt may carry a generation-time reference, but its offline verifier does not independently prove membership | **Local audit only; no provider attestation and no active v2 run** |
-| Public evidence bundle | Six strict, hash-checked files; bundle hash `3c0d8b76…cc38dac8`; a second export reproduced every file hash and the derived-only audit passes | **Ready for final public-commit audit** |
-| Dashboard | Command, Matchroom, Casebook, Study, and separated synthetic-proof panel build and serve read-only | **Ready locally; not deployed** |
-| Historical claim | Corrected causal/economic v4 reports 38 held-out normalized buys / 18 fixtures / `+132.7` bps after proxy / clustered interval `+14.3` to `+243.9` | **Signal research only; v2 unregistered** |
-| External anchor | Unsigned devnet intent `cb921e05…e0bc03` generated offline; no signer, RPC, wallet, or transaction used | **Awaiting Deborah's explicit authorization** |
-| Capture expansion | France–Spain failed closed before kickoff. England–Argentina is scheduled for the watchdog-supervised absolute `2026-07-15T16:00:00Z`–`2026-07-15T22:00:00Z` window | **England pending capture/verification; capture-only** |
+| Public evidence bundle | A strict allowlist of derived artifacts passes the public-data audit during development; exact file count and bundle hash must come from the final frozen export | **Ready for final public-commit audit** |
+| Dashboard | Command, Matchroom, Casebook, Study, and Proof build and serve read-only | **Ready locally; deployment and signed-out verification remain open** |
+| Historical claim | Corrected causal/economic v4 reports 38 held-out normalized buys / 18 fixtures / `+132.7` bps after proxy / clustered interval `+14.3` to `+243.9` | **Signal research only; v2 registered July 18 for forward paper observation** |
+| External anchor | Offline devnet preparation and human-gated tooling exist; no signer, RPC submission, wallet action, or transaction is part of the bounty release | **Intentionally unanchored; no explorer claim** |
+| Capture expansion | France–Spain failed closed before kickoff. England–Argentina also failed closed after a watchdog-detected Polymarket stall and incomplete terminal manifests, so no semifinal paired capture is currently admissible | **No eligible semifinal paired capture; capture-only evidence remains blocked** |
 
-Release-gate evidence recorded July 15 for the current local release candidate:
+Development snapshots have passed root/dashboard typechecks, tests, the deterministic demo, receipt verification, the public-artifact audit, the production dashboard build, dependency gates, and isolated Phase 0 checks. The tree and evidence bundle changed afterward, so earlier test counts, file counts, and hashes are deliberately not release claims. A clean clone and GitHub CI run on the exact frozen public commit remain the authoritative release evidence.
 
-- root typecheck and dashboard typecheck passed;
-- 48 root test files / 294 tests passed;
-- deterministic demo and receipt verifier passed;
-- public artifact audit passed over 6 files;
-- production dashboard build passed;
-- the root judge/runtime graph passed the high/critical dependency-advisory gate;
-- isolated Phase 0 install, typecheck, and all 10 capture tests passed; and
-- both future capture configurations passed strict validation as `tradeable: false`.
+The remaining path to submission is deliberately small and evidence-sensitive:
 
-A clean clone of the frozen release-candidate tree installed from both lockfiles and passed the full judge gate (285 tests passed, 9 private-evidence tests skipped by design), the high/critical advisory gate, the production dashboard build, public-artifact audit, isolated Phase 0 typecheck, and all 10 capture tests. GitHub CI on the pushed commit remains the final automated release gate.
-
-The remaining path to submission is deliberately small and authority-sensitive:
-
-1. Preserve the France–Spain failed-run evidence and execute/verify England–Argentina without auto-promoting it into a study.
-2. Freeze an intentional public Git commit, run CI from that exact commit, add a public remote, and deploy the no-login dashboard.
-3. Deborah decides whether to submit the exact frozen synthetic commitment to Solana devnet. Until then, every public surface must say **unanchored**.
-4. Deborah sends and retains the sponsor clarification request on human participation and derived-data display.
-5. Deborah reviews the claims in her own words, narrates the sub-five-minute video, verifies the deployed URL incognito/mobile, and submits the entry herself.
+1. Preserve both failed semifinal captures as fail-closed evidence; any later capture remains separate until every registered-study admission gate passes.
+2. Keep registered v2 on fresh versioned ledgers and admit nothing until exact evidence and mapping gates pass.
+3. Freeze the implemented judge-evidence manifest, Proof route, and derived-only TXLine pulse without publishing licensed rows or exact probabilities.
+4. Freeze an intentional public Git commit, run CI from that exact commit, merge it to the public default branch, and deploy the no-login dashboard.
+5. Deborah sends and retains the sponsor clarification, reviews every claim in her own words, narrates the sub-five-minute video, verifies the deployed URL incognito/mobile, and submits the entry herself.
 
 The current environment exposed no controllable browser target, so the final rendered/incognito visual pass is a real open gate—not a box to mark from build output.
+
+### July 18 competitor delta
+
+Five public self-described track builds were audited without copying their code, copy, or assets. Only Voight carries a detected MIT license; SignalDesk, EdgeKeeper, STEAM, and TxGuard are treated as all-rights-reserved.
+
+- **SignalDesk** is the submission benchmark: deployed MVP, short video, live derived pulse, verified replay, and one-call judge evidence.
+- **EdgeKeeper** is closest to Samaritan's governance/receipt story but opens on an empty live state and has weaker receipt durability.
+- **Voight** has the clearest simple production narrative and real capture story, but no equivalent no-login governed runtime.
+- **STEAM** and **TxGuard** are visually accessible but materially demo/synthetic; they are examples of clarity, not evidence quality.
+
+Paper trading, replay, receipts, and multiple deterministic “agents” are not unique. Samaritan's remaining winning gap is one authentic chain:
+
+> real TXLine evidence → real bounded Claude thesis → non-overridable deterministic risk → paper action or refusal → durable pre-action receipt
+
+The independent patterns adopted into this plan are a licence-safe `/api/judge/evidence` manifest, a dedicated `/proof` route, a derived-only live health pulse, persistent evidence-class labels, and a default judge-ready case. Raw fixture rows, exact odds/probabilities, copied visuals, random demo P&L, fake transaction signatures, and shallow agent grids are explicitly rejected.
 
 ---
 
@@ -60,12 +64,13 @@ It will compete as:
 
 > **The governed autonomous sports-trading system: Claude investigates uncertainty, deterministic code alone controls risk and execution, and every action—or refusal—is committed before it happens.**
 
-The bounty submission wins by proving four things extremely well:
+The bounty submission addresses the five published criteria directly:
 
-1. Samaritan consumes official TXLine data through one shared live/captured-replay paper conductor.
-2. It completes one synthetic, explicitly performance-excluded paper lifecycle end to end through that conductor.
-3. An LLM can contribute judgment without receiving authority over money.
-4. A stranger can independently verify the disclosed evidence references, decision ordering, risk permission, and paper result without being given private raw feeds.
+1. **Core Functionality & Data Ingestion:** Samaritan consumes official TXLine data through one shared live/captured-replay paper conductor.
+2. **Autonomous Operation:** one synthetic, explicitly performance-excluded case completes the conductor end to end with deterministic stubs; an authentic Claude lifecycle is not claimed without an admitted fixture.
+3. **Clean, deterministic, defensible logic/code:** code owns eligibility, paper risk, pre-action ledgering, execution, and failure handling.
+4. **Innovation/novelty:** an LLM can contribute bounded judgment without receiving authority over money, while refusals and invalidated research remain first-class evidence.
+5. **Production readiness:** a stranger can run the no-wallet judge path and independently verify disclosed decision ordering and paper results; the hosted no-login URL remains open until signed-out verification passes.
 
 The submission will not depend on:
 
@@ -127,7 +132,7 @@ Samaritan is winner-ready only when all of the following are true:
 
 - [ ] A clean public clone installs and launches the judge demo with one documented command.
 - [x] The demo does not require TXLine credentials, a wallet, paid access, or local private archives.
-- [x] A live-connectivity proof demonstrates that the same canonical runtime accepts TXLine SL12 events.
+- [x] Mainnet capture and ingestion tests demonstrate SL12 consumption and the shared canonical source contract; the optional Command pulse is connectivity metadata, not a live lifecycle or study observation.
 - [x] One explicitly synthetic case visibly completes signal → triage stub → thesis stub → risk → intent → paper result → close → settlement.
 - [x] One real captured case visibly ends in a justified no-trade or veto.
 - [x] Any synthetic proving case is unmistakably labelled and excluded from performance results.
@@ -136,10 +141,10 @@ Samaritan is winner-ready only when all of the following are true:
 - [x] Paper fills use actual observation readiness plus model latency plus venue delay.
 - [x] Restarting the runtime reconstructs dedupe, positions, exposure, P&L, peak equity, and drawdown.
 - [x] The decision hash authenticates the full canonical record, including event type and timestamps.
-- [ ] Optional, non-blocking: Deborah may explicitly authorize anchoring one corrected ledger head on Solana devnet; until a transaction verifies, the release remains visibly unanchored.
+- [x] The bounty release intentionally remains unanchored: no transaction or explorer link is claimed. Any later devnet submission would be a separate, explicitly authorized post-release action.
 - [x] An independent offline verifier validates the frozen receipt. Network-backed anchor verification remains conditional on an actually submitted transaction.
 - [ ] The deployed dashboard exposes only licence-safe derived data.
-- [x] The current README, dashboard, video script, and submission draft make no claim beyond implemented evidence; rerun on the final public commit/video.
+- [ ] Run the final claims audit across the README, dashboard, recorded video, and submission form on the exact public commit; no draft review substitutes for that gate.
 - [ ] Deborah can explain and defend the architecture, evidence, limitations, and major design decisions.
 - [ ] Sponsor clarification on human participation and public derived data is retained in writing.
 - [ ] The video is below five minutes and every URL works in an incognito browser.
@@ -152,7 +157,7 @@ These items block every profit, edge, or production-readiness claim.
 
 ### 4.1 Invalidate gate-study v1
 
-The current dynamic-total study chooses the market using a price observed as late as kickoff minus five minutes, even though eligible signals stop at kickoff minus fifteen minutes. In the audited artifact, 95 of 98 selected lines used information after the signal window. Coverage also counts observations without the same as-of cutoff.
+The original v1 dynamic-total study chose the market using a price observed as late as kickoff minus five minutes, even though eligible signals stopped at kickoff minus fifteen minutes. In the audited artifact, 95 of 98 selected lines used information after the signal window. Its coverage calculation also counted observations without the same as-of cutoff; v1 is preserved as invalidated history and the corrected selector is used by v2.
 
 Actions:
 
@@ -398,17 +403,21 @@ Actions:
 
 ### 7.3 Optional post-release external anchoring
 
-This track is not required for the paper-only bounty proof and remains blocked unless Deborah explicitly authorizes a specific devnet submission. Until a transaction is actually submitted and verified, every surface must say **unanchored**.
+This track is intentionally outside the paper-only bounty release. The submitted receipt remains **unanchored**, contains no explorer link, and makes no TXLine Merkle/on-chain source-verification claim.
 
-Actions:
+Release action:
 
-- [ ] Anchor at least one corrected v2 ledger head on Solana devnet before the demonstrated outcome is known where possible.
-- [ ] Store network, signature, slot, commitment status, and anchored head.
-- [ ] Surface a working public explorer link.
-- [ ] Verify that the public receipt head equals the anchored value.
-- [ ] Add one TXLine Merkle/validation demonstration where the official API permits it.
+- [x] Freeze the public receipt and every judge-facing surface at `not_submitted` / unanchored.
 
-Conditional acceptance tests, only if Deborah authorizes and a transaction is submitted:
+Future actions require a separate Deborah authorization after the bounty release:
+
+- Anchor a specific ledger head on Solana devnet.
+- Store network, signature, slot, commitment status, and anchored head.
+- Surface a working public explorer link only after verification.
+- Verify that the public receipt head equals the anchored value.
+- Separately integrate and test a TXLine Merkle/validation demonstration where the official API permits it.
+
+Conditional acceptance tests, only if Deborah later authorizes and a transaction is submitted:
 
 - A stranger can run the verifier and reach the explorer transaction without a wallet.
 - The dashboard distinguishes local integrity, replay parity, and external anchoring.
@@ -485,7 +494,8 @@ Actions:
 - [x] Remove temporary root scripts, design explorations, and social-render projects from submission scope through `.gitignore` without deleting local work.
 - [x] Confirm the current two-commit Git history contains no secret-bearing path or known credential signature; only the safe `phase0/.env.example` is tracked.
 - [ ] Commit the intended Phase 3/4/runtime/dashboard work in understandable commits.
-- [ ] Add a public remote and push the submission branch.
+- [x] Configure the approved public GitHub remote.
+- [ ] Push the exact release commit, merge it to the public default `main` branch, and verify all public documentation links against that branch.
 - [x] Add CI for install, typecheck, tests, build, and frozen-demo verification.
 - [x] Pin Node and pnpm requirements.
 - [x] Provide a clean-clone quickstart.
@@ -527,7 +537,7 @@ Actions:
 - [x] Replace offline-only projection assumptions with the frozen public bundle plus runtime API.
 - [x] Bind the service to a validated platform-provided interface/port configuration; deployment remains open.
 - [x] Correct detector and proof labels.
-- [ ] Show zero-state, failure, veto, no-trade, and fill states honestly.
+- [x] Show zero-state, failure, veto, no-trade, and synthetic paper-fill states honestly and with persistent evidence-class labels.
 - [x] Surface model cost and execution latency in the captured case and downloadable receipt.
 - [x] Surface the exact Solana status (`not_submitted`) and offline verifier result without implying network proof.
 - [x] Keep long-run sealed results sealed.
@@ -602,7 +612,7 @@ Exception: a frozen item may only be resumed before submission if all winner-rea
 - [x] Collapse economic duplicates and resolve sell semantics.
 - [x] Correct the execution clock and model venue delay.
 - [x] Verify France–Spain; it failed closed and remains inadmissible.
-- [ ] Execute and verify England–Argentina in its absolute `16:00`–`22:00Z` watchdog-supervised window.
+- [x] Attempt England–Argentina in its watchdog-supervised window; preserve the Polymarket-stall failure and incomplete terminal manifests as inadmissible fail-closed evidence.
 - [ ] Send the sponsor clarification questions.
 - [ ] Recover and commit the intended working tree.
 
@@ -612,7 +622,7 @@ Exception: a frozen item may only be resumed before submission if all winner-rea
 
 - [x] Add the shared `runPaperSession` production orchestration entrypoint and source adapters.
 - [x] Reconstruct state from the ledger on startup.
-- [ ] Produce one complete ledgered real-Claude paper case; blocked until Deborah registers v2 and an eligible fixture passes admission.
+- [ ] Produce one complete ledgered real-Claude paper case; v2 registration is complete, but no case may run until a fresh fixture passes every admission and mapping-review gate.
 - [x] Produce one real evidence-based refusal.
 - [x] Record case-level latency and model cost in the receipt contract; the synthetic proving case records zero stub cost.
 - [x] Complete close and settlement evidence for the synthetic proving fixture.
@@ -623,7 +633,7 @@ Exception: a frozen item may only be resumed before submission if all winner-rea
 
 - [x] Version the complete hash envelope.
 - [x] Generate the Decision Receipt.
-- [ ] Anchor the corrected head on Solana devnet.
+- [x] Keep the bounty release intentionally unanchored; publish no explorer link or network-backed proof claim.
 - [x] Ship the independent offline receipt verifier.
 - [x] Freeze the licence-safe public artifact bundle.
 - [ ] Deploy the read-only dashboard.
@@ -637,7 +647,7 @@ Exception: a frozen item may only be resumed before submission if all winner-rea
 - [x] Draft the required TXLine API feedback for Deborah's final review.
 - [ ] Record and edit the demo below five minutes.
 - [ ] Rehearse Deborah's narration and likely judge questions.
-- [ ] Test every link, command, explorer URL, and mobile layout.
+- [ ] Test every applicable link, command, and mobile layout; confirm that no Solana explorer link appears in the intentionally unanchored release.
 
 **End-of-day gate:** submission package is complete and frozen.
 
@@ -654,7 +664,7 @@ July 19 is buffer, not feature-development time.
 
 ---
 
-## 13. Five-minute demo script
+## 13. Five-minute demo script — target 4:30–4:45
 
 ### 0:00–0:20 — Hook
 
@@ -671,7 +681,7 @@ TXLine → deterministic detector → bounded Claude thesis
 
 State that Claude has no wallet, order, or position-sizing capability.
 
-### 0:50–1:40 — Real captured refusal
+### 0:50–1:35 — Real captured refusal
 
 Show the synchronized real case:
 
@@ -683,7 +693,7 @@ Show the synchronized real case:
 
 Close the segment with: **“Every decision. Especially the pass.”**
 
-### 1:40–3:00 — Complete synthetic autonomous lifecycle
+### 1:35–2:45 — Complete synthetic autonomous lifecycle
 
 Show:
 
@@ -697,7 +707,7 @@ Show:
 - fill/no-fill;
 - close and settlement.
 
-### 3:00–3:35 — Falsification
+### 2:45–3:15 — Falsification
 
 Show “Strategies Samaritan refused to deploy”:
 
@@ -709,18 +719,18 @@ Show “Strategies Samaritan refused to deploy”:
 
 Do not hide a corrected negative result.
 
-### 3:35–4:20 — Independent proof
+### 3:15–4:00 — Independent proof
 
 Show:
 
 - ordered lifecycle entries;
 - receipt hash;
 - verifier command;
-- Solana explorer transaction only if an actual transaction has been submitted and verified;
+- visible `not_submitted` Solana status and no explorer link;
 - disclosed TXLine-derived source-reference boundary without raw feed redistribution;
 - distinction between local integrity and external anchoring.
 
-### 4:20–4:50 — Production posture
+### 4:00–4:30 — Production posture
 
 Show:
 
@@ -731,7 +741,7 @@ Show:
 - licence-safe public deployment;
 - no-wallet judge access.
 
-### 4:50–5:00 — Close
+### 4:30–4:45 — Close
 
 > **“Samaritan does not promise certainty. It makes autonomous trading accountable.”**
 
@@ -761,7 +771,7 @@ Required links near the top:
 - Architecture
 - Corrected evidence report
 - Example Decision Receipt
-- Solana explorer transaction only if an actual transaction has been submitted and verified
+- Explicit unanchored status; no Solana explorer link in this release
 - TXLine API feedback
 
 ---
@@ -778,19 +788,19 @@ Claude handles bounded interpretation: competing explanations, contrary evidence
 
 ### “Why TXLine?”
 
-TXLine supplies normalized, low-latency, verifiable sports-market and score evidence suitable for reproducible decisions. Samaritan demonstrates its value through timing, probability normalization, replay parity, health monitoring, and proof references.
+TXLine supplies normalized, low-latency sports-market and score data suitable for reproducible decisions. Samaritan demonstrates its value through timing, probability normalization, replay parity, health monitoring, and locally committed source references. TXLine's validation surfaces were researched, but Samaritan does not claim that the current receipt performs Merkle or on-chain source verification.
 
 ### “Can the agent lose money?”
 
-The bounty build is paper-only. In the architecture, deterministic code owns caps, eligibility, execution, drawdown, and the manual kill switch. The real-money gate remains closed.
+The bounty build is paper-only. Implemented deterministic code owns paper eligibility, fixed-stake caps, exposure, execution, and drawdown rejection. A global manual kill switch belongs to the separately authorized real-money roadmap and is not implemented in this release. The real-money gate remains closed.
 
 ### “What is actually on-chain?”
 
-Nothing in the current bounty release is on-chain. The receipt is locally hash-chained and replay-verifiable but unanchored. Discuss Solana timestamping only if Deborah later authorizes a transaction and the exact receipt passes network verification.
+No Samaritan decision receipt is on-chain. TXLine access uses Solana-backed subscription infrastructure, but Samaritan's receipt is locally hash-chained and intentionally unanchored for this bounty release. There is no explorer transaction to show. Any later timestamping would require separate authorization and exact network verification.
 
 ### “Can I reproduce this?”
 
-Yes: use the public clean-clone command or hosted no-wallet demo, then verify the frozen receipt independently.
+Yes: use the public clean-clone command and verify the frozen receipt independently. The hosted no-wallet path may be named only after its public URL passes the final signed-out deployment gate.
 
 ### “What failed?”
 

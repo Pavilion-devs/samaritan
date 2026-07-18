@@ -1,0 +1,40 @@
+{
+  "captureId": "paired-france-england-2026-07-18",
+  "status": "human_confirmed_for_capture_only",
+  "tradeable": false,
+  "confirmedBy": "Deborah",
+  "confirmedAt": "2026-07-18",
+  "txline": {
+    "fixtureId": "18257865",
+    "home": "France",
+    "away": "England",
+    "kickoffUtc": "2026-07-18T21:00:00.000Z"
+  },
+  "polymarket": {
+    "eventId": "708596",
+    "eventSlug": "fifwc-fra-eng-2026-07-18",
+    "totalsEventId": "708643",
+    "totalsEventSlug": "fifwc-fra-eng-2026-07-18-more-markets",
+    "home": "France",
+    "away": "England",
+    "kickoffUtc": "2026-07-18T21:00:00.000Z",
+    "rulesPeriod": "first_90_minutes_plus_stoppage_time"
+  },
+  "capture": {
+    "scheduledStartUtc": "2026-07-18T18:00:00.000Z",
+    "scheduledEndUtc": "2026-07-19T00:00:00.000Z",
+    "durationMinutes": 360,
+    "runLabel": "paired-france-england-2026-07-18",
+    "polymarketMaxAssets": 50,
+    "discoveryIntervalSeconds": 900,
+    "startupGraceSeconds": 180,
+    "streamStaleSeconds": 300,
+    "maxStartupSkewSeconds": 120
+  },
+  "evidence": {
+    "txlineFixtures": "samples/fixtures/mainnet-world-cup-fixtures.json",
+    "polymarketEvents": "data/live/gamma-discovery/open-world-cup-events.json",
+    "readinessReport": "docs/research/capture-readiness.md"
+  },
+  "note": "Deborah authorized capture-only preparation on July 18. This config cannot authorize study admission, mapping approval, Polymarket authentication, wallet access, trading, approval, deposit, order placement, Solana submission, or money movement."
+}

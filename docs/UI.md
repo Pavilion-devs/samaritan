@@ -2,7 +2,7 @@
 
 *Status: Matchroom v2 dark hybrid approved by Deborah as the binding production direction on July 13, 2026. V1 remains preserved as a comparison baseline. Production frontend implementation may proceed against this contract; real-money gates are unchanged.*
 
-> **July 14 governance correction:** paper-study v1 is invalidated, suspended, and preserved only as zero-observation audit history. The dashboard must not call it an active registered profitability test. Corrected v2 remains `engineering_candidate_unregistered` until Deborah signs it.
+> **July 18 governance status:** paper-study v1 is invalidated, suspended, and preserved only as zero-observation audit history. Deborah registered corrected v2 for forward paper observation only. The dashboard must show registration separately from evidence: v2 has no qualifying observation until a fresh fixture passes every admission gate, and the real-money gate remains closed.
 
 ## 1. Product position
 
@@ -73,7 +73,7 @@ The public navigation contains five destinations.
 | **Matchroom** | Explain one fixture, its selected market, probability movement, and active decision lifecycle |
 | **Casebook** | Search and inspect every signal, escalation, veto, no-trade, fill, close, and settlement |
 | **Study** | Explain the invalidated v1 audit, corrected historical signal evidence, and the human gate before any v2 paper observations |
-| **Proof** | Verify ledger hashes, replay identity, source references, validation records, and Solana anchors |
+| **Proof** | Verify ledger hashes, replay identity, source references, validation records, and the exact Solana anchor status |
 
 There is no marketing-only landing page in v1. The root route opens **Command**, with a compact explainer integrated into the product.
 
@@ -182,6 +182,7 @@ Links the visible case to ledger sequence, previous hash, record hash, replay id
 Required content:
 
 - current system strip;
+- optional live derived TXLine connectivity pulse, labelled `NOT STUDY EVIDENCE`, with a degraded state when server-side SL12 credentials are absent or invalid;
 - active and upcoming verified fixtures;
 - strongest recent signals, including vetoes and no-trades;
 - current paper-study stopping-rule progress;
@@ -342,10 +343,10 @@ Required views:
 - hash-chain verification status;
 - replay event count and identity hash;
 - source-reference validation status;
-- Solana anchor status and explorer links;
+- Solana anchor status, with an explorer link only when an actual transaction has been submitted and verified;
 - explicit distinction between local verification, TXLine validation, and on-chain anchoring.
 
-An unavailable anchor is displayed as `NOT YET ANCHORED`, not as an error if anchoring has not run.
+The bounty release is intentionally unanchored and displays `NOT SUBMITTED`; it must not show a placeholder or fake explorer link. A future separately authorized anchor may replace that state only after network verification succeeds.
 
 ## 8. Visual direction: Live Intelligence
 
@@ -490,7 +491,7 @@ The server-side projection layer should expose five conceptual view models:
 - `MatchProjection`: fixture identity, derived match state, selected market, and probability series;
 - `DecisionCaseProjection`: ordered lifecycle stages and public evidence;
 - `StudyProjection`: stopping rule, sealed status, metrics, guardrails, and per-match rows;
-- `ProofProjection`: public hashes, verification results, and explorer links.
+- `ProofProjection`: public hashes, verification results, anchor status, and an explorer link only for a verified submitted transaction.
 
 These names describe frontend contracts; they do not freeze route names or storage schemas.
 
@@ -539,7 +540,7 @@ Both checkpoints use the verified Spain-Belgium capture and deliberately end in 
 
 ### Production implementation status
 
-The first four production vertical slices are implemented in [`apps/dashboard/`](../apps/dashboard/) and served by the read-only projection layer in [`src/dash/`](../src/dash/). Matchroom renders one deterministic exemplar from the verified Spain-Belgium replay, Command derives the operating posture and capture schedule, Casebook projects all 18 reported goal×market feasibility observations from that replay, and Study presents the suspended v1 audit without prototype fallback data.
+The five primary observer routes are implemented in [`apps/dashboard/`](../apps/dashboard/) and served by the read-only projection layer in [`src/dash/`](../src/dash/). Matchroom renders one deterministic exemplar from the verified Spain-Belgium replay, Command derives the operating posture and capture schedule, Casebook projects all 18 reported goal×market feasibility observations from that replay, Study separates registered v2 from preserved v1 audit history, and Proof verifies the synthetic receipt's portable commitments without claiming an external anchor.
 
 Implemented in this slice:
 
@@ -549,6 +550,7 @@ Implemented in this slice:
 - manual replay states and deterministic autoplay across `T-5 seconds`, `Goal first seen`, and `T+30 seconds`;
 - explicit captured-replay, paper, no-trade, and real-money-gate-closed states;
 - root-level Command surface with current system state, exact confirmed capture fixtures, the strongest verified case, and direct Matchroom entry;
+- server-side-only TXLine connectivity pulse with a strict seven-field derived response, four-second timeout, response-size cap, malformed-row rejection, GET/HEAD-only API, and explicit exclusion from v2 evidence;
 - fail-closed Command fixture admission against exact TXLine fixture and Polymarket event evidence;
 - searchable Casebook index over the complete current 18-observation feasibility corpus, with fixture, market, detector, disposition, execution, lane, source, and date filters;
 - explicitly selected Casebook exemplar detail with lifecycle, executable evidence, analyst/execution boundaries, observation sequence, and replay hashes;
@@ -560,14 +562,14 @@ Implemented in this slice:
 - packaged Manrope and IBM Plex Mono fonts, reduced-motion behavior, keyboard focus, and mobile evidence cards;
 - honest loading and fail-closed error surfaces.
 
-Expanded Proof remains the subsequent major observer route. Until it exists, the shared shell routes Proof to the authoritative integrity section of Command rather than a fabricated placeholder screen.
+Expanded Proof is a standalone route over the frozen synthetic receipt. It labels the paper approval and settlement separately from the refused real-money path, recomputes the portable receipt commitment in-browser, and provides the exact offline verification command while keeping Solana visibly unsubmitted.
 
 Frontend work follows this order:
 
 1. **Annotated reference board:** capture the exact pattern taken and rejected from each source below.
 2. **Low-fidelity wireframes:** Command, Matchroom, and Casebook on desktop; Matchroom on mobile.
 3. **High-fidelity checkpoint:** one Matchroom with realistic Samaritan data and all major lifecycle states. V2 dark hybrid is approved and unlocks production dashboard implementation. Full paper-signal states follow after eligible ledgers contain evidence; light mode follows later without blocking launch.
-4. **State inventory:** loading, empty, sealed, no-signal, no-trade, veto, partial fill, degraded feed, stale projection, offline artifact, and not-yet-anchored.
+4. **State inventory:** loading, empty, sealed, no-signal, no-trade, veto, partial fill, degraded feed, stale projection, offline artifact, and anchor-not-submitted.
 5. **Clickable replay prototype:** one honest captured sequence using the final information hierarchy.
 6. **Comprehension test:** a new viewer explains what moved, what Samaritan decided, and whether money moved within 30 seconds.
 7. **Implementation:** shared shell, derived projection layer, replay, responsive states, and accessibility.

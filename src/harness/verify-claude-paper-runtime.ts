@@ -7,9 +7,16 @@ import { PolymarketClobFeeResolver } from "../ingest/polymarket/fees.js";
 import { createPersistentClaudePaperStudy } from "./claude-paper-study.js";
 import type { PaperFixtureUniverse } from "./paper-fixture-universe.js";
 import {
+  PAPER_STUDY_FROZEN_CONFIG_SHA256,
   PAPER_STUDY_PROTOCOL_STATUS,
+  PAPER_STUDY_PROTOCOL_VERSION,
   initializePaperStudyLedger
 } from "./paper-study-ledger.js";
+
+function argument(name: string, fallback: string): string {
+  const index = process.argv.indexOf(`--${name}`);
+  return index >= 0 && process.argv[index + 1] ? process.argv[index + 1]! : fallback;
+}
 
 if (PAPER_STUDY_PROTOCOL_STATUS !== ("registered" as string)) {
   throw new Error(
@@ -18,16 +25,30 @@ if (PAPER_STUDY_PROTOCOL_STATUS !== ("registered" as string)) {
   );
 }
 
-loadEnvFile(resolve(".env"));
+loadEnvFile(resolve(argument("env", ".env")));
 const apiKey = process.env.ANTHROPIC_API_KEY;
 if (!apiKey) throw new Error("ANTHROPIC_API_KEY is not configured");
 
-const manifest = JSON.parse(await readFile(resolve("data/paper/study-ledgers.json"), "utf8")) as {
+const manifest = JSON.parse(await readFile(resolve(
+  argument("manifest", "data/paper/v2/study-ledgers.json")
+), "utf8")) as {
+  protocolVersion: string;
+  protocolStatus: string;
+  configHash: string;
+  realMoneyGate: string;
   bounty: { path: string; startedAtTsMs: number };
   longRun: { path: string; startedAtTsMs: number };
 };
+if (
+  manifest.protocolVersion !== PAPER_STUDY_PROTOCOL_VERSION ||
+  manifest.protocolStatus !== PAPER_STUDY_PROTOCOL_STATUS ||
+  manifest.configHash !== PAPER_STUDY_FROZEN_CONFIG_SHA256 ||
+  manifest.realMoneyGate !== "closed"
+) {
+  throw new Error("Claude paper runtime requires the registered v2 paper-study manifest");
+}
 const universe = JSON.parse(
-  await readFile(resolve("data/research/paper-fixture-universe.json"), "utf8")
+  await readFile(resolve(argument("universe", "data/paper/v2/fixture-universe.json")), "utf8")
 ) as PaperFixtureUniverse;
 const bounty = initializePaperStudyLedger({
   path: resolve(manifest.bounty.path),
@@ -39,9 +60,14 @@ const longRun = initializePaperStudyLedger({
   lane: "long_run",
   startedAtTsMs: manifest.longRun.startedAtTsMs
 });
-const spendLedger = new ClaudeSpendLedger(resolve("data/agents/claude-spend.sqlite"));
+const spendLedger = new ClaudeSpendLedger(resolve(
+  argument("spend-ledger", "data/paper/v2/agents/claude-spend.sqlite")
+));
 const evidenceLedger = new ClaudeInvocationEvidenceLedger(
-  resolve("data/agents/claude-invocation-evidence.sqlite")
+  resolve(argument(
+    "invocation-evidence-ledger",
+    "data/paper/v2/agents/claude-invocation-evidence.sqlite"
+  ))
 );
 try {
   const spendBefore = spendLedger.verifyChain();

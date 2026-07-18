@@ -1,10 +1,14 @@
 import { readdir, readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { z } from "zod";
-import { validateCaptureConfig } from "../harness/capture-config.js";
+import { parseCaptureConfig, validateCaptureConfig } from "../harness/capture-config.js";
 import { parseVerifiedPairedAnalysisManifest } from "../harness/paired-capture-manifest.js";
+import { PAPER_STUDY_EVALUATION_CANDIDATE } from "../metrics/paper-study.js";
 import {
   COMMAND_SNAPSHOT_ID,
+  FORWARD_PAPER_CONFIG_HASH,
+  FORWARD_PAPER_PROTOCOL_ID,
+  FORWARD_PAPER_REGISTERED_AT,
   type CommandApiResponse,
   type CommandCase,
   type CommandFixture,
@@ -54,6 +58,57 @@ const paperReportSchema = z.object({
     })
   })
 });
+
+const registeredInitializationSchema = z.object({
+  protocolVersion: z.literal(FORWARD_PAPER_PROTOCOL_ID),
+  protocolStatus: z.literal("registered"),
+  configHash: z.literal(FORWARD_PAPER_CONFIG_HASH),
+  realMoneyGate: z.literal("closed"),
+  startedAtTsMs: z.number().int().nonnegative(),
+  startedAt: z.string().datetime(),
+  registration: z.object({
+    protocolId: z.literal(FORWARD_PAPER_PROTOCOL_ID),
+    status: z.literal("registered"),
+    registeredBy: z.literal("Deborah"),
+    registeredAt: z.literal(FORWARD_PAPER_REGISTERED_AT),
+    scope: z.literal("forward_paper_only"),
+    realMoneyGate: z.literal("closed")
+  }).strict(),
+  frozenConfig: z.object({
+    evaluation: z.object({
+      minimumFilledMatches: z.number().int().positive(),
+      minimumFills: z.number().int().positive()
+    }).passthrough()
+  }).passthrough()
+}).passthrough();
+
+const registeredV2ReportSchema = z.object({
+  generatedAt: z.string().datetime(),
+  protocolVersion: z.literal(FORWARD_PAPER_PROTOCOL_ID),
+  configHash: z.literal(FORWARD_PAPER_CONFIG_HASH),
+  realMoneyGate: z.literal("closed"),
+  fixtureUniverseGeneratedAt: z.string().datetime(),
+  lanes: z.object({
+    bounty: z.object({
+      initialization: registeredInitializationSchema,
+      chain: z.object({ valid: z.literal(true), rows: z.number().int().positive(), headHash: z.string().regex(/^[a-f0-9]{64}$/) }).passthrough(),
+      report: z.object({ status: z.literal("exploratory"), counts: paperCountsSchema }).passthrough()
+    }).passthrough(),
+    longRun: z.object({
+      initialization: registeredInitializationSchema,
+      chain: z.object({ valid: z.literal(true), rows: z.number().int().positive(), headHash: z.string().regex(/^[a-f0-9]{64}$/) }).passthrough(),
+      report: z.object({
+        status: z.literal("sealed"),
+        reason: z.string().min(1),
+        counts: paperCountsSchema,
+        stoppingRuleMet: z.literal(false),
+        rows: z.null(),
+        endpoints: z.null(),
+        guardrails: z.null()
+      }).passthrough()
+    }).passthrough()
+  }).strict()
+}).strict();
 
 const fixtureUniverseSchema = z.object({
   generatedAt: z.string().datetime(),
@@ -391,43 +446,47 @@ async function buildFixtureSchedule(repoRoot: string, nowTsMs: number): Promise<
 
   const fixtures: CommandFixture[] = [];
   for (const name of names.filter((value) => value.endsWith(".json")).sort()) {
-    const config = await json(resolve(configDir, name));
-    if (config === null || typeof config !== "object" || !("capture" in config)) continue;
-    const validation = validateCaptureConfig({ repoRoot, config, txlineFixtures, polymarketEvents });
+    const configValue = await json(resolve(configDir, name));
+    if (configValue === null || typeof configValue !== "object" || !("capture" in configValue)) continue;
+    const parsedConfig = parseCaptureConfig(configValue);
+    const historicalReviewedConfig = nowTsMs > Date.parse(parsedConfig.capture.scheduledEndUtc);
+    const config = historicalReviewedConfig
+      ? parsedConfig
+      : validateCaptureConfig({ repoRoot, config: configValue, txlineFixtures, polymarketEvents, nowTsMs }).config;
     // Historical confirmed captures remain valid display evidence after their launch
-    // window closes. `readyToSchedule` is a launch permission, not an identity or
-    // confirmation verdict for this offline projection.
-    if (validation.config.status !== "human_confirmed_for_capture_only") {
+    // window closes, but they are labelled as reviewed config rather than
+    // re-verified against today's rolling source snapshots.
+    if (config.status !== "human_confirmed_for_capture_only") {
       throw new Error(`Command projection failed closed: ${name} is not confirmed for capture`);
     }
-    const kickoffTsMs = Date.parse(validation.config.txline.kickoffUtc);
+    const kickoffTsMs = Date.parse(config.txline.kickoffUtc);
     const [analysisManifest, supervisorStatus] = await Promise.all([
-      optionalJson(resolve(repoRoot, "data/live", validation.config.capture.runLabel, "analysis-manifest.json")),
-      optionalJson(resolve(repoRoot, "samples/_logs", `${validation.config.capture.runLabel}.supervisor.json`))
+      optionalJson(resolve(repoRoot, "data/live", config.capture.runLabel, "analysis-manifest.json")),
+      optionalJson(resolve(repoRoot, "samples/_logs", `${config.capture.runLabel}.supervisor.json`))
     ]);
     const outcome = resolveCaptureOutcome({
       nowTsMs,
-      captureId: validation.config.captureId,
-      runLabel: validation.config.capture.runLabel,
-      fixtureId: validation.config.txline.fixtureId,
-      eventSlug: validation.config.polymarket.eventSlug,
-      captureStartUtc: validation.config.capture.scheduledStartUtc,
-      captureEndUtc: validation.config.capture.scheduledEndUtc,
+      captureId: config.captureId,
+      runLabel: config.capture.runLabel,
+      fixtureId: config.txline.fixtureId,
+      eventSlug: config.polymarket.eventSlug,
+      captureStartUtc: config.capture.scheduledStartUtc,
+      captureEndUtc: config.capture.scheduledEndUtc,
       analysisManifest,
       supervisorStatus
     });
-    const codes = teamCodes(validation.config.polymarket.eventSlug);
+    const codes = teamCodes(config.polymarket.eventSlug);
     fixtures.push({
-      fixtureId: validation.config.txline.fixtureId,
-      home: { name: validation.config.txline.home, code: codes.home },
-      away: { name: validation.config.txline.away, code: codes.away },
-      kickoffUtc: validation.config.txline.kickoffUtc,
-      captureStartUtc: validation.config.capture.scheduledStartUtc,
-      captureEndUtc: validation.config.capture.scheduledEndUtc,
+      captureId: config.captureId,
+      home: { name: config.txline.home, code: codes.home },
+      away: { name: config.txline.away, code: codes.away },
+      kickoffUtc: config.txline.kickoffUtc,
+      captureStartUtc: config.capture.scheduledStartUtc,
+      captureEndUtc: config.capture.scheduledEndUtc,
       signalCutoffUtc: new Date(kickoffTsMs - 15 * 60_000).toISOString(),
-      eventSlug: validation.config.polymarket.eventSlug,
+      eventSlug: config.polymarket.eventSlug,
       ...outcome,
-      identityStatus: "exact_match_confirmed",
+      identityStatus: historicalReviewedConfig ? "historical_reviewed_config" : "exact_match_confirmed",
       captureOnly: true,
       tradeable: false
     });
@@ -438,16 +497,36 @@ async function buildFixtureSchedule(repoRoot: string, nowTsMs: number): Promise<
 
 export async function buildCommandSnapshot(repoRoot: string, nowTsMs = Date.now()): Promise<CommandSnapshot> {
   if (!Number.isSafeInteger(nowTsMs)) throw new Error("Command projection requires a valid current timestamp");
-  const [matchroom, reportValue, universeValue, fixtureSchedule] = await Promise.all([
+  const [matchroom, reportValue, universeValue, registeredReportValue, registeredUniverseValue, fixtureSchedule] = await Promise.all([
     buildSpainBelgiumMatchroomSnapshot(repoRoot),
     json(resolve(repoRoot, "data/paper/reports/current.json")),
     json(resolve(repoRoot, "data/research/paper-fixture-universe.json")),
+    json(resolve(repoRoot, "data/paper/v2/reports/current.json")),
+    json(resolve(repoRoot, "data/paper/v2/fixture-universe.json")),
     buildFixtureSchedule(repoRoot, nowTsMs)
   ]);
   const report = paperReportSchema.parse(reportValue);
   const universe = fixtureUniverseSchema.parse(universeValue);
+  const registeredReport = registeredV2ReportSchema.parse(registeredReportValue);
+  const registeredUniverse = fixtureUniverseSchema.parse(registeredUniverseValue);
   if (universe.summary.longRunEligible !== 0) {
     throw new Error("Command projection failed closed: fixture admission changed without a refreshed public contract");
+  }
+  if (
+    Object.values(report.lanes.bounty.report.counts).some((value) => value !== 0) ||
+    Object.values(report.lanes.longRun.report.counts).some((value) => value !== 0)
+  ) {
+    throw new Error("Command projection failed closed: invalidated v1 audit contains observations");
+  }
+  const registeredAtTsMs = Date.parse(FORWARD_PAPER_REGISTERED_AT);
+  if (
+    registeredReport.fixtureUniverseGeneratedAt !== registeredUniverse.generatedAt ||
+    registeredReport.lanes.bounty.initialization.startedAtTsMs < registeredAtTsMs ||
+    registeredReport.lanes.longRun.initialization.startedAtTsMs < registeredAtTsMs ||
+    registeredReport.lanes.bounty.initialization.startedAt !== new Date(registeredReport.lanes.bounty.initialization.startedAtTsMs).toISOString() ||
+    registeredReport.lanes.longRun.initialization.startedAt !== new Date(registeredReport.lanes.longRun.initialization.startedAtTsMs).toISOString()
+  ) {
+    throw new Error("Command projection failed closed: registered v2 report does not match its forward-only boundary");
   }
 
   const goal = matchroom.replay.states.find((state) => state.id === "goal");
@@ -455,7 +534,7 @@ export async function buildCommandSnapshot(repoRoot: string, nowTsMs = Date.now(
   const recentCase: CommandCase = {
     caseId: matchroom.caseId,
     matchroomId: matchroom.snapshotId,
-    fixtureId: matchroom.match.fixtureId,
+    fixtureRef: matchroom.match.fixtureRef,
     fixtureLabel: `${matchroom.match.home.name} vs ${matchroom.match.away.name}`,
     home: matchroom.match.home,
     away: matchroom.match.away,
@@ -487,9 +566,14 @@ export async function buildCommandSnapshot(repoRoot: string, nowTsMs = Date.now(
     activeFixture.phase === "complete" ? "Capture outcome recorded" : "Capture outcome unknown";
   const postureDetail = `${activeFixture.home.name} vs ${activeFixture.away.name}: ${activeFixture.statusDetail}. Non-tradeable.`;
   const longRun = report.lanes.longRun;
+  const registeredLongRun = registeredReport.lanes.longRun;
+  const qualifyingCounts = registeredLongRun.report.counts;
+  const observationStatus = qualifyingCounts.signals === 0
+    ? "awaiting_fresh_evidence" as const
+    : "collecting_forward_evidence" as const;
 
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     snapshotId: COMMAND_SNAPSHOT_ID,
     generatedAt: new Date(nowTsMs).toISOString(),
     mode: "offline_artifact",
@@ -501,9 +585,9 @@ export async function buildCommandSnapshot(repoRoot: string, nowTsMs = Date.now(
       label: postureLabel,
       detail: postureDetail,
       feeds: [
-        { id: "txline", label: "TXLine", status: activeFixture.phase, statusLabel: activeFixture.statusLabel, detail: `Exact fixture ${activeFixture.fixtureId} · ${activeFixture.statusDetail}` },
+        { id: "txline", label: "TXLine", status: activeFixture.phase, statusLabel: activeFixture.statusLabel, detail: `Exact source identity confirmed at export · ${activeFixture.statusDetail}` },
         { id: "polymarket", label: "Polymarket", status: activeFixture.phase, statusLabel: activeFixture.statusLabel, detail: `Exact event family · ${activeFixture.statusDetail}` },
-        { id: "decision_ledger", label: "Paper ledgers", status: "initialized", statusLabel: "Preserved", detail: "Invalidated v1 zero-observation chains remain valid" },
+        { id: "decision_ledger", label: "V2 study ledgers", status: "verified", statusLabel: "Verified", detail: `Registered forward-paper chains verify · ${qualifyingCounts.signals} qualifying signal${qualifyingCounts.signals === 1 ? "" : "s"}` },
         { id: "replay_proof", label: "Replay proof", status: "verified", statusLabel: "Verified", detail: `${matchroom.proof.canonicalEvents.toLocaleString("en-US")} canonical events` }
       ]
     },
@@ -521,39 +605,49 @@ export async function buildCommandSnapshot(repoRoot: string, nowTsMs = Date.now(
     recentCases: [recentCase],
     additionalCaseState: {
       status: "waiting_for_eligible_capture",
-      label: "No active study can admit cases",
-      detail: "Capture verification may add evidence, but study admission waits for Deborah to register corrected v2."
+      label: "Registered v2 awaits fresh eligible evidence",
+      detail: qualifyingCounts.signals === 0
+        ? "Registration is active for forward paper only; zero observations qualify until a fresh fixture passes every admission gate."
+        : `${qualifyingCounts.signals} forward signal${qualifyingCounts.signals === 1 ? " is" : "s are"} reconstructed from the registered v2 ledger; historical, retrospective, and synthetic rows remain excluded.`
     },
     study: {
-      protocolVersion: report.protocolVersion,
-      protocolStatus: "invalidated_suspended",
-      configHash: report.configHash,
-      startedAt: longRun.initialization.startedAt,
-      status: "suspended",
-      statusLabel: "V1 suspended",
-      filledMatches: longRun.report.counts.filledMatches,
-      requiredFilledMatches: longRun.initialization.frozenConfig.evaluation.minimumFilledMatches,
-      fills: longRun.report.counts.fills,
-      requiredFills: longRun.initialization.frozenConfig.evaluation.minimumFills,
+      protocolVersion: FORWARD_PAPER_PROTOCOL_ID,
+      protocolStatus: "registered",
+      configHash: FORWARD_PAPER_CONFIG_HASH,
+      registeredAt: FORWARD_PAPER_REGISTERED_AT,
+      status: "active_forward_paper",
+      statusLabel: "V2 registered",
+      observationStatus,
+      qualifyingCounts,
+      requiredFilledMatches: PAPER_STUDY_EVALUATION_CANDIDATE.minimumFilledMatches,
+      requiredFills: PAPER_STUDY_EVALUATION_CANDIDATE.minimumFills,
       bountyStatus: "exploratory",
-      stoppingRuleMet: false,
-      reason: longRun.report.reason
+      stoppingRuleMet: registeredLongRun.report.stoppingRuleMet,
+      realMoneyGate: "closed",
+      reason: `${registeredLongRun.report.reason}. Historical, retrospective, and synthetic rows cannot count.`,
+      historicalV1: {
+        protocolVersion: report.protocolVersion,
+        protocolStatus: "invalidated_suspended",
+        configHash: report.configHash,
+        startedAt: longRun.initialization.startedAt,
+        zeroObservationAudit: true
+      }
     },
     proof: {
       replayIdentityParity: true,
       replayIdentityHash: matchroom.proof.identityHash,
       canonicalEvents: matchroom.proof.canonicalEvents,
       bountyLedgerValid: true,
-      bountyLedgerRows: report.lanes.bounty.chain.rows,
+      bountyLedgerRows: registeredReport.lanes.bounty.chain.rows,
       longRunLedgerValid: true,
-      longRunLedgerRows: longRun.chain.rows,
+      longRunLedgerRows: registeredLongRun.chain.rows,
       evidenceFixtures: universe.summary.fixtures,
       pairedBookReplays: universe.summary.pairedBookReplays,
       signalResearchOnly: universe.summary.signalResearchOnly
     },
     sourceFreshness: {
-      paperReportGeneratedAt: report.generatedAt,
-      fixtureUniverseGeneratedAt: universe.generatedAt,
+      paperReportGeneratedAt: registeredReport.generatedAt,
+      fixtureUniverseGeneratedAt: registeredUniverse.generatedAt,
       replayGeneratedAt: matchroom.generatedAt
     },
     publicDataPolicy: matchroom.publicDataPolicy

@@ -1,6 +1,6 @@
 # Samaritan Paper Study Evidence
 
-> **Invalidated/suspended July 14, 2026:** this is a preserved zero-observation v1 ledger report, not an active preregistered study. It cannot admit cases. The corrected v2 engineering candidate awaits Deborah's registration.
+> **Invalidated/suspended July 14, 2026:** this is a preserved zero-observation v1 ledger report, not the current study. It cannot admit cases. The corrected v2 protocol was registered separately on July 18 and begins from fresh, isolated ledgers.
 
 Generated: 2026-07-12T16:48:13.459Z<br>
 Protocol: `paper-study-v1-2026-07-12`<br>

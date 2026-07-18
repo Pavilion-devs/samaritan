@@ -1,10 +1,12 @@
 # Samaritan Public Release Scope
 
-**Status:** release-candidate allowlist, July 14, 2026<br>
+**Status:** release-candidate allowlist, July 18, 2026<br>
 **Owner and final approver:** Deborah<br>
 **Purpose:** prevent private licensed data, credentials, local creative exports, and unreviewed utilities from entering the bounty repository or hosted judge surface.
 
 This is an inclusion allowlist, not a claim that the current dirty working tree is already a public release. The final public commit must be assembled deliberately and rerun through every gate below.
+
+In this document, **public artifacts** means the hosted UI/API responses, frozen downloadable evidence, receipt, screenshots, video, and submission payload. Reproducibility-oriented Git source and `tradeable: false` capture configuration may contain opaque, non-secret official API request identifiers; those selectors are not raw feed responses and cannot reconstruct the feed. They remain excluded from every public artifact until sponsor approval, together with all raw rows, exact probability series, captured files, and credentials.
 
 ## Include in the public submission
 
@@ -31,12 +33,12 @@ The following are enforced by `.gitignore` and must remain absent from both Git 
 
 The public artifact auditor is the second line of defence. It rejects raw/reconstructive TXLine field names, likely secrets, private filesystem paths, unsafe links, and oversized artifacts inside the frozen bundle.
 
-## Dependency isolation and open advisory
+## Dependency isolation and Phase 0 advisory
 
 The judge/runtime workspace and the Phase 0 subscription utility are intentionally separate install graphs:
 
 - Root `pnpm install --frozen-lockfile` does not install `phase0` dependencies.
-- `pnpm security:audit` currently passes the high/critical threshold for the root judge/runtime graph; one moderate transitive `uuid` advisory remains through the latest `@solana/web3.js` → `jayson` dependency chain.
+- The root judge/runtime graph pins the `@solana/web3.js` → `jayson` `uuid` edge to patched `uuid@11.1.1`. The exact release lockfile passes `pnpm security:audit` at the moderate-or-greater threshold with no known production vulnerability; rerun that command after any dependency change.
 - Phase 0 still carries `@solana/spl-token` → `bigint-buffer@1.1.5`, which has the high-severity availability advisory [GHSA-3gc7-fjrx-p6mg](https://github.com/advisories/GHSA-3gc7-fjrx-p6mg) and no patched package release.
 
 The affected Phase 0 module is a local, human-invoked TXLine token-account/subscription helper. It is not imported by the dashboard, frozen demo, receipt verifier, capture process, or hosted read-only API. Do not expose its auth/subscription commands in the hosted image. Replacing its associated-token helpers changes a wallet/token path and therefore requires Deborah's explicit review and authorization under `AGENTS.md`; until then, this is an isolated and disclosed release exception, not a silently accepted production claim.
@@ -59,15 +61,15 @@ Then verify all of the following before pushing or deploying:
 
 - `git status --short` is empty after the intentional commit.
 - `git ls-files` contains no path excluded above.
-- The public bundle hash and receipt hash match the video and submission text.
+- Regenerate the manifest after the final export, record the exact public-bundle and receipt hashes from that frozen commit, and make the video/submission text match them; do not reuse an earlier snapshot's counts or hashes.
 - The dashboard works signed out on desktop and mobile without a wallet, credential, subscription, or private archive.
 - No exact TXLine probability series or raw response is visible.
-- The receipt says unanchored unless Deborah has authorized a devnet submission and the final network verifier passes.
+- The receipt says unanchored, no explorer transaction is shown, and no network-backed proof is implied; the bounty release intentionally omits a devnet anchor.
 - Deborah has reviewed every public claim and submits the entry herself.
 
-## Authority-gated actions still open
+## Human release gates still open
 
-1. Deborah provides or approves the public Git remote and hosted deployment target.
-2. Deborah decides whether the frozen receipt commitment may be submitted to Solana devnet.
-3. Deborah sends and retains the sponsor clarification request.
+1. The approved GitHub remote is `Pavilion-devs/samaritan`; freeze and push the exact release commit to default `main`, then verify the hosted deployment target and public URL.
+2. The bounty release is intentionally unanchored. Do not submit a devnet transaction or add an explorer link unless Deborah explicitly changes that scope in a separate authorization.
+3. Deborah sends and retains the sponsor clarification request; silence is not approval.
 4. Deborah rewrites/rehearses the narration, records the final video, verifies every public URL, and submits through Superteam Earn.

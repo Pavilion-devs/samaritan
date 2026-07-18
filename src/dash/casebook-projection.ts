@@ -46,7 +46,7 @@ export async function buildCasebookSnapshot(repoRoot: string): Promise<CasebookS
     goalOrdinal: item.goalOrdinal,
     goalClockSeconds: item.goalClockSeconds,
     occurredAt: item.occurredAt,
-    fixtureId: corpus.fixtureId,
+    fixtureRef: corpus.fixtureRef,
     fixtureLabel: `${corpus.home.name} vs ${corpus.away.name}`,
     homeCode: corpus.home.code,
     awayCode: corpus.away.code,

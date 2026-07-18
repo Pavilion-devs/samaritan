@@ -1,6 +1,6 @@
 # 03 — Strategy Playbook
 
-*v0.3 (July 15, 2026). Status: STRATEGY DESIGN SPEC. The four personas remain the intended tournament roster, not a claim that all four currently run. The corrected historical gate supports only a Total Goals `CONSENSUS_MOVE` candidate for possible forward paper review; v2 is unregistered, STALE_QUOTE remains disabled, and MODELER is not implemented.*
+*v0.4 (July 18, 2026). Status: STRATEGY DESIGN SPEC. The four personas remain the intended tournament roster, not a claim that all four currently run. The corrected historical gate supports only a Total Goals `CONSENSUS_MOVE` candidate; v2 is registered for forward paper observation only, STALE_QUOTE remains disabled, and MODELER is not implemented.*
 
 ## First principles (why anything here works at all)
 

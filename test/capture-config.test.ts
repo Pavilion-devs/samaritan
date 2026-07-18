@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { validateCaptureConfig } from "../src/harness/capture-config.js";
+import { parseCaptureConfig, validateCaptureConfig } from "../src/harness/capture-config.js";
 
 const repoRoot = "/tmp/samaritan-portable-clone";
 const kickoff = "2026-07-14T19:00:00.000Z";
@@ -55,6 +55,31 @@ const polymarketEvents = [
 ];
 
 describe("paired capture config validation", () => {
+  it("parses an ended reviewed config without pretending it exists in current rolling snapshots", () => {
+    const parsed = parseCaptureConfig({
+      ...config,
+      status: "human_confirmed_for_capture_only",
+      confirmedBy: "Deborah",
+      confirmedAt: "2026-07-12"
+    });
+    expect(parsed).toMatchObject({
+      captureId: "paired-france-spain-2026-07-14",
+      txline: { fixtureId: "123", home: "France", away: "Spain" },
+      polymarket: { eventSlug: "fifwc-fra-esp-2026-07-14" }
+    });
+  });
+
+  it("keeps static cross-source identity and capture-window rules in schema-only parsing", () => {
+    expect(() => parseCaptureConfig({
+      ...config,
+      polymarket: { ...config.polymarket, away: "Argentina" }
+    })).toThrow(/teams or kickoff disagree/);
+    expect(() => parseCaptureConfig({
+      ...config,
+      capture: { ...config.capture, scheduledStartUtc: "2026-07-14T15:59:59.000Z", scheduledEndUtc: "2026-07-14T21:59:59.000Z" }
+    })).toThrow(/exactly three hours/);
+  });
+
   it("validates evidence but withholds launch until human confirmation", () => {
     const result = validateCaptureConfig({
       repoRoot,

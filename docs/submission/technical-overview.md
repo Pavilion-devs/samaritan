@@ -6,9 +6,9 @@
 
 Samaritan is an auditable, risk-gated sports-market decision system built around TXLine World Cup odds and scores. Live and captured-replay adapters feed the same canonical conductor; deterministic TypeScript computes probability-space features and raises typed market signals. For an eligible registered session, Claude can be invoked only at a judgment boundary to return a strict thesis; it cannot size a position, access a wallet, or place an order. Code-owned risk checks make the final decision, a depth-aware simulator executes **paper orders only**, and an append-only hash chain records the lifecycle before each action.
 
-The evidence boundary is explicit: the real Spain–Belgium capture is a retrospective no-trade feasibility corpus and never entered the Claude/execution runtime. The complete lifecycle fixture uses deterministic stubs at both model boundaries. Real Anthropic admission remains disabled while corrected v2 is `engineering_candidate_unregistered`.
+The evidence boundary is explicit: the real Spain–Belgium capture is a retrospective no-trade feasibility corpus and never entered the Claude/execution runtime. The complete lifecycle fixture uses deterministic stubs at both model boundaries. Corrected v2 was registered for forward paper observation on July 18, but no real Anthropic case is claimed until a fresh fixture passes every admission gate.
 
-This directly targets the bounty's five published criteria: working TXLine ingestion, autonomous operation once started, defensible deterministic logic, a novel agent/risk separation, and a deployable evidence surface. The current bounty build is deliberately **paper-only**: the real-money gate is closed, the corrected v2 paper protocol is `engineering_candidate_unregistered`, and no profitability claim is made.
+This directly targets the bounty's five published criteria: **Core Functionality & Data Ingestion**, **Autonomous Operation**, **Clean, deterministic, defensible logic/code**, **Innovation/novelty**, and **Production readiness**. The current bounty build is deliberately **paper-only**: the real-money gate is closed, corrected v2 is registered for forward observation only, and no profitability claim is made.
 
 ## Architecture
 
@@ -21,7 +21,8 @@ TXLine odds + scores SSE       Public Polymarket books
                          |
         rolling features + deterministic detectors
                          |
-         Haiku triage -> Opus strict thesis
+ eligible admitted case: Haiku triage -> Opus strict thesis
+ public lifecycle proof: deterministic stubs at both boundaries
                          |
         deterministic eligibility + risk rules
                          |
@@ -51,6 +52,8 @@ Mainnet origin: `https://txline.txodds.com`; devnet was also used for integratio
 
 Captured TXLine `Pct` is parsed as a de-vigged percentage and divided by 100; `Prices` is retained as integer odds multiplied by 1000. Empty quote transitions are not converted to zero. Public artifacts do not contain raw TXLine responses, exact TXLine probability levels, or reconstructive time series.
 
+The Command surface supports an optional server-side-only connectivity check against the official fixture snapshot. A deployment enables it only with the JWT, API token, and an explicit `TXLINE_SERVICE_LEVEL_ID=12` runtime assertion; otherwise it reports `degraded`. Its strict public response contains only mainnet/SL12, check time, connected/degraded status, rounded latency, aggregate fixture count, and coarse HTTP-response freshness. A timeout, oversized body, non-JSON response, non-array response, or malformed fixture identity row fails closed. This pulse is operational metadata, not a v2 paper-study observation or evidence of a trading signal; the hosted connection must not be claimed until the final deployed URL is tested.
+
 ## Live and replay are one path
 
 Both live SSE envelopes and captured historical records pass through the same strict normalizers into the same `CanonicalEvent` union and serialized bus. Features, detectors, schedulers, risk, and the decision ledger consume those events without a mode switch. Replay therefore exercises the product path rather than a separate backtest implementation.
@@ -60,7 +63,7 @@ The live evidence case in the public dashboard is a synchronized, read-only Spai
 ## Risk boundary
 
 - Claude can classify or submit a research thesis only. Its schemas contain no stake, bankroll, order, wallet, credential, or venue-authentication field.
-- Deterministic code can veto; model output cannot override a cap, enlarge a position, create an order, or reopen the kill switch.
+- Deterministic code can veto; model output cannot override the implemented paper caps, enlarge a position, create an order, or bypass the closed real-money gate. A global manual kill switch belongs to the unimplemented real-money roadmap, not this release.
 - Research-only sampled prices cannot authorize execution. Only correctly mapped, post-readiness executable-book evidence can reach the paper adapter.
 - The paper adapter walks displayed depth, handles partial/no fills, applies validated fee/tick/minimum metadata, and never calls an order endpoint.
 - Every signal, triage result, thesis, risk verdict, execution intent, paper result, close, and settlement is appended before its downstream action. Restart reconstruction verifies the chain before restoring pending cases, positions, exposure, P&L, and drawdown.
@@ -69,11 +72,11 @@ The live evidence case in the public dashboard is a synchronized, read-only Spai
 ## Evidence and proof
 
 1. **Captured refusal:** the Spain–Belgium case demonstrates real synchronized input and a defensible no-trade result. Only derived, non-reconstructive TXLine movement buckets are public.
-2. **Corrected historical signal evidence:** under a fixed chronological split, the Total Goals `CONSENSUS_MOVE` candidate produced 38 normalized held-out buy cases across 18 fixtures, with mean `+132.7` probability bps after a 100-bps proxy and a fixture-clustered 95% interval of `+14.3` to `+243.9` bps. These are sampled-price signal results without executable bid/ask depth—not alpha, fills, or profitability—and support only a fresh forward paper review. See the [v4 report](../research/historical-gate-study-causal-economic-v4.md).
+2. **Corrected historical signal evidence:** under a fixed chronological split, the Total Goals `CONSENSUS_MOVE` candidate produced 38 normalized held-out buy cases across 18 fixtures, with mean `+132.7` probability bps after a 100-bps proxy and a fixture-clustered 95% interval of `+14.3` to `+243.9` bps. These sampled-price results justified Deborah's July 18 registration decision for forward paper observation; they are not themselves a v2 observation, alpha, fills, or profitability. See the [v4 report](../research/historical-gate-study-causal-economic-v4.md) and [v2 registration record](../10-paper-study-v2-registration.md).
 3. **Falsification record:** Samaritan preserved and withdrew its earlier result after discovering a future-informed selector, repaired the selector and economic-case semantics, and reran the unchanged boundary. See the [v1 invalidation record](../research/historical-gate-study-v1-invalidation.md).
 4. **Synthetic full lifecycle:** `pnpm demo` runs 20 invented canonical events through the production paper components, creating one signal, paper fill, kickoff close, settlement, and 12 v2 ledger records. The two model boundaries use deterministic stubs; there are zero external API, model, wallet, RPC, or real-order calls. The fixture is permanently marked synthetic and excluded from performance evidence.
 5. **Decision Receipt:** the public receipt commits to build/config hashes, source-evidence hashes, bucketed derived signals, model-run metadata, lifecycle ordering, and the final ledger head. `receipt:verify` checks the strict schema, canonical receipt hash, disclosed lifecycle consistency, and committed ledger head offline. It does not replay private source data or prove profitability. See the [receipt contract](../proof/decision-receipt.md).
-6. **Current Solana status:** offline prepare, human-gated devnet submit, and read-only verify tooling is implemented and tested, but **no anchor transaction has been submitted**. The public receipt is unanchored: `solanaAnchorMetadataPresent: false` and `solanaNetworkVerificationPerformed: false`. See the [devnet anchor boundary](../proof/solana-devnet-anchor.md).
+6. **Current Solana status:** offline prepare, human-gated devnet submit, and read-only verify tooling is implemented and tested, but the bounty release intentionally submits **no anchor transaction**. The public receipt is unanchored: `solanaAnchorMetadataPresent: false` and `solanaNetworkVerificationPerformed: false`; no explorer link exists. See the [devnet anchor boundary](../proof/solana-devnet-anchor.md).
 
 ## Run the judge path locally
 

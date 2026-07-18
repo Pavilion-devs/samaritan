@@ -2,7 +2,7 @@
 
 *Registered July 11, 2026 and signed by Deborah July 12. **Invalidated and suspended July 14 before producing any paper observation:** its upstream historical market selector used information later than the eligible signal window. This document is preserved as the immutable v1 audit record; it must not admit new cases. A corrected study requires a new protocol ID and signature. The real-money gate remains **closed**.*
 
-The corrected implementation is currently identified as `paper-study-v2-candidate-2026-07-14` with status `engineering_candidate_unregistered`. That label is deliberately not a registration. Operational Claude readiness and new ledger initialization remain fail-closed until Deborah reviews and signs the complete corrected protocol after economic-case normalization and the causal rerun are finalized.
+The corrected implementation was reviewed separately and registered for forward paper observation only on July 18, 2026 as `paper-study-v2-2026-07-18`; see [`10-paper-study-v2-registration.md`](10-paper-study-v2-registration.md). That decision does not repair or reactivate this v1 protocol, copy any v1 row forward, admit a fixture, or unlock real money.
 
 ## Purpose
 

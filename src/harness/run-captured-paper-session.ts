@@ -43,6 +43,7 @@ import {
 import type { PaperStudyLane } from "./paper-pipeline.js";
 import { runPaperSession, type PaperSessionSummary } from "./paper-session.js";
 import {
+  PAPER_STUDY_FROZEN_CONFIG_SHA256,
   PAPER_STUDY_PROTOCOL_STATUS,
   PAPER_STUDY_PROTOCOL_VERSION,
   initializePaperStudyLedger
@@ -383,12 +384,12 @@ export function parseCapturedPaperSessionArgs(
       "causal-total-evidence",
       "data/research/main-total-line-evidence-causal-v2.json"
     ),
-    fixtureUniversePath: path("universe", "data/research/paper-fixture-universe.json"),
-    studyLedgerManifestPath: path("study-ledger-manifest", "data/paper/study-ledgers.json"),
-    spendLedgerPath: path("spend-ledger", "data/agents/claude-spend.sqlite"),
+    fixtureUniversePath: path("universe", "data/paper/v2/fixture-universe.json"),
+    studyLedgerManifestPath: path("study-ledger-manifest", "data/paper/v2/study-ledgers.json"),
+    spendLedgerPath: path("spend-ledger", "data/paper/v2/agents/claude-spend.sqlite"),
     invocationEvidenceLedgerPath: path(
       "invocation-evidence-ledger",
-      "data/agents/claude-invocation-evidence.sqlite"
+      "data/paper/v2/agents/claude-invocation-evidence.sqlite"
     ),
     envPath: path("env", ".env"),
     fixtureId,
@@ -686,6 +687,7 @@ export async function preflightCapturedPaperSession(
   if (
     manifest.protocolVersion !== PAPER_STUDY_PROTOCOL_VERSION ||
     manifest.protocolStatus !== (PAPER_STUDY_PROTOCOL_STATUS as string) ||
+    manifest.configHash !== PAPER_STUDY_FROZEN_CONFIG_SHA256 ||
     manifest.protocolStatus !== "registered"
   ) {
     throw new Error("Study-ledger manifest is not registered for the current paper protocol");

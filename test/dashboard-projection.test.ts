@@ -11,6 +11,8 @@ import { buildStudySnapshot } from "../src/dash/study-projection.js";
 const repoRoot = resolve(import.meta.dirname, "..");
 const privateProjectionEvidenceAvailable = process.env.SAMARITAN_TEST_NO_PRIVATE_DATA !== "1" && [
   "data/paper/reports/current.json",
+  "data/paper/v2/reports/current.json",
+  "data/paper/v2/fixture-universe.json",
   "data/research/paper-fixture-universe.json",
   "data/research/historical-gate-study-causal-economic-v4.json",
   "data/research/paired-spain-belgium-2026-07-10-live-lane.json",
@@ -182,16 +184,16 @@ describe("Command capture outcome projection", () => {
 
 describe.runIf(privateProjectionEvidenceAvailable)("public dashboard private projection", () => {
   it("builds Command from confirmed fixtures, sealed study evidence, and the verified replay", async () => {
-    const snapshot = await buildCommandSnapshot(repoRoot, Date.parse("2026-07-13T12:00:00.000Z"));
+    const snapshot = await buildCommandSnapshot(repoRoot, Date.parse("2026-07-18T08:00:00.000Z"));
     expect(snapshot).toMatchObject({
-      schemaVersion: 2,
+      schemaVersion: 3,
       mode: "offline_artifact",
       executionMode: "paper",
       realMoneyGate: "closed",
       tradeable: false,
       system: { posture: "standing_by", label: "Standing by for paired capture" },
       featuredCase: {
-        caseId: "FX-18218149-G01-MR",
+        caseId: "SB-20260710-G01-MR",
         fixtureLabel: "Spain vs Belgium",
         home: { name: "Spain", code: "ESP" },
         away: { name: "Belgium", code: "BEL" },
@@ -208,13 +210,21 @@ describe.runIf(privateProjectionEvidenceAvailable)("public dashboard private pro
         canonicalEvents: 2_470_342
       },
       study: {
-        protocolStatus: "invalidated_suspended",
-        status: "suspended",
-        filledMatches: 0,
+        protocolVersion: "paper-study-v2-2026-07-18",
+        protocolStatus: "registered",
+        status: "active_forward_paper",
+        registeredAt: "2026-07-18T07:03:55Z",
+        observationStatus: "awaiting_fresh_evidence",
+        qualifyingCounts: { matches: 0, signals: 0, filledMatches: 0, fills: 0, settledFills: 0 },
         requiredFilledMatches: 20,
-        fills: 0,
         requiredFills: 40,
-        stoppingRuleMet: false
+        stoppingRuleMet: false,
+        realMoneyGate: "closed",
+        historicalV1: {
+          protocolVersion: "paper-study-v1-2026-07-12",
+          protocolStatus: "invalidated_suspended",
+          zeroObservationAudit: true
+        }
       },
       proof: {
         replayIdentityParity: true,
@@ -226,23 +236,32 @@ describe.runIf(privateProjectionEvidenceAvailable)("public dashboard private pro
       }
     });
     expect(snapshot.fixtureSchedule).toEqual([
-      expect.objectContaining({ fixtureId: "18237038", home: { name: "France", code: "FRA" }, away: { name: "Spain", code: "ESP" }, phase: "scheduled", captureOnly: true, tradeable: false }),
-      expect.objectContaining({ fixtureId: "18241006", home: { name: "England", code: "ENG" }, away: { name: "Argentina", code: "ARG" }, phase: "scheduled", captureOnly: true, tradeable: false })
+      expect.objectContaining({ captureId: "paired-france-spain-2026-07-14", home: { name: "France", code: "FRA" }, away: { name: "Spain", code: "ESP" }, phase: "failed", identityStatus: "historical_reviewed_config", captureOnly: true, tradeable: false }),
+      expect.objectContaining({ captureId: "paired-england-argentina-2026-07-15", home: { name: "England", code: "ENG" }, away: { name: "Argentina", code: "ARG" }, phase: "failed", identityStatus: "historical_reviewed_config", captureOnly: true, tradeable: false }),
+      expect.objectContaining({ captureId: "paired-france-england-2026-07-18", home: { name: "France", code: "FRA" }, away: { name: "England", code: "ENG" }, phase: "scheduled", identityStatus: "exact_match_confirmed", captureOnly: true, tradeable: false }),
+      expect.objectContaining({ captureId: "paired-spain-argentina-2026-07-19", home: { name: "Spain", code: "ESP" }, away: { name: "Argentina", code: "ARG" }, phase: "scheduled", identityStatus: "exact_match_confirmed", captureOnly: true, tradeable: false })
     ]);
     expect(snapshot.recentCases).toHaveLength(1);
   });
 
-  it("overrides clock-derived schedule state with the France-Spain failed analysis outcome", async () => {
-    const snapshot = await buildCommandSnapshot(repoRoot, Date.parse("2026-07-15T01:00:00.000Z"));
-    expect(snapshot.fixtureSchedule.find((fixture) => fixture.fixtureId === "18237038")).toMatchObject({
+  it("uses terminal manifests for ended captures and current-source validation for future captures", async () => {
+    const snapshot = await buildCommandSnapshot(repoRoot, Date.parse("2026-07-18T08:00:00.000Z"));
+    expect(snapshot.fixtureSchedule.find((fixture) => fixture.captureId === "paired-france-spain-2026-07-14")).toMatchObject({
       phase: "failed",
       statusLabel: "Failed closed",
       statusSource: "analysis_manifest",
-      statusUpdatedAt: "2026-07-15T00:23:23.588Z"
+      statusUpdatedAt: "2026-07-15T00:23:23.588Z",
+      identityStatus: "historical_reviewed_config"
     });
-    expect(snapshot.fixtureSchedule.find((fixture) => fixture.fixtureId === "18241006")).toMatchObject({
+    expect(snapshot.fixtureSchedule.find((fixture) => fixture.captureId === "paired-england-argentina-2026-07-15")).toMatchObject({
+      phase: "failed",
+      statusSource: "analysis_manifest",
+      identityStatus: "historical_reviewed_config"
+    });
+    expect(snapshot.fixtureSchedule.find((fixture) => fixture.captureId === "paired-france-england-2026-07-18")).toMatchObject({
       phase: "scheduled",
-      statusSource: "reviewed_config"
+      statusSource: "supervisor_status",
+      identityStatus: "exact_match_confirmed"
     });
   });
 
@@ -250,14 +269,14 @@ describe.runIf(privateProjectionEvidenceAvailable)("public dashboard private pro
     const snapshot = await buildSpainBelgiumMatchroomSnapshot(repoRoot);
     expect(snapshot).toMatchObject({
       schemaVersion: 2,
-      caseId: "FX-18218149-G01-MR",
+      caseId: "SB-20260710-G01-MR",
       casebookCaseCount: 18,
       mode: "captured_replay",
       executionMode: "paper",
       realMoneyGate: "closed",
       tradeable: false,
       match: {
-        fixtureId: "18218149",
+        fixtureRef: "paired-spain-belgium-2026-07-10",
         eventSlug: "fifwc-esp-bel-2026-07-10",
         home: { name: "Spain", code: "ESP" },
         away: { name: "Belgium", code: "BEL" },
@@ -325,13 +344,13 @@ describe.runIf(privateProjectionEvidenceAvailable)("public dashboard private pro
         cleanStaleWindows: 0,
         assurance: "local_file_sha256_not_capture_manifest_membership",
         selectedExemplar: {
-          caseId: "FX-18218149-G01-MR",
+          caseId: "SB-20260710-G01-MR",
           policy: "earliest_pretrigger_match_result_then_largest_pretrigger_ask_move"
         }
       },
       selectedCase: {
         summary: {
-          caseId: "FX-18218149-G01-MR",
+          caseId: "SB-20260710-G01-MR",
           fixtureLabel: "Spain vs Belgium",
           homeCode: "ESP",
           awayCode: "BEL",
@@ -384,13 +403,28 @@ describe.runIf(privateProjectionEvidenceAvailable)("public dashboard private pro
       realMoneyGate: "closed",
       tradeable: false,
       protocol: {
+        version: "paper-study-v2-2026-07-18",
+        status: "registered",
+        activity: "active_forward_paper",
+        active: true,
+        registeredAt: "2026-07-18T07:03:55Z",
+        observationStatus: "awaiting_fresh_evidence",
+        evidencePolicy: "fresh_forward_only",
+        qualifyingCounts: { matches: 0, signals: 0, filledMatches: 0, fills: 0, settledFills: 0 },
         evaluation: { minimumFilledMatches: 20, minimumFills: 40, bootstrapIterations: 10_000 },
         risk: { bankrollMicroUsd: 50_000_000, perTradeStakeMicroUsd: 3_000_000, aggregateExposureMicroUsd: 15_000_000, drawdownStopMicroUsd: 20_000_000 },
         guardrailThresholds: { minimumFillRate: 0.6, maximumMeanSlippageBps: 100 }
       },
-      lanes: {
-        bounty: { status: "exploratory", canSatisfyGate: false },
-        longRun: { status: "sealed", stoppingRuleMet: false, canSatisfyGate: false }
+      historicalV1: {
+        protocolVersion: "paper-study-v1-2026-07-12",
+        status: "invalidated_suspended",
+        active: false,
+        invalidatedBeforeObservations: true,
+        lanes: {
+          bounty: { sourceStatus: "exploratory", canSatisfyGate: false },
+          longRun: { sourceStatus: "sealed", stoppingRuleMet: false, canSatisfyGate: false }
+        },
+        results: { visibility: "sealed", rows: null, endpoints: null, guardrails: null }
       },
       results: { visibility: "sealed", rows: null, endpoints: null, guardrails: null },
       correctedHistoricalCandidate: {
@@ -401,8 +435,8 @@ describe.runIf(privateProjectionEvidenceAvailable)("public dashboard private pro
         costProxyBps: 100,
         meanNetAfterCostProxyBps: 132.7,
         matchClustered95Bps: { iterations: 10_000, cluster: "fixture", low: 14.3, high: 243.9 },
-        registration: "engineering_candidate_unregistered",
-        activeStudy: false,
+        sourceRegistrationAtGeneration: "engineering_candidate_unregistered",
+        activeStudyAtGeneration: false,
         executable: false
       },
       syntheticProof: {
@@ -412,21 +446,21 @@ describe.runIf(privateProjectionEvidenceAvailable)("public dashboard private pro
         externalCalls: 0,
         solanaAnchorStatus: "not_submitted"
       },
-      fixtureUniverse: { evidenceFixtures: 3, pairedBookReplays: 1, executableBookReplays: 0, longRunEligible: 0 }
+      fixtureUniverse: { evidenceFixtures: 0, pairedBookReplays: 0, executableBookReplays: 0, longRunEligible: 0 }
     });
   });
 
   it("exposes bucketed TXLine movement without exact levels, reconstructive gaps, or raw fields", async () => {
     const projections = {
       matchroom: await buildSpainBelgiumMatchroomSnapshot(repoRoot),
-      command: await buildCommandSnapshot(repoRoot, Date.parse("2026-07-13T12:00:00.000Z")),
+      command: await buildCommandSnapshot(repoRoot, Date.parse("2026-07-18T08:00:00.000Z")),
       casebook: await buildCasebookSnapshot(repoRoot),
       study: await buildStudySnapshot(repoRoot)
     };
     const serialized = JSON.stringify(projections);
     const keys = publicKeys(projections);
 
-    for (const forbiddenKey of ["fairProbability", "consensusProbability", "Pct", "executableGap"]) {
+    for (const forbiddenKey of ["fairProbability", "consensusProbability", "Pct", "executableGap", "fixtureId"]) {
       expect(keys).not.toContain(forbiddenKey);
     }
     expect(keys.filter((key) => key.toLowerCase().startsWith("raw"))).toEqual([]);
@@ -449,12 +483,15 @@ describe.runIf(privateProjectionEvidenceAvailable)("public dashboard private pro
     ]) {
       expect(serialized).not.toContain(forbidden);
     }
+    for (const txlineFixtureId of ["18218149", "18237038", "18241006", "18257865", "18257739"]) {
+      expect(serialized).not.toContain(txlineFixtureId);
+    }
   });
 
   it("serves only the explicit read-only public API routes", async () => {
     const command = await handleDashboardApi(COMMAND_API_PATH, repoRoot);
     expect(command).toMatchObject({ status: 200, headers: { "cache-control": "no-store" } });
-    expect(JSON.parse(command!.body)).toHaveProperty("data.study.status", "suspended");
+    expect(JSON.parse(command!.body)).toHaveProperty("data.study.status", "active_forward_paper");
     const match = await handleDashboardApi(SPAIN_BELGIUM_API_PATH, repoRoot);
     expect(match).toMatchObject({ status: 200, headers: { "cache-control": "no-store" } });
     expect(JSON.parse(match!.body)).toHaveProperty("data.publicDataPolicy.txlineProbabilityDisplay", "bucketed_movement_only");
@@ -463,7 +500,14 @@ describe.runIf(privateProjectionEvidenceAvailable)("public dashboard private pro
     expect(JSON.parse(casebook!.body)).toHaveProperty("data.selectedCase.analysis.thesisStatus", "not_requested");
     const study = await handleDashboardApi(STUDY_API_PATH, repoRoot);
     expect(study).toMatchObject({ status: 200, headers: { "cache-control": "no-store" } });
-    expect(JSON.parse(study!.body)).toMatchObject({ data: { results: { visibility: "sealed", endpoints: null }, realMoneyGate: "closed" } });
+    expect(JSON.parse(study!.body)).toMatchObject({
+      data: {
+        protocol: { status: "registered", activity: "active_forward_paper", qualifyingCounts: { fills: 0 } },
+        historicalV1: { status: "invalidated_suspended" },
+        results: { visibility: "sealed", endpoints: null },
+        realMoneyGate: "closed"
+      }
+    });
     expect(await handleDashboardApi("/api/v1/wallet", repoRoot)).toMatchObject({ status: 404 });
     expect(await handleDashboardApi("/matchroom", repoRoot)).toBeNull();
   });

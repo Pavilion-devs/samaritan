@@ -7,8 +7,13 @@ import {
   STUDY_API_PATH,
   type PublicDashboardApiPath
 } from "./public-bundle.js";
+import { buildJudgeEvidenceResponse, JUDGE_EVIDENCE_API_PATH } from "./judge-evidence.js";
+import { buildNodeTxlinePulse, type NodeTxlinePulseOptions } from "./txline-pulse-node.js";
+import { TXLINE_PULSE_API_PATH } from "./txline-pulse.js";
 
 export { CASEBOOK_API_PATH, COMMAND_API_PATH, SPAIN_BELGIUM_API_PATH, STUDY_API_PATH } from "./public-bundle.js";
+export { JUDGE_EVIDENCE_API_PATH } from "./judge-evidence.js";
+export { TXLINE_PULSE_API_PATH } from "./txline-pulse.js";
 
 export type DashboardApiResult = {
   status: number;
@@ -41,6 +46,17 @@ function frozenJsonResult(body: string, bundleSha256: string): DashboardApiResul
   };
 }
 
+function methodNotAllowedResult(): DashboardApiResult {
+  const result = jsonResult(405, { error: "method_not_allowed" });
+  return {
+    ...result,
+    headers: {
+      ...result.headers,
+      allow: "GET, HEAD"
+    }
+  };
+}
+
 export type DashboardApiSource = "frozen" | "private";
 
 async function privateProjection(pathname: PublicDashboardApiPath, repoRoot: string): Promise<unknown> {
@@ -63,8 +79,22 @@ async function privateProjection(pathname: PublicDashboardApiPath, repoRoot: str
 export async function handleDashboardApi(
   pathname: string,
   repoRoot: string,
-  options: { source?: DashboardApiSource } = {}
+  options: { source?: DashboardApiSource; method?: string; txlinePulse?: NodeTxlinePulseOptions } = {}
 ): Promise<DashboardApiResult | null> {
+  const method = (options.method ?? "GET").toUpperCase();
+  if (pathname.startsWith("/api/") && method !== "GET" && method !== "HEAD") {
+    return methodNotAllowedResult();
+  }
+  if (pathname === TXLINE_PULSE_API_PATH) {
+    return jsonResult(200, await buildNodeTxlinePulse(repoRoot, options.txlinePulse));
+  }
+  if (pathname === JUDGE_EVIDENCE_API_PATH) {
+    try {
+      return jsonResult(200, await buildJudgeEvidenceResponse(repoRoot));
+    } catch {
+      return jsonResult(503, { error: "evidence_unavailable" });
+    }
+  }
   if (pathname === "/api/v1/health") {
     return jsonResult(200, { status: "ok", service: "samaritan-dashboard", readOnly: true });
   }

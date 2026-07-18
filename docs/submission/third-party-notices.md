@@ -4,10 +4,10 @@ This file covers the judge-facing bounty repository and dashboard. Local ignored
 
 ## Data and services
 
-- **TXLine / TxODDS:** official fixture, odds, score, and validation APIs are used under the World Cup Hackathon terms. The public bundle contains only Samaritan-derived, non-reconstructive signals, decisions, aggregates, and hashes; it does not redistribute raw TXLine data. Continued post-hackathon operation requires the appropriate TxODDS licence.
+- **TXLine / TxODDS:** official fixture, odds, and score APIs are used under the World Cup Hackathon terms. TXLine validation surfaces were researched but are not integrated into the current Samaritan receipt, so no Merkle or on-chain source-verification claim is made. The release-candidate bundle is limited to Samaritan-derived, non-reconstructive signals, decisions, aggregates, and hashes; it does not redistribute raw TXLine data. Reproducibility-oriented source/configuration contains only opaque API request selectors, never source payloads; those identifiers remain absent from the hosted UI/API, evidence bundle, receipt, video, and submission pending written sponsor clarification. Continued post-hackathon operation requires the appropriate TxODDS licence.
 - **Polymarket:** public market metadata, sampled prices, and public order-book data are used for research and paper simulation. Samaritan places no real order in the bounty build and does not require a judge wallet or account.
 - **Anthropic Claude:** Haiku and Opus are constrained runtime components. The zero-network public proving fixture uses deterministic stubs at those two boundaries and does not call Anthropic.
-- **Solana:** `@solana/web3.js` and the public Memo program are used for offline devnet anchor preparation and human-gated submission/verification tooling. No anchor transaction has been submitted for the current receipt.
+- **Solana:** `@solana/web3.js` and the public Memo program are used for offline devnet anchor preparation and human-gated submission/verification tooling. The bounty release intentionally submits no anchor transaction; the current receipt is unanchored and has no explorer link.
 
 ## Fonts and visual assets
 

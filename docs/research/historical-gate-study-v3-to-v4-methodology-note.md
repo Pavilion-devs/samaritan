@@ -14,4 +14,4 @@ V4 therefore adds one audit field without changing any detector threshold, selec
 - keep the aggregate detector result visible;
 - label any passing Total Goals result only as a historical signal candidate for a fresh forward paper review.
 
-No v3 artifact was overwritten. V4 uses a new protocol ID, configuration hash, JSON path, and Markdown path. This refinement cannot activate the paper study: the corrected paper protocol remains `engineering_candidate_unregistered`, operational Claude readiness remains disabled, and Deborah must review and sign a fresh protocol before any qualifying observation.
+No v3 artifact was overwritten. V4 uses a new protocol ID, configuration hash, JSON path, and Markdown path. This refinement did not itself activate the paper study. Deborah later registered corrected v2 for forward paper observation only on July 18; v4 remains historical source evidence and is not retroactively relabelled as a qualifying observation.

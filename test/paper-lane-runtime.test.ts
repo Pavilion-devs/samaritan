@@ -108,7 +108,7 @@ function universe(fixtures: PaperFixtureUniverse["fixtures"]): PaperFixtureUnive
 
 describe("persistent paper lane runtime", () => {
   it("physically excludes sampled-history fixtures from the bounty executor", () => {
-    const handle = initializePaperStudyLedger({ path: ":memory:", lane: "bounty", startedAtTsMs: 10_000 });
+    const handle = initializePaperStudyLedger({ path: ":memory:", lane: "bounty", startedAtTsMs: 10_000, testOnlyAllowPreRegistrationStart: true });
     const runtime = createPersistentPaperLaneRuntime({
       lane: "bounty",
       initialization: handle.initialization,
@@ -131,7 +131,7 @@ describe("persistent paper lane runtime", () => {
   });
 
   it("starts a long-run runtime empty when no post-start fixture is eligible", () => {
-    const handle = initializePaperStudyLedger({ path: ":memory:", lane: "long_run", startedAtTsMs: 10_000 });
+    const handle = initializePaperStudyLedger({ path: ":memory:", lane: "long_run", startedAtTsMs: 10_000, testOnlyAllowPreRegistrationStart: true });
     const runtime = createPersistentPaperLaneRuntime({
       lane: "long_run",
       initialization: handle.initialization,
@@ -149,7 +149,7 @@ describe("persistent paper lane runtime", () => {
   });
 
   it("admits a newly verified executable fixture without changing prior identities", () => {
-    const handle = initializePaperStudyLedger({ path: ":memory:", lane: "long_run", startedAtTsMs: 10_000 });
+    const handle = initializePaperStudyLedger({ path: ":memory:", lane: "long_run", startedAtTsMs: 10_000, testOnlyAllowPreRegistrationStart: true });
     const runtime = createPersistentPaperLaneRuntime({
       lane: "long_run",
       initialization: handle.initialization,
@@ -181,7 +181,7 @@ describe("persistent paper lane runtime", () => {
   });
 
   it("rehydrates committed seen cases before admitting any repeated model work", async () => {
-    const handle = initializePaperStudyLedger({ path: ":memory:", lane: "bounty", startedAtTsMs: 10_000 });
+    const handle = initializePaperStudyLedger({ path: ":memory:", lane: "bounty", startedAtTsMs: 10_000, testOnlyAllowPreRegistrationStart: true });
     const admitted = fixture({
       fixtureId: "restart",
       kickoffTsMs: 20_000_000,

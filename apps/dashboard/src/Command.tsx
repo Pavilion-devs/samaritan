@@ -4,7 +4,8 @@ import type {
   CommandSnapshot,
   PublicBookPoint
 } from "../../../src/dash/public-contract";
-import { loadCommand } from "./api";
+import { loadCommand, loadTxlinePulse, type TxlinePulse } from "./api";
+import { frozenCaptureWindowLabel } from "./command-schedule";
 import { BrandMark, Icon, MobileNavigation, Navigation, ProvenanceBadge, Topbar } from "./Shell";
 
 function percent(value: number, digits = 2) {
@@ -26,14 +27,6 @@ function dateParts(value: string) {
     month: new Intl.DateTimeFormat("en-GB", { month: "short", timeZone: "UTC" }).format(date).toUpperCase(),
     time: new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "UTC" }).format(date)
   };
-}
-
-function relativeStart(target: string, generatedAt: string) {
-  const difference = Date.parse(target) - Date.parse(generatedAt);
-  if (difference <= 0) return "Window reached";
-  const hours = Math.floor(difference / 3_600_000);
-  const days = Math.floor(hours / 24);
-  return days > 0 ? `Starts in ${days}d ${hours % 24}h` : `Starts in ${hours}h`;
 }
 
 function MiniProbabilityChart({ featured }: { featured: CommandSnapshot["featuredCase"] }) {
@@ -89,6 +82,49 @@ function SystemDeck({ snapshot }: { snapshot: CommandSnapshot }) {
   );
 }
 
+function LiveTxlinePulse() {
+  const [pulse, setPulse] = useState<TxlinePulse | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setFailed(false);
+    loadTxlinePulse(controller.signal)
+      .then((next) => startTransition(() => setPulse(next)))
+      .catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        setFailed(true);
+      });
+    const refresh = window.setTimeout(() => setAttempt((value) => value + 1), 60_000);
+    return () => {
+      controller.abort();
+      window.clearTimeout(refresh);
+    };
+  }, [attempt]);
+
+  const connected = pulse?.status === "connected" && !failed;
+  const status = failed ? "degraded" : pulse?.status ?? "checking";
+  const freshness = failed ? "unknown" : pulse?.freshnessClass ?? "unknown";
+  const checkedAt = pulse?.checkedAt;
+  return (
+    <section className={`command-live-pulse ${connected ? "connected" : "degraded"}`} aria-labelledby="live-pulse-title">
+      <header>
+        <span><i /><b id="live-pulse-title">LIVE DERIVED METADATA · NOT STUDY EVIDENCE</b></span>
+        <em>{status}</em>
+      </header>
+      <div className="command-live-pulse-grid">
+        <div className="pulse-identity"><span><Icon name="pulse" /></span><span><small>Official server-side check</small><b>TXLine mainnet · SL12</b><em>{connected ? "Fixture snapshot reached through the credential boundary." : "Connectivity is unavailable or degraded; no feed state is inferred."}</em></span></div>
+        <div><small>Latency bucket</small><b>{pulse?.latencyMsRounded === null || pulse === null ? "—" : `≤ ${pulse.latencyMsRounded} ms`}</b></div>
+        <div><small>Aggregate fixtures</small><b>{pulse?.aggregateFixtureCount ?? "—"}</b></div>
+        <div><small>Response freshness</small><b>{freshness}</b></div>
+        <div><small>Checked</small><b>{checkedAt ? `${checkedAt.slice(11, 19)} UTC` : "Waiting"}</b></div>
+      </div>
+      <footer><Icon name="lock" /><span><b>Connectivity metadata only.</b> No fixture identity, kickoff, raw row, odds, probability, or v2 observation is exposed or admitted.</span><button type="button" onClick={() => setAttempt((value) => value + 1)}>Refresh</button></footer>
+    </section>
+  );
+}
+
 function FeaturedCase({ snapshot }: { snapshot: CommandSnapshot }) {
   const featured = snapshot.featuredCase;
   const minutes = Math.floor(featured.clockSeconds / 60);
@@ -122,29 +158,34 @@ function FeaturedCase({ snapshot }: { snapshot: CommandSnapshot }) {
   );
 }
 
-function FixtureCard({ fixture, generatedAt, lead }: { fixture: CommandFixture; generatedAt: string; lead: boolean }) {
+function FixtureCard({ fixture, browserNowMs, lead }: { fixture: CommandFixture; browserNowMs: number; lead: boolean }) {
   const kickoff = dateParts(fixture.kickoffUtc);
   const capture = dateParts(fixture.captureStartUtc);
   return (
     <article className={`fixture-card ${fixture.phase} ${lead ? "lead" : ""}`}>
       <div className="fixture-date"><b>{kickoff.day}</b><span>{kickoff.month}</span></div>
       <div className="fixture-card-main">
-        <div className="fixture-status"><span><i />{fixture.statusLabel}</span><em>{fixture.phase === "scheduled" ? relativeStart(fixture.captureStartUtc, generatedAt) : fixture.statusDetail}</em></div>
+        <div className="fixture-status"><span><i />At export: {fixture.statusLabel}</span><em>{frozenCaptureWindowLabel(fixture.captureStartUtc, fixture.captureEndUtc, browserNowMs)}</em></div>
         <div className="fixture-versus"><span><i className={`mini-crest ${fixture.home.code.toLowerCase()}`}>{fixture.home.code}</i><b>{fixture.home.name}</b></span><em>vs</em><span><b>{fixture.away.name}</b><i className={`mini-crest ${fixture.away.code.toLowerCase()}`}>{fixture.away.code}</i></span></div>
         <div className="fixture-times"><span><small>Capture begins</small><b>{capture.time} UTC</b></span><span><small>Kickoff</small><b>{kickoff.time} UTC</b></span></div>
-        <div className="fixture-boundary"><Icon name="lock" /><span><b>Capture only</b><small>Exact identity confirmed · non-tradeable</small></span></div>
+        <div className="fixture-boundary"><Icon name="lock" /><span><b>Capture only</b><small>{fixture.identityStatus === "exact_match_confirmed" ? "Identity confirmed at export" : "Historical config reviewed at export"} · non-tradeable</small></span></div>
       </div>
     </article>
   );
 }
 
 function CaptureSchedule({ snapshot }: { snapshot: CommandSnapshot }) {
+  const [browserNowMs, setBrowserNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    const refresh = window.setInterval(() => setBrowserNowMs(Date.now()), 60_000);
+    return () => window.clearInterval(refresh);
+  }, []);
   return (
     <aside className="capture-schedule surface reveal r2" aria-labelledby="capture-title">
-      <header className="command-panel-head"><div><span>Fixture watch</span><h2 id="capture-title">Capture schedule</h2></div><ProvenanceBadge tone="configured" label={`${snapshot.fixtureSchedule.length} configured · not live`} /></header>
-      <p className="schedule-intro">The next evidence enters only through exact, human-confirmed public-data captures.</p>
+      <header className="command-panel-head"><div><span>Fixture watch</span><h2 id="capture-title">Capture schedule</h2></div><ProvenanceBadge tone="configured" label={`Frozen export · ${snapshot.fixtureSchedule.length} configured`} /></header>
+      <p className="schedule-intro">Frozen at export {new Date(snapshot.generatedAt).toISOString()}. Browser-clock timing describes configured windows, not live recorder state.</p>
       <div className="fixture-stack">
-        {snapshot.fixtureSchedule.map((fixture, index) => <FixtureCard key={fixture.fixtureId} fixture={fixture} generatedAt={snapshot.generatedAt} lead={index === 0} />)}
+        {snapshot.fixtureSchedule.map((fixture, index) => <FixtureCard key={fixture.captureId} fixture={fixture} browserNowMs={browserNowMs} lead={index === 0} />)}
       </div>
       <div className="schedule-rule"><Icon name="shield" /><span><b>Admission stays fail-closed</b><small>Capture does not authorize a trade. Replay and paper-study gates still apply.</small></span></div>
     </aside>
@@ -171,15 +212,19 @@ function RecentCases({ snapshot }: { snapshot: CommandSnapshot }) {
 
 function StudyPanel({ snapshot }: { snapshot: CommandSnapshot }) {
   const study = snapshot.study;
+  const counts = study.qualifyingCounts;
+  const observationCopy = counts.signals === 0
+    ? "Zero fresh observations qualify."
+    : `${counts.signals} fresh signal${counts.signals === 1 ? " qualifies" : "s qualify"} from the registered v2 ledger.`;
   return (
     <section className="command-study surface reveal r4" id="study" aria-labelledby="study-title">
       <header className="command-panel-head"><div><span>Evidence governance</span><h2 id="study-title">Paper protocol audit</h2></div><span className="sealed-label"><Icon name="lock" />{study.statusLabel}</span></header>
-      <div className="study-message"><span className="study-lock"><Icon name="shield" /></span><span><b>V1 was invalidated before any observation.</b><small>The zero-row ledgers are preserved; corrected v2 awaits Deborah's registration.</small></span></div>
+      <div className="study-message"><span className="study-lock"><Icon name="shield" /></span><span><b>V2 is registered for forward paper only.</b><small>{observationCopy} Invalidated v1 remains separate audit history; the real-money gate is closed.</small></span></div>
       <div className="study-progress">
-        <div><span><b>{study.filledMatches}</b> / {study.requiredFilledMatches}</span><small>filled matches</small><i><em style={{ width: `${Math.min(100, study.filledMatches / study.requiredFilledMatches * 100)}%` }} /></i></div>
-        <div><span><b>{study.fills}</b> / {study.requiredFills}</span><small>fills</small><i><em style={{ width: `${Math.min(100, study.fills / study.requiredFills * 100)}%` }} /></i></div>
+        <div><span><b>{counts.filledMatches}</b> / {study.requiredFilledMatches}</span><small>fresh filled matches</small><i><em style={{ width: `${Math.min(100, counts.filledMatches / study.requiredFilledMatches * 100)}%` }} /></i></div>
+        <div><span><b>{counts.fills}</b> / {study.requiredFills}</span><small>fresh fills</small><i><em style={{ width: `${Math.min(100, counts.fills / study.requiredFills * 100)}%` }} /></i></div>
       </div>
-      <div className="study-meta"><span><small>Protocol status</small><b>Suspended audit history</b></span><span><small>Config hash</small><code title={study.configHash}>{compactHash(study.configHash)}</code></span></div>
+      <div className="study-meta"><span><small>Protocol status</small><b>Active forward paper</b></span><span><small>Config hash</small><code title={study.configHash}>{compactHash(study.configHash)}</code></span></div>
     </section>
   );
 }
@@ -190,7 +235,7 @@ function CommandProof({ snapshot }: { snapshot: CommandSnapshot }) {
     <aside className="command-proof surface reveal r5" id="proof" aria-labelledby="command-proof-title">
       <header className="command-panel-head"><div><span>Integrity spine</span><h2 id="command-proof-title">Offline integrity checks</h2></div><ProvenanceBadge tone="offline" label="Local replay check" /></header>
       <div className="command-proof-hero"><span>{snapshot.proof.replayIdentityParity ? "PASS" : "FAIL"}</span><div><b>Replay identity parity</b><small>{snapshot.proof.replayIdentityParity ? "Deterministic replay matched twice" : "Local replay check failed"}</small></div></div>
-      <div className="command-proof-grid"><span><small>Canonical events</small><b>{snapshot.proof.canonicalEvents.toLocaleString("en-US")}</b></span><span><small>Evidence fixtures</small><b>{snapshot.proof.evidenceFixtures}</b></span><span><small>Local ledger chains</small><b>{validLedgerChains} valid</b></span><span><small>Paired replays</small><b>{snapshot.proof.pairedBookReplays}</b></span></div>
+      <div className="command-proof-grid"><span><small>Canonical events</small><b>{snapshot.proof.canonicalEvents.toLocaleString("en-US")}</b></span><span><small>Evidence fixtures</small><b>{snapshot.proof.evidenceFixtures}</b></span><span><small>V2 study chains</small><b>{validLedgerChains} valid</b></span><span><small>Paired replays</small><b>{snapshot.proof.pairedBookReplays}</b></span></div>
       <div className="command-hash"><span>Replay identity</span><code title={snapshot.proof.replayIdentityHash}>{compactHash(snapshot.proof.replayIdentityHash)}</code></div>
       <div className="proof-policy"><Icon name="lock" /><span><b>Public observer boundary</b><small>Derived evidence only · no wallet or raw feed access</small></span></div>
     </aside>
@@ -205,6 +250,7 @@ function CommandView({ snapshot }: { snapshot: CommandSnapshot }) {
         <Topbar title="Command" modeLabel="Offline snapshot" modeClass="offline" />
         <SystemDeck snapshot={snapshot} />
         <div className="command-content">
+          <LiveTxlinePulse />
           <div className="command-lead-grid"><FeaturedCase snapshot={snapshot} /><CaptureSchedule snapshot={snapshot} /></div>
           <div className="command-evidence-grid"><RecentCases snapshot={snapshot} /><div className="command-side-stack"><StudyPanel snapshot={snapshot} /><CommandProof snapshot={snapshot} /></div></div>
         </div>

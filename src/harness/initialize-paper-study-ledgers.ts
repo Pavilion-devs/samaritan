@@ -1,8 +1,10 @@
 import { mkdir, writeFile } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
+import { dirname, relative, resolve } from "node:path";
 import { evaluatePaperStudyLedger } from "../metrics/paper-study-observations.js";
 import {
-  PAPER_STUDY_PROTOCOL_STATUS,
+  PAPER_STUDY_PROTOCOL_VERSION,
+  PAPER_STUDY_REGISTRATION,
+  assertPaperStudyRegistrationRequest,
   initializePaperStudyLedger
 } from "./paper-study-ledger.js";
 
@@ -11,23 +13,20 @@ function argument(name: string, fallback: string): string {
   return index >= 0 && process.argv[index + 1] ? process.argv[index + 1]! : fallback;
 }
 
-const root = resolve(argument("root", "data/paper"));
-const manifestPath = resolve(argument("manifest", "data/paper/study-ledgers.json"));
-const reportPath = resolve(argument("report", "docs/research/paper-study-ledger-initialization.md"));
-if (!process.argv.includes("--candidate")) {
-  throw new Error(
-    `Paper protocol is ${PAPER_STUDY_PROTOCOL_STATUS}; pass --candidate only for isolated engineering fixtures. ` +
-    "Do not replace or append to the preserved v1 study ledgers before Deborah registers the corrected protocol."
-  );
-}
+assertPaperStudyRegistrationRequest(argument("register", ""));
+const root = resolve(argument("root", "data/paper/v2"));
+const manifestPath = resolve(argument("manifest", "data/paper/v2/study-ledgers.json"));
+const reportPath = resolve(argument("report", "data/paper/v2/registration.md"));
 const now = Date.now();
+const bountyLedgerPath = resolve(root, "bounty", "decision-ledger.sqlite");
+const longRunLedgerPath = resolve(root, "long-run", "decision-ledger.sqlite");
 const bounty = initializePaperStudyLedger({
-  path: resolve(root, "bounty", "decision-ledger.sqlite"),
+  path: bountyLedgerPath,
   lane: "bounty",
   startedAtTsMs: now
 });
 const longRun = initializePaperStudyLedger({
-  path: resolve(root, "long-run", "decision-ledger.sqlite"),
+  path: longRunLedgerPath,
   lane: "long_run",
   startedAtTsMs: now
 });
@@ -40,19 +39,21 @@ try {
     kickoffByFixtureId: new Map()
   });
   const manifest = {
+    protocolId: PAPER_STUDY_PROTOCOL_VERSION,
     protocolVersion: bounty.initialization.protocolVersion,
     protocolStatus: bounty.initialization.protocolStatus,
+    registration: PAPER_STUDY_REGISTRATION,
     configHash: bounty.initialization.configHash,
     realMoneyGate: "closed",
     bounty: {
-      path: "data/paper/bounty/decision-ledger.sqlite",
+      path: relative(process.cwd(), bountyLedgerPath),
       startedAtTsMs: bounty.initialization.startedAtTsMs,
       startedAt: bounty.initialization.startedAt,
       created: bounty.created,
       chain: bountyChain
     },
     longRun: {
-      path: "data/paper/long-run/decision-ledger.sqlite",
+      path: relative(process.cwd(), longRunLedgerPath),
       startedAtTsMs: longRun.initialization.startedAtTsMs,
       startedAt: longRun.initialization.startedAt,
       created: longRun.created,
@@ -65,6 +66,8 @@ try {
     "",
     `Protocol: \`${manifest.protocolVersion}\`  `,
     `Protocol status: **${manifest.protocolStatus}**  `,
+    `Registered by: **${manifest.registration.registeredBy}** at ${manifest.registration.registeredAt}  `,
+    `Scope: **${manifest.registration.scope}**  `,
     `Frozen config SHA-256: \`${manifest.configHash}\`  `,
     "Real-money gate: **closed**",
     "",
