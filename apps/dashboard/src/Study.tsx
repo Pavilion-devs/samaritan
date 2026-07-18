@@ -1,7 +1,7 @@
 import { startTransition, useEffect, useState } from "react";
 import type { StudyGuardrails, StudySnapshot } from "../../../src/dash/public-contract";
 import { loadStudy } from "./api";
-import { BrandMark, Icon, MobileNavigation, Navigation, ProvenanceBadge, Topbar } from "./Shell";
+import { BrandMark, EditorialNavigation, Icon } from "./Shell";
 
 function money(microUsd: number) {
   return `$${(microUsd / 1_000_000).toFixed(2)}`;
@@ -16,105 +16,79 @@ function bps(value: number | null) {
 }
 
 function compactHash(value: string) {
-  return `${value.slice(0, 12)}…${value.slice(-8)}`;
+  return `${value.slice(0, 14)}…${value.slice(-7)}`;
 }
 
-function ProgressMeter({ value, target, label }: { value: number; target: number; label: string }) {
+function registrationDate(value: string) {
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC"
+  }).format(new Date(value));
+}
+
+function ProgressLine({ value, target, label }: { value: number; target: number; label: string }) {
   const progress = Math.min(100, target === 0 ? 0 : value / target * 100);
   return (
-    <div className="study-progress-meter">
-      <div><span><b>{value}</b> / {target}</span><small>{label}</small></div>
+    <div className="editorial-performance-progress-line">
+      <span><small>{label}</small><b>{value} / {target}</b></span>
       <i><em style={{ width: `${progress}%` }} /></i>
     </div>
   );
 }
 
-function StudyHero({ snapshot }: { snapshot: StudySnapshot }) {
-  const protocol = snapshot.protocol;
-  const evaluation = protocol.evaluation;
-  const counts = protocol.qualifyingCounts;
+function PerformanceHero({ snapshot }: { snapshot: StudySnapshot }) {
+  const counts = snapshot.protocol.qualifyingCounts;
+  const evaluation = snapshot.protocol.evaluation;
   return (
-    <section className="study-hero reveal r1" aria-labelledby="study-heading">
-      <div className="study-hero-copy">
-        <ProvenanceBadge tone="configured" label="Registered protocol · forward paper" />
-        <h2 id="study-heading">V2 is registered.<br /><em>Evidence starts fresh.</em></h2>
-        <p>Deborah activated the corrected protocol for forward paper observation only. Historical, retrospective, and synthetic cases remain excluded; zero observations currently qualify.</p>
-        <div className="study-primary-question"><span><Icon name="chart" /></span><span><small>Registered primary endpoint</small><b>{evaluation.primaryEndpoint}</b></span></div>
+    <section className="editorial-performance-hero" aria-labelledby="editorial-performance-title">
+      <div className="editorial-performance-hero-copy">
+        <span className="editorial-performance-kicker"><i aria-hidden="true" />Registered forward paper · fresh evidence only</span>
+        <h1 id="editorial-performance-title">Performance<br />waits for proof.</h1>
+        <p>Samaritan will not turn promising research, a synthetic demo, or an empty ledger into a performance claim. The registered v2 study opens only after fresh evidence satisfies its stopping rule.</p>
+        <div className="editorial-performance-endpoint-label">
+          <span><Icon name="chart" /></span>
+          <span><small>Registered primary endpoint</small><b>{evaluation.primaryEndpoint}</b></span>
+        </div>
       </div>
-      <div className="study-clock">
-        <header><span><i />Registered · active forward paper</span><em>Since {new Date(protocol.registeredAt).toISOString().slice(0, 10)}</em></header>
-        <div className="study-clock-main">
-          <span className="study-clock-lock"><Icon name="lock" /></span>
-          <div><small>Fresh observations</small><strong><b>{counts.filledMatches}</b><em>/</em>{evaluation.minimumFilledMatches}</strong><span>qualifying matches</span></div>
-          <div><small>Fresh fills</small><strong><b>{counts.fills}</b><em>/</em>{evaluation.minimumFills}</strong><span>qualifying fills</span></div>
+      <div className="editorial-performance-clock">
+        <header><span><i aria-hidden="true" />V2 registered · active</span><time>{registrationDate(snapshot.protocol.registeredAt)}</time></header>
+        <div className="editorial-performance-clock-counts">
+          <div><small>Fresh filled matches</small><strong><b>{counts.filledMatches}</b><i>/</i>{evaluation.minimumFilledMatches}</strong><span>required before decision</span></div>
+          <div><small>Fresh fills</small><strong><b>{counts.fills}</b><i>/</i>{evaluation.minimumFills}</strong><span>required before decision</span></div>
         </div>
-        <div className="study-clock-progress">
-          <ProgressMeter value={counts.filledMatches} target={evaluation.minimumFilledMatches} label="Filled-match threshold" />
-          <ProgressMeter value={counts.fills} target={evaluation.minimumFills} label="Fill threshold" />
+        <div className="editorial-performance-clock-progress">
+          <ProgressLine value={counts.filledMatches} target={evaluation.minimumFilledMatches} label="Filled-match threshold" />
+          <ProgressLine value={counts.fills} target={evaluation.minimumFills} label="Fill threshold" />
         </div>
-        <footer><span>Status <b>registered</b></span><span>Evidence <b>fresh only</b></span><span><Icon name="shield" />Real money closed</span></footer>
+        <footer><span>Status <b>Registered</b></span><span>Result <b>{snapshot.results.visibility === "sealed" ? "Sealed" : "Open"}</b></span><span><Icon name="shield" />Real money closed</span></footer>
       </div>
     </section>
   );
 }
 
-function LaneStrip({ snapshot }: { snapshot: StudySnapshot }) {
-  const bounty = snapshot.historicalV1.lanes.bounty;
-  const longRun = snapshot.historicalV1.lanes.longRun;
+function EvidenceBoundary({ snapshot }: { snapshot: StudySnapshot }) {
+  const steps = [
+    { icon: "pulse" as const, label: "Fresh capture", detail: "Post-registration only" },
+    { icon: "spark" as const, label: "Registered signal", detail: snapshot.protocol.candidate.detector },
+    { icon: "check" as const, label: "Paper fill", detail: "Executable evidence" },
+    { icon: "chart" as const, label: "V2 count", detail: `${snapshot.protocol.qualifyingCounts.matches} qualified` }
+  ];
   return (
-    <section className="study-lanes surface reveal r2" aria-label="Preserved v1 paper-study audit">
-      <div className="study-lane long-run"><span className="lane-mark"><Icon name="lock" /></span><span><small>Historical decision lane</small><b>{longRun.label}</b><em>{longRun.reason}</em></span><strong>{longRun.statusLabel}</strong></div>
-      <div className="study-lane bounty"><span className="lane-mark"><Icon name="spark" /></span><span><small>Historical demo lane</small><b>{bounty.label}</b><em>{bounty.reason}</em></span><strong>{bounty.statusLabel}</strong></div>
-      <div className="lane-boundary"><Icon name="shield" /><span><b>V1 remains invalidated audit history</b><small>Both zero-observation chains are preserved and can never satisfy registered v2.</small></span></div>
-    </section>
-  );
-}
-
-function CorrectedHistoricalEvidence({ snapshot }: { snapshot: StudySnapshot }) {
-  const candidate = snapshot.correctedHistoricalCandidate;
-  return (
-    <section className="study-corrected-evidence surface reveal r3" aria-labelledby="corrected-evidence-title">
-      <header className="study-panel-head">
-        <div><span>Historical derived · not performance</span><h2 id="corrected-evidence-title">Historical signal candidate</h2></div>
-        <span className="study-unregistered-chip"><Icon name="lock" />Historical v4 artifact · predates v2 registration</span>
+    <section className="editorial-performance-boundary" aria-labelledby="editorial-performance-boundary-title">
+      <header className="editorial-performance-section-heading">
+        <span><small>Admission boundary</small><h2 id="editorial-performance-boundary-title">Only one path can become performance.</h2></span>
+        <em>Fresh forward evidence</em>
       </header>
-      <div className="corrected-evidence-grid">
-        <div className="corrected-evidence-primary"><small>Held-out mean after {candidate.costProxyBps} bps proxy</small><b>{bps(candidate.meanNetAfterCostProxyBps)}</b><em>95% fixture-clustered CI {bps(candidate.matchClustered95Bps.low)} to {bps(candidate.matchClustered95Bps.high)}</em></div>
-        <div><small>Training cases</small><b>{candidate.trainingNormalizedCases}</b><em>Normalized before held-out review</em></div>
-        <div><small>Held-out cases</small><b>{candidate.heldoutNormalizedCases}</b><em>Across {candidate.heldoutFixtures} fixtures</em></div>
-        <div><small>Evidence class</small><b>Sampled prices</b><em>No historical bid, ask, depth, or fill proof</em></div>
+      <div className="editorial-performance-admission-path">
+        {steps.map((step) => <div key={step.label}><i><Icon name={step.icon} /></i><span><b>{step.label}</b><small>{step.detail}</small></span></div>)}
       </div>
-      <div className="corrected-evidence-boundary"><Icon name="shield" /><span><b>Historical source status preserved</b><small>{candidate.claimBoundary}</small></span></div>
-      <footer><span>Protocol <code>{candidate.protocolId}</code></span><span>Configuration <code title={candidate.configurationHash}>{compactHash(candidate.configurationHash)}</code></span></footer>
-    </section>
-  );
-}
-
-function SyntheticReceiptProof({ snapshot }: { snapshot: StudySnapshot }) {
-  const proof = snapshot.syntheticProof;
-  const steps = ["Signal", "Triage stub", "Thesis stub", "Hard risk", "Paper fill", "Close", "Settlement"];
-  return (
-    <section className="study-synthetic-proof surface reveal r4" aria-labelledby="synthetic-proof-title">
-      <header className="study-panel-head">
-        <div><span>Synthetic · engineering proof</span><h2 id="synthetic-proof-title">One case. Every boundary. Verifiable offline.</h2></div>
-        <ProvenanceBadge tone="synthetic" label="Synthetic · zero external calls" />
-      </header>
-      <div className="synthetic-proof-body">
-        <div className="synthetic-proof-story">
-          <span className="synthetic-proof-mark"><Icon name="proof" /></span>
-          <div><small>Closed-world proving fixture</small><b>{proof.label}</b><p>{proof.explanation} Deterministic agent stubs replace external model calls.</p></div>
-        </div>
-        <div className="synthetic-proof-facts">
-          <span><small>Lifecycle</small><b>Filled + settled</b></span>
-          <span><small>External calls</small><b>{proof.externalCalls}</b></span>
-          <span><small>Performance use</small><b>Excluded</b></span>
-          <span><small>Solana anchor</small><b>Not submitted</b></span>
-        </div>
+      <div className="editorial-performance-exclusions">
+        <span><Icon name="minus" /><b>Historical research</b><small>Context only · not executable performance</small></span>
+        <span><Icon name="minus" /><b>Synthetic receipt</b><small>Engineering proof · permanently excluded</small></span>
+        <span><Icon name="minus" /><b>Invalidated v1</b><small>Audit history · cannot satisfy v2</small></span>
       </div>
-      <div className="synthetic-proof-flow" aria-label="Synthetic proving lifecycle">
-        {steps.map((step, index) => <span key={step}><b>{step}</b>{index < steps.length - 1 ? <i><Icon name="arrow" /></i> : null}</span>)}
-      </div>
-      <footer><span><Icon name="lock" /><b>Synthetic and permanently excluded from historical, forward-study, and profitability/performance claims.</b></span><a href={proof.path}>Open synthetic receipt · JSON <Icon name="arrow" /></a></footer>
     </section>
   );
 }
@@ -122,18 +96,23 @@ function SyntheticReceiptProof({ snapshot }: { snapshot: StudySnapshot }) {
 function SealedEndpoint({ snapshot }: { snapshot: StudySnapshot }) {
   const evaluation = snapshot.protocol.evaluation;
   const counts = snapshot.protocol.qualifyingCounts;
-  const countLabel = `${counts.signals} qualifying signal${counts.signals === 1 ? "" : "s"}`;
   return (
-    <section className="study-endpoint surface reveal r3" aria-labelledby="endpoint-title">
-      <header className="study-panel-head"><div><span>Registered endpoint · sealed</span><h2 id="endpoint-title">Awaiting the registered stopping rule</h2></div><span className="study-sealed-chip"><Icon name="lock" />{countLabel}</span></header>
-      <div className="sealed-endpoint-stage">
-        <div className="endpoint-axis-labels"><span>Reject zone</span><span>0 bps</span><span>Accept zone</span></div>
-        <div className="endpoint-axis"><i /><em /><span /></div>
-        <div className="endpoint-vault"><span><Icon name="lock" /></span><div><small>No current endpoint</small><b>{counts.filledMatches} / {evaluation.minimumFilledMatches} filled matches · {counts.fills} / {evaluation.minimumFills} fills</b><p>Only fresh post-registration evidence may open the registered endpoint; old research, v1 rows, and synthetic proof are excluded.</p></div></div>
-        <div className="endpoint-method"><span><small>Bootstrap</small><b>{evaluation.bootstrapIterations.toLocaleString("en-US")} iterations</b></span><span><small>Resampling block</small><b>Whole matches</b></span><span><small>Control</small><b>{evaluation.randomDirectionControl}</b></span></div>
+    <section className="editorial-performance-endpoint" aria-labelledby="editorial-performance-endpoint-title">
+      <header className="editorial-performance-section-heading">
+        <span><small>Registered endpoint · sealed</small><h2 id="editorial-performance-endpoint-title">No result yet.</h2></span>
+        <em><Icon name="lock" />Stopping rule unmet</em>
+      </header>
+      <div className="editorial-performance-vault">
+        <span><Icon name="lock" /></span>
+        <span><small>Current endpoint</small><b>Withheld by design</b><p>{counts.filledMatches} of {evaluation.minimumFilledMatches} filled matches and {counts.fills} of {evaluation.minimumFills} fills qualify. Old research and synthetic proof cannot open this result.</p></span>
       </div>
-      <div className="study-accept-criteria">
-        {snapshot.decisionRules.accept.map((rule, index) => <div key={rule}><span>{String(index + 1).padStart(2, "0")}</span><i><Icon name="lock" /></i><p>{rule}</p></div>)}
+      <div className="editorial-performance-method">
+        <span><small>Unit of analysis</small><b>{evaluation.unitOfAnalysis}</b></span>
+        <span><small>Bootstrap</small><b>{evaluation.bootstrapIterations.toLocaleString("en-US")} iterations</b></span>
+        <span><small>Control</small><b>{evaluation.randomDirectionControl}</b></span>
+      </div>
+      <div className="editorial-performance-zero-axis" aria-label="Decision axis remains sealed">
+        <span>Reject</span><i><em /></i><b>0 bps</b><i><em /></i><span>Accept</span>
       </div>
     </section>
   );
@@ -143,159 +122,189 @@ function OpenEndpoint({ snapshot }: { snapshot: StudySnapshot }) {
   if (snapshot.results.visibility !== "open") return null;
   const endpoints = snapshot.results.endpoints;
   return (
-    <section className="study-endpoint surface reveal r3" aria-labelledby="endpoint-title">
-      <header className="study-panel-head"><div><span>Gating endpoint</span><h2 id="endpoint-title">Executable CLV decision</h2></div><span className="study-result-chip registered">Registered v2</span></header>
-      {endpoints ? <div className="study-open-endpoints">
-        <div className="study-endpoint-primary"><span>Mean net executable CLV</span><b>{bps(endpoints.meanNetClvBps)}</b><small>95% CI [{bps(endpoints.netClvInterval.low)}, {bps(endpoints.netClvInterval.high)}]</small></div>
-        <div><span>Settlement P&amp;L</span><b>{money(endpoints.meanSettlementPnlMicroUsd)}</b><small>Mean resolved result</small></div>
-        <div><span>Random control</span><b>{bps(endpoints.randomDirectionControlClvBps)}</b><small>Matched observed costs</small></div>
-        <div><span>Positive matches</span><b>{percentage(endpoints.fractionSettledMatchesNetPositive)}</b><small>Settled match fraction</small></div>
-      </div> : <div className="study-incomplete-endpoint"><Icon name="clock" /><span><b>Endpoint evidence incomplete</b><small>The minimum sample opened the rows, but complete close or settlement evidence is still required.</small></span></div>}
+    <section className="editorial-performance-endpoint" aria-labelledby="editorial-performance-endpoint-title">
+      <header className="editorial-performance-section-heading"><span><small>Registered v2 endpoint</small><h2 id="editorial-performance-endpoint-title">Executable evidence result</h2></span><em>Stopping rule met</em></header>
+      {endpoints ? (
+        <div className="editorial-performance-open-result">
+          <div className="primary"><small>Mean net executable CLV</small><b>{bps(endpoints.meanNetClvBps)}</b><span>95% CI {bps(endpoints.netClvInterval.low)} to {bps(endpoints.netClvInterval.high)}</span></div>
+          <div><small>Settlement P&amp;L</small><b>{money(endpoints.meanSettlementPnlMicroUsd)}</b><span>Mean resolved result</span></div>
+          <div><small>Random control</small><b>{bps(endpoints.randomDirectionControlClvBps)}</b><span>Matched observed costs</span></div>
+          <div><small>Positive matches</small><b>{percentage(endpoints.fractionSettledMatchesNetPositive)}</b><span>Settled fraction</span></div>
+        </div>
+      ) : <div className="editorial-performance-incomplete"><Icon name="clock" /><span><b>Endpoint evidence incomplete</b><small>The minimum sample opened the rows, but complete close or settlement evidence is still required.</small></span></div>}
     </section>
   );
 }
 
 function guardrailState(guardrails: StudyGuardrails | null, key: keyof StudyGuardrails): "pass" | "fail" | "waiting" {
   if (!guardrails) return "waiting";
-  const value = guardrails[key];
-  return value === true ? "pass" : "fail";
+  return guardrails[key] === true ? "pass" : "fail";
 }
 
-function GuardrailsPanel({ snapshot }: { snapshot: StudySnapshot }) {
+function StudyContract({ snapshot }: { snapshot: StudySnapshot }) {
+  const candidate = snapshot.protocol.candidate;
   const thresholds = snapshot.protocol.guardrailThresholds;
   const observed = snapshot.results.visibility === "open" ? snapshot.results.guardrails : null;
-  const items = [
-    { label: "Fill rate", threshold: `≥ ${percentage(thresholds.minimumFillRate)}`, value: observed ? percentage(observed.fillRate, 1) : "Awaiting fills", state: guardrailState(observed, "fillRatePassed") },
-    { label: "Mean slippage", threshold: `≤ ${thresholds.maximumMeanSlippageBps} bps`, value: observed ? bps(observed.meanSlippageBps) : "Awaiting fills", state: guardrailState(observed, "slippagePassed") },
-    { label: "Max drawdown", threshold: `≤ ${money(thresholds.maximumDrawdownMicroUsd)}`, value: observed ? money(observed.maxDrawdownMicroUsd) : "No observations", state: guardrailState(observed, "drawdownPassed") },
-    { label: "Selected depth", threshold: "Every trade", value: observed ? (observed.selectedDepthComplete ? "Complete" : "Incomplete") : "Awaiting fills", state: guardrailState(observed, "selectedDepthComplete") }
+  const guardrails = [
+    { label: "Fill rate", threshold: `≥ ${percentage(thresholds.minimumFillRate)}`, observed: observed ? percentage(observed.fillRate, 1) : "Awaiting fills", state: guardrailState(observed, "fillRatePassed") },
+    { label: "Mean slippage", threshold: `≤ ${thresholds.maximumMeanSlippageBps} bps`, observed: observed ? bps(observed.meanSlippageBps) : "Awaiting fills", state: guardrailState(observed, "slippagePassed") },
+    { label: "Max drawdown", threshold: `≤ ${money(thresholds.maximumDrawdownMicroUsd)}`, observed: observed ? money(observed.maxDrawdownMicroUsd) : "No observations", state: guardrailState(observed, "drawdownPassed") },
+    { label: "Selected depth", threshold: "Every fill", observed: observed ? (observed.selectedDepthComplete ? "Complete" : "Incomplete") : "Awaiting fills", state: guardrailState(observed, "selectedDepthComplete") }
   ];
   return (
-    <aside className="study-guardrails surface reveal r4" aria-labelledby="guardrails-title">
-      <header className="study-panel-head"><div><span>Hard constraints</span><h2 id="guardrails-title">Acceptance guardrails</h2></div><Icon name="shield" /></header>
-      <p>Positive CLV cannot rescue a study that fails execution quality or risk control.</p>
-      <div className="study-guardrail-list">
-        {items.map((item) => <div className={item.state} key={item.label}><span><i>{item.state === "waiting" ? <Icon name="clock" /> : <Icon name={item.state === "pass" ? "check" : "minus"} />}</i><span><b>{item.label}</b><small>{item.value}</small></span></span><em>{item.threshold}</em></div>)}
+    <aside className="editorial-performance-contract" aria-labelledby="editorial-performance-contract-title">
+      <header className="editorial-performance-section-heading"><span><small>Frozen study contract</small><h2 id="editorial-performance-contract-title">What is being tested</h2></span><em><i />Frozen</em></header>
+      <div className="editorial-performance-candidate">
+        <span><Icon name="pulse" /></span>
+        <span><small>Enabled detector</small><b>{candidate.detector}</b><em>{candidate.marketFamily}</em></span>
       </div>
-      <footer><Icon name="lock" /><span><b>Runtime market metadata required</b><small>Missing depth, fee, tick, or close evidence fails closed.</small></span></footer>
-    </aside>
-  );
-}
-
-function CandidatePanel({ snapshot }: { snapshot: StudySnapshot }) {
-  const candidate = snapshot.protocol.candidate;
-  return (
-    <section className="study-candidate surface reveal r5" aria-labelledby="candidate-title">
-      <header className="study-panel-head"><div><span>Registered configuration</span><h2 id="candidate-title">Forward-paper v2</h2></div><span className="config-frozen"><i />Frozen</span></header>
-      <div className="candidate-lead"><span><Icon name="pulse" /></span><span><small>Enabled detector</small><b>{candidate.detector}</b><em>{candidate.marketFamily}</em></span></div>
-      <div className="candidate-parameters">
+      <div className="editorial-performance-parameters">
         <span><small>Move Z</small><b>{candidate.moveAbsZ.toFixed(1)}</b></span>
         <span><small>CUSUM</small><b>{candidate.cusumThresholdBps.toFixed(0)} bps</b></span>
         <span><small>Minimum gap</small><b>{candidate.minimumGapBps.toFixed(0)} bps</b></span>
         <span><small>Updates</small><b>{candidate.minimumUpdates}</b></span>
       </div>
-      <div className="candidate-selector"><span><Icon name="chart" /></span><span><small>Dynamic total selector</small><b>{candidate.selector}</b><em>≥ {candidate.minimumCoveragePoints.toLocaleString("en-US")} points · within {percentage(candidate.maximumDistanceFromEven)} of even</em></span></div>
-      <div className="candidate-hash"><span>Registered at</span><code>{snapshot.protocol.registeredAt}</code></div>
-      <div className="candidate-hash"><span>Configuration identity</span><code title={snapshot.protocol.configHash}>{compactHash(snapshot.protocol.configHash)}</code></div>
-    </section>
+      <div className="editorial-performance-selector"><Icon name="chart" /><span><small>Market selector</small><b>{candidate.selector}</b><em>≥ {candidate.minimumCoveragePoints.toLocaleString("en-US")} points · within {percentage(candidate.maximumDistanceFromEven)} of even</em></span></div>
+      <div className="editorial-performance-guardrails">
+        <h3>Acceptance guardrails</h3>
+        {guardrails.map((item) => (
+          <div className={item.state} key={item.label}>
+            <span><i><Icon name={item.state === "waiting" ? "clock" : item.state === "pass" ? "check" : "minus"} /></i><span><b>{item.label}</b><small>{item.observed}</small></span></span>
+            <em>{item.threshold}</em>
+          </div>
+        ))}
+      </div>
+      <div className="editorial-performance-contract-hash"><span>Configuration identity</span><code title={snapshot.protocol.configHash}>{compactHash(snapshot.protocol.configHash)}</code></div>
+    </aside>
   );
 }
 
-function RiskPanel({ snapshot }: { snapshot: StudySnapshot }) {
+function RiskEnvelope({ snapshot }: { snapshot: StudySnapshot }) {
   const risk = snapshot.protocol.risk;
   return (
-    <section className="study-risk surface reveal r6" aria-labelledby="risk-title">
-      <header className="study-panel-head"><div><span>Paper limits</span><h2 id="risk-title">Risk envelope</h2></div><span className="paper-only">Simulated USD</span></header>
-      <div className="risk-orbit">
-        <div className="risk-bankroll"><span>Bankroll</span><b>{money(risk.bankrollMicroUsd)}</b><small>Paper notional</small></div>
-        <span className="risk-ring one" /><span className="risk-ring two" />
+    <section className="editorial-performance-risk" aria-labelledby="editorial-performance-risk-title">
+      <header className="editorial-performance-section-heading"><span><small>Paper-only risk</small><h2 id="editorial-performance-risk-title">Limits before outcomes</h2></span><em>Simulated USD</em></header>
+      <div className="editorial-performance-risk-grid">
+        <div className="primary"><small>Paper bankroll</small><b>{money(risk.bankrollMicroUsd)}</b><span>Not real capital</span></div>
+        <div><small>Per trade</small><b>{money(risk.perTradeStakeMicroUsd)}</b><span>Fixed stake ceiling</span></div>
+        <div><small>Max exposure</small><b>{money(risk.aggregateExposureMicroUsd)}</b><span>Aggregate cap</span></div>
+        <div><small>Drawdown stop</small><b>{money(risk.drawdownStopMicroUsd)}</b><span>Deterministic breaker</span></div>
       </div>
-      <div className="risk-grid"><span><small>Per trade</small><b>{money(risk.perTradeStakeMicroUsd)}</b></span><span><small>Max exposure</small><b>{money(risk.aggregateExposureMicroUsd)}</b></span><span><small>Drawdown stop</small><b>{money(risk.drawdownStopMicroUsd)}</b></span></div>
-      <footer><Icon name="shield" /><span><b>Deterministic limits</b><small>No agent can increase stake or exposure, or override the drawdown stop.</small></span></footer>
+      <footer><Icon name="shield" /><span><b>No agent can enlarge these limits</b><small>Stake, exposure, and drawdown rules remain deterministic.</small></span></footer>
     </section>
   );
 }
 
-function EvidenceQueue({ snapshot }: { snapshot: StudySnapshot }) {
-  const universe = snapshot.fixtureUniverse;
+function HistoricalResearch({ snapshot }: { snapshot: StudySnapshot }) {
+  const candidate = snapshot.correctedHistoricalCandidate;
   return (
-    <section className="study-queue surface reveal r7" aria-labelledby="queue-title">
-      <header className="study-panel-head"><div><span>Fresh-forward admission boundary</span><h2 id="queue-title">Evidence queue</h2></div><span>{snapshot.protocol.qualifyingCounts.matches} qualified</span></header>
-      <div className="queue-flow">
-        <div><b>{universe.evidenceFixtures}</b><span>Historical evidence fixtures</span></div><i><Icon name="arrow" /></i><div><b>{universe.pairedBookReplays}</b><span>Retrospective paired replay</span></div><i><Icon name="arrow" /></i><div className="eligible"><b>{snapshot.protocol.qualifyingCounts.matches}</b><span>V2 qualifying</span></div>
+    <section className="editorial-performance-history" aria-labelledby="editorial-performance-history-title">
+      <header className="editorial-performance-section-heading"><span><small>Historical derived research · excluded from v2</small><h2 id="editorial-performance-history-title">Promising research is not performance.</h2></span><em><Icon name="lock" />Predates registration</em></header>
+      <div className="editorial-performance-history-grid">
+        <div className="primary"><small>Held-out mean after {candidate.costProxyBps} bps proxy</small><b>{bps(candidate.meanNetAfterCostProxyBps)}</b><span>95% fixture-clustered CI {bps(candidate.matchClustered95Bps.low)} to {bps(candidate.matchClustered95Bps.high)}</span></div>
+        <div><small>Training cases</small><b>{candidate.trainingNormalizedCases}</b><span>Normalized research cases</span></div>
+        <div><small>Held-out cases</small><b>{candidate.heldoutNormalizedCases}</b><span>Across {candidate.heldoutFixtures} fixtures</span></div>
+        <div><small>Execution evidence</small><b>Not established</b><span>No historical bid, ask, depth, or fills</span></div>
       </div>
-      <div className="queue-rejection"><span><Icon name="minus" /></span><span><b>{universe.signalResearchOnly} sampled-history fixtures remain research-only</b><small>They lack synchronized executable depth and cannot count toward the long-run gate.</small></span></div>
-      <a href="/command"><span>Inspect fresh capture status</span><Icon name="arrow" /></a>
+      <div className="editorial-performance-history-boundary"><Icon name="shield" /><p>{candidate.claimBoundary}</p></div>
+      <footer><span>Protocol <code>{candidate.protocolId}</code></span><span>Configuration <code title={candidate.configurationHash}>{compactHash(candidate.configurationHash)}</code></span></footer>
+    </section>
+  );
+}
+
+function ExcludedContext({ snapshot }: { snapshot: StudySnapshot }) {
+  const longRun = snapshot.historicalV1.lanes.longRun;
+  const bounty = snapshot.historicalV1.lanes.bounty;
+  const synthetic = snapshot.syntheticProof;
+  return (
+    <section className="editorial-performance-context" aria-labelledby="editorial-performance-context-title">
+      <header className="editorial-performance-section-heading"><span><small>Preserved context</small><h2 id="editorial-performance-context-title">Useful for audit. Excluded from results.</h2></span><em>Boundaries intact</em></header>
+      <div className="editorial-performance-context-rows">
+        <div><span><i><Icon name="lock" /></i><span><small>Invalidated v1 audit</small><b>Two zero-observation chains preserved</b><p>{longRun.reason}. {bounty.reason}.</p></span></span><span><small>Chain state</small><b>{longRun.chain.valid && bounty.chain.valid ? "Both valid" : "Check failed"}</b></span></div>
+        <div><span><i><Icon name="proof" /></i><span><small>Synthetic engineering proof</small><b>{synthetic.label}</b><p>{synthetic.explanation}</p></span></span><span><small>Performance use</small><b>Excluded</b></span></div>
+      </div>
+      <a href={synthetic.path}>Open synthetic receipt <Icon name="arrow" /></a>
     </section>
   );
 }
 
 function DecisionRules({ snapshot }: { snapshot: StudySnapshot }) {
   const groups = [
-    { label: "Accept", className: "accept", icon: "check" as const, rules: snapshot.decisionRules.accept },
-    { label: "Reject", className: "reject", icon: "minus" as const, rules: snapshot.decisionRules.reject },
-    { label: "Inconclusive", className: "inconclusive", icon: "clock" as const, rules: snapshot.decisionRules.inconclusive }
+    { label: "Accept", icon: "check" as const, rules: snapshot.decisionRules.accept },
+    { label: "Reject", icon: "minus" as const, rules: snapshot.decisionRules.reject },
+    { label: "Inconclusive", icon: "clock" as const, rules: snapshot.decisionRules.inconclusive }
   ];
   return (
-    <section className="study-rules surface reveal r8" aria-labelledby="rules-title">
-      <header className="study-panel-head"><div><span>Registered rules · active</span><h2 id="rules-title">How v2 will reach a verdict</h2></div><span className="rules-note">Fresh evidence only</span></header>
-      <div className="study-rule-grid">{groups.map((group) => <div className={group.className} key={group.label}><header><span><Icon name={group.icon} /></span><b>{group.label}</b></header>{group.rules.map((rule) => <p key={rule}>{rule}</p>)}</div>)}</div>
-      <footer><Icon name="shield" /><b>Registration authorizes forward paper observation only. No study result can unlock real money without a separate future decision.</b></footer>
+    <section className="editorial-performance-rules" aria-labelledby="editorial-performance-rules-title">
+      <header className="editorial-performance-section-heading"><span><small>Registered decision rules</small><h2 id="editorial-performance-rules-title">The verdict is predetermined.</h2></span><em>Fresh evidence only</em></header>
+      <div>
+        {groups.map((group) => (
+          <article key={group.label}>
+            <header><i><Icon name={group.icon} /></i><h3>{group.label}</h3></header>
+            {group.rules.map((rule) => <p key={rule}>{rule}</p>)}
+          </article>
+        ))}
+      </div>
+      <footer><Icon name="shield" /><b>Registration authorizes forward paper observation only. A study result cannot unlock real money without a separate future decision.</b></footer>
     </section>
-  );
-}
-
-function StudyProof({ snapshot }: { snapshot: StudySnapshot }) {
-  return (
-    <footer className="study-proof reveal r9">
-      <span className="study-proof-status"><Icon name="proof" /><span><b>Both preserved v1 chains verify</b><small>Local append-only audit history · not an external anchor</small></span></span>
-      <span><small>V1 long-run head</small><code title={snapshot.historicalV1.lanes.longRun.chain.headHash}>{compactHash(snapshot.historicalV1.lanes.longRun.chain.headHash)}</code></span>
-      <span><small>V1 bounty head</small><code title={snapshot.historicalV1.lanes.bounty.chain.headHash}>{compactHash(snapshot.historicalV1.lanes.bounty.chain.headHash)}</code></span>
-      <span><small>Current protocol</small><code>{snapshot.protocol.version}</code></span>
-      <span className="study-proof-boundary"><Icon name="lock" />Derived evidence only</span>
-    </footer>
   );
 }
 
 function StudyRows({ snapshot }: { snapshot: StudySnapshot }) {
   if (snapshot.results.visibility !== "open") return null;
   return (
-    <section className="study-rows surface" aria-labelledby="study-rows-title">
-      <header className="study-panel-head"><div><span>Opened after stopping rule</span><h2 id="study-rows-title">Per-match evidence</h2></div><span>{snapshot.results.rows.length} rows</span></header>
-      <div className="study-row-table"><div className="study-row-head"><span>Fixture</span><span>Total</span><span>Signals</span><span>Fills</span><span>Fill rate</span><span>Slippage</span><span>Net CLV</span><span>P&amp;L</span></div>{snapshot.results.rows.map((row) => <div className="study-row" key={`${row.fixtureRef}:${row.kickoffUtc}`}><span><b>{row.fixtureRef}</b><small>{row.kickoffUtc.slice(0, 10)}</small></span><span>{row.selectedLine.toFixed(1)}</span><span>{row.signals}</span><span>{row.fills}</span><span>{percentage(row.fillRate, 1)}</span><span>{bps(row.meanSlippageBps)}</span><span>{bps(row.netClvBps)}</span><span>{row.settlementPnlMicroUsd === null ? "—" : money(row.settlementPnlMicroUsd)}</span></div>)}</div>
+    <section className="editorial-performance-rows" aria-labelledby="editorial-performance-rows-title">
+      <header className="editorial-performance-section-heading"><span><small>Opened after stopping rule</small><h2 id="editorial-performance-rows-title">Per-match evidence</h2></span><em>{snapshot.results.rows.length} rows</em></header>
+      <div role="region" aria-label="Per-match performance evidence" tabIndex={0}>
+        <table><thead><tr><th>Fixture</th><th>Total</th><th>Signals</th><th>Fills</th><th>Fill rate</th><th>Slippage</th><th>Net CLV</th><th>P&amp;L</th></tr></thead><tbody>{snapshot.results.rows.map((row) => <tr key={`${row.fixtureRef}:${row.kickoffUtc}`}><td><b>{row.fixtureRef}</b><small>{row.kickoffUtc.slice(0, 10)}</small></td><td>{row.selectedLine.toFixed(1)}</td><td>{row.signals}</td><td>{row.fills}</td><td>{percentage(row.fillRate, 1)}</td><td>{bps(row.meanSlippageBps)}</td><td>{bps(row.netClvBps)}</td><td>{row.settlementPnlMicroUsd === null ? "—" : money(row.settlementPnlMicroUsd)}</td></tr>)}</tbody></table>
+      </div>
     </section>
+  );
+}
+
+function PerformanceProof({ snapshot }: { snapshot: StudySnapshot }) {
+  return (
+    <aside className="editorial-performance-proof">
+      <span><i><Icon name="check" /></i><span><small>Protocol state</small><b>V2 registration verified</b></span></span>
+      <span><small>Current protocol</small><code>{snapshot.protocol.version}</code></span>
+      <span><small>V1 long-run head</small><code title={snapshot.historicalV1.lanes.longRun.chain.headHash}>{compactHash(snapshot.historicalV1.lanes.longRun.chain.headHash)}</code></span>
+      <span><small>V1 bounty head</small><code title={snapshot.historicalV1.lanes.bounty.chain.headHash}>{compactHash(snapshot.historicalV1.lanes.bounty.chain.headHash)}</code></span>
+      <a href="/proof"><small>Public boundary</small><b>Derived only</b><Icon name="arrow" /></a>
+    </aside>
   );
 }
 
 function StudyView({ snapshot }: { snapshot: StudySnapshot }) {
   return (
-    <div className="app-shell study-shell">
-      <Navigation active="study" />
-      <main className="workspace" id="study">
-        <Topbar title="Study" modeLabel="Offline snapshot" modeClass="offline" />
-        <div className="study-content">
-          <StudyHero snapshot={snapshot} />
-          <LaneStrip snapshot={snapshot} />
-          <CorrectedHistoricalEvidence snapshot={snapshot} />
-          <SyntheticReceiptProof snapshot={snapshot} />
-          <div className="study-primary-grid">{snapshot.results.visibility === "sealed" ? <SealedEndpoint snapshot={snapshot} /> : <OpenEndpoint snapshot={snapshot} />}<GuardrailsPanel snapshot={snapshot} /></div>
-          <div className="study-secondary-grid"><CandidatePanel snapshot={snapshot} /><RiskPanel snapshot={snapshot} /><EvidenceQueue snapshot={snapshot} /></div>
+    <div className="editorial-performance">
+      <div className="editorial-page editorial-performance-page">
+        <EditorialNavigation active="study" modeLabel="Registered study · real money closed" />
+        <main>
+          <PerformanceHero snapshot={snapshot} />
+          <EvidenceBoundary snapshot={snapshot} />
+          <div className="editorial-performance-primary-grid">
+            {snapshot.results.visibility === "sealed" ? <SealedEndpoint snapshot={snapshot} /> : <OpenEndpoint snapshot={snapshot} />}
+            <StudyContract snapshot={snapshot} />
+          </div>
+          <RiskEnvelope snapshot={snapshot} />
+          <HistoricalResearch snapshot={snapshot} />
+          <ExcludedContext snapshot={snapshot} />
           <DecisionRules snapshot={snapshot} />
           <StudyRows snapshot={snapshot} />
-          <StudyProof snapshot={snapshot} />
-        </div>
-        <MobileNavigation active="study" />
-      </main>
+          <PerformanceProof snapshot={snapshot} />
+        </main>
+        <footer className="editorial-footer"><span>Forward paper only · no profitability claim before the stopping rule</span><span>Real-money gate closed</span></footer>
+      </div>
     </div>
   );
 }
 
 function StudyLoading() {
-  return <main className="load-screen"><BrandMark /><span className="load-kicker">Samaritan / Study</span><h1>Reconstructing study governance</h1><div className="load-line"><i /></div><p>Verifying current v2 registration and the separate preserved zero-observation v1 audit.</p></main>;
+  return <main className="editorial-load"><BrandMark /><span>Samaritan / Performance</span><h1>Reconstructing study governance</h1><div><i /></div><p>Verifying current v2 registration and the separate preserved audit history.</p></main>;
 }
 
 function StudyError({ retry }: { retry: () => void }) {
-  return <main className="load-screen error-screen"><span className="error-mark"><Icon name="shield" /></span><span className="load-kicker">Fail-closed boundary</span><h1>Study evidence unavailable</h1><p>The protocol identity, ledger chain, or sealing state could not be reconciled. Samaritan will not expose a partial profitability result.</p><button type="button" onClick={retry}>Retry verified load</button></main>;
+  return <main className="editorial-load editorial-load-error"><span><Icon name="shield" /></span><small>Fail-closed boundary</small><h1>Performance evidence unavailable</h1><p>Samaritan will not expose a partial or unreconciled result.</p><button type="button" onClick={retry}>Retry verified load</button></main>;
 }
 
 export function StudyApp() {

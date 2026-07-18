@@ -1,6 +1,6 @@
 # Samaritan UI/UX Specification
 
-*Status: Deborah approved the editorial Overview, Live Match, and Decisions direction on July 18, 2026. They establish the binding navigation and evidence language for the public observer; Performance and Proof retain their specialized layouts until their deliberate migration. Real-money gates are unchanged.*
+*Status: Deborah approved the editorial Overview, Live Match, Decisions, and Performance direction on July 18, 2026. They establish the binding navigation and evidence language for the public observer; Proof retains its specialized layout until its deliberate migration. Real-money gates are unchanged.*
 
 > **July 18 governance status:** paper-study v1 is invalidated, suspended, and preserved only as zero-observation audit history. Deborah registered corrected v2 for forward paper observation only. The dashboard must show registration separately from evidence: v2 has no qualifying observation until a fresh fixture passes every admission gate, and the real-money gate remains closed.
 
@@ -350,11 +350,11 @@ The bounty release is intentionally unanchored and displays `NOT SUBMITTED`; it 
 
 ## 8. Visual direction: Editorial Intelligence
 
-Editorial Intelligence is a polished sports-market product, not a trading terminal, sportsbook, or generic admin dashboard. The public Overview, Live Match, and Decisions routes use Samaritan's social language as their source of truth: warm paper, navy typography, an electric-blue signal path, large editorial statements, generous negative space, and progressive evidence disclosure. Live Match keeps its analytical depth through the synchronized Probability Field and Decision Rail; Decisions presents the full 18-observation corpus as an ordered journal with one explicitly marked three-state exemplar. The remaining evidence routes retain specialized composition until migrated.
+Editorial Intelligence is a polished sports-market product, not a trading terminal, sportsbook, or generic admin dashboard. The public Overview, Live Match, Decisions, and Performance routes use Samaritan's social language as their source of truth: warm paper, navy typography, an electric-blue signal path, large editorial statements, generous negative space, and progressive evidence disclosure. Live Match keeps its analytical depth through the synchronized Probability Field and Decision Rail; Decisions presents the full 18-observation corpus as an ordered journal with one explicitly marked three-state exemplar; Performance separates registered forward evidence, sealed results, historical research, and synthetic proof. Proof retains specialized composition until migrated.
 
 The two layers remain one product. Overview establishes the match, market, signal, decision, and trust hierarchy in seconds; deeper routes expose the complete Decision Rail, replay identity, provenance, study state, and deterministic risk boundaries.
 
-The interface should feel composed, disciplined, football-native, and evidence-led. It must not resemble a casino, crypto exchange, generic admin template, or faux command center. Overview, Live Match, and Decisions may use oversized editorial typography and a warm grid canvas, but never decorative data claims, fake live activity, photographic spectacle, or market theatrics.
+The interface should feel composed, disciplined, football-native, and evidence-led. It must not resemble a casino, crypto exchange, generic admin template, or faux command center. Overview, Live Match, Decisions, and Performance may use oversized editorial typography and a warm grid canvas, but never decorative data claims, fake live activity, photographic spectacle, or market theatrics.
 
 ### Color tokens
 
@@ -534,13 +534,13 @@ Golden demo flow:
 
 The v1 and v2 comparison checkpoints remain in the private, gitignored `design/` workspace and are intentionally excluded from the public repository. Their approved dark-hybrid direction is implemented in the production dashboard; this public document does not link to unavailable private assets.
 
-The editorial light Overview, Live Match, and Decisions now share the production shell. Performance and Proof retain their darker analytical treatment until they are deliberately migrated to the same editorial system; semantic-state and information-boundary parity are mandatory throughout that migration.
+The editorial light Overview, Live Match, Decisions, and Performance now share the production shell. Proof retains its darker analytical treatment until it is deliberately migrated to the same editorial system; semantic-state and information-boundary parity are mandatory throughout that migration.
 
 Both checkpoints use the verified Spain-Belgium capture and deliberately end in `NO TRADE`: the live-lane study found that Polymarket moved before TXLine and produced no clean stale-quote window. They are design prototypes, not production frontend code.
 
 ### Production implementation status
 
-The five primary observer routes are implemented in [`apps/dashboard/`](../apps/dashboard/) and served by the read-only projection layer in [`src/dash/`](../src/dash/). Command, Matchroom, and Casebook use the approved warm editorial shell. Matchroom renders one deterministic exemplar from the verified Spain-Belgium replay, Command derives the operating posture and capture schedule, Casebook projects all 18 reported goal×market feasibility observations from that replay, Study separates registered v2 from preserved v1 audit history, and Proof verifies the synthetic receipt's portable commitments without claiming an external anchor.
+The five primary observer routes are implemented in [`apps/dashboard/`](../apps/dashboard/) and served by the read-only projection layer in [`src/dash/`](../src/dash/). Command, Matchroom, Casebook, and Study use the approved warm editorial shell. Matchroom renders one deterministic exemplar from the verified Spain-Belgium replay, Command derives the operating posture and capture schedule, Casebook projects all 18 reported goal×market feasibility observations from that replay, Study separates registered v2 from preserved v1 audit history, and Proof verifies the synthetic receipt's portable commitments without claiming an external anchor.
 
 Implemented in this slice:
 
