@@ -27,7 +27,9 @@ export default defineConfig({
   publicDir: fileURLToPath(new URL("../../public", import.meta.url)),
   plugins: [react(), dashboardApi()],
   build: {
-    outDir: "dist",
+    // Sites binds static assets from the conventional dist/client directory;
+    // dist/server/index.js is the Worker entry point packaged alongside it.
+    outDir: "dist/client",
     emptyOutDir: true
   },
   server: {

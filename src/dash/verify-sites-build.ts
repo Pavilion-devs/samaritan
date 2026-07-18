@@ -7,6 +7,7 @@ import { verifyPublicEdgeBundle } from "./edge-bundle.js";
 const repoRoot = resolve(fileURLToPath(new URL("../..", import.meta.url)));
 const dashboardRoot = resolve(repoRoot, "apps/dashboard");
 const distRoot = resolve(dashboardRoot, "dist");
+const clientRoot = resolve(distRoot, "client");
 const workerPath = resolve(distRoot, "server/index.js");
 
 type WorkerEnv = {
@@ -49,8 +50,8 @@ class LocalAssetBinding {
       return new Response("Not found", { status: 404 });
     }
     const relative = decoded === "/" ? "index.html" : decoded.replace(/^\/+/, "");
-    const candidate = resolve(distRoot, relative);
-    if (candidate !== distRoot && !candidate.startsWith(`${distRoot}${sep}`)) {
+    const candidate = resolve(clientRoot, relative);
+    if (candidate !== clientRoot && !candidate.startsWith(`${clientRoot}${sep}`)) {
       return new Response("Not found", { status: 404 });
     }
     try {
@@ -74,14 +75,14 @@ class LocalAssetBinding {
 async function verifyLayout(): Promise<void> {
   for (const path of [
     workerPath,
-    resolve(distRoot, "index.html"),
-    resolve(distRoot, "artifacts/dashboard/manifest.json"),
-    resolve(distRoot, "artifacts/edge/manifest.json"),
-    resolve(distRoot, "artifacts/edge/judge-evidence.json")
+    resolve(clientRoot, "index.html"),
+    resolve(clientRoot, "artifacts/dashboard/manifest.json"),
+    resolve(clientRoot, "artifacts/edge/manifest.json"),
+    resolve(clientRoot, "artifacts/edge/judge-evidence.json")
   ]) {
     assert((await stat(path)).isFile(), `Sites build is missing ${path.slice(distRoot.length + 1)}`);
   }
-  const assets = await readdir(resolve(distRoot, "assets"));
+  const assets = await readdir(resolve(clientRoot, "assets"));
   assert(assets.some((name) => name.endsWith(".js")), "Sites build has no browser JavaScript asset");
   assert(assets.some((name) => name.endsWith(".css")), "Sites build has no browser stylesheet asset");
   const workerSource = await readFile(workerPath, "utf8");
@@ -104,7 +105,7 @@ async function verifyRuntime(): Promise<void> {
       get.headers.get("x-samaritan-edge-bundle") === verified.manifest.edgeBundleSha256,
       `Sites Worker edge commitment changed for ${route.apiPath}`
     );
-    const expected = await readFile(resolve(distRoot, route.assetPath.replace(/^\/+/, "")), "utf8");
+    const expected = await readFile(resolve(clientRoot, route.assetPath.replace(/^\/+/, "")), "utf8");
     assert(await get.text() === expected, `Sites Worker body changed for ${route.apiPath}`);
 
     const head = await workerModule.default.fetch(new Request(`https://samaritan.test${route.apiPath}`, {
