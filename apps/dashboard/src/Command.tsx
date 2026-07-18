@@ -1,12 +1,7 @@
-import { startTransition, useEffect, useState } from "react";
-import type {
-  CommandFixture,
-  CommandSnapshot,
-  PublicBookPoint
-} from "../../../src/dash/public-contract";
+import { startTransition, useEffect, useMemo, useState } from "react";
+import type { CommandFixture, CommandSnapshot } from "../../../src/dash/public-contract";
 import { loadCommand, loadTxlinePulse, type TxlinePulse } from "./api";
-import { frozenCaptureWindowLabel } from "./command-schedule";
-import { BrandMark, Icon, MobileNavigation, Navigation, ProvenanceBadge, Topbar } from "./Shell";
+import { BrandMark, Icon } from "./Shell";
 
 function percent(value: number, digits = 2) {
   return `${(value * 100).toFixed(digits)}%`;
@@ -20,69 +15,53 @@ function compactHash(value: string) {
   return `${value.slice(0, 10)}…${value.slice(-7)}`;
 }
 
-function dateParts(value: string) {
-  const date = new Date(value);
-  return {
-    day: new Intl.DateTimeFormat("en-GB", { day: "2-digit", timeZone: "UTC" }).format(date),
-    month: new Intl.DateTimeFormat("en-GB", { month: "short", timeZone: "UTC" }).format(date).toUpperCase(),
-    time: new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "UTC" }).format(date)
-  };
+function utcTime(value: string) {
+  return `${new Intl.DateTimeFormat("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: "UTC"
+  }).format(new Date(value))} UTC`;
 }
 
-function MiniProbabilityChart({ featured }: { featured: CommandSnapshot["featuredCase"] }) {
-  const points: PublicBookPoint[] = featured.chart;
-  const frame = { left: 28, right: 624, top: 24, bottom: 194 };
-  const minimumOffset = Math.min(...points.map((point) => point.offsetMs));
-  const maximumOffset = Math.max(...points.map((point) => point.offsetMs));
-  const goalPoint = points.find((point) => point.offsetMs === 0);
-  if (!goalPoint || minimumOffset === maximumOffset) {
-    throw new Error("Featured capture chart is missing its trigger-aligned evidence window");
+function chooseFocusFixture(fixtures: CommandFixture[], nowMs: number) {
+  const eligible = fixtures
+    .filter((fixture) => fixture.identityStatus === "exact_match_confirmed" && fixture.phase !== "failed")
+    .sort((left, right) => Date.parse(left.captureStartUtc) - Date.parse(right.captureStartUtc));
+  return eligible.find((fixture) => nowMs >= Date.parse(fixture.captureStartUtc) && nowMs <= Date.parse(fixture.captureEndUtc))
+    ?? eligible.find((fixture) => Date.parse(fixture.captureStartUtc) > nowMs)
+    ?? eligible.at(-1)
+    ?? fixtures[0];
+}
+
+function fixturePosture(fixture: CommandFixture, nowMs: number) {
+  if (nowMs >= Date.parse(fixture.captureStartUtc) && nowMs <= Date.parse(fixture.captureEndUtc)) {
+    return "Capture window active";
   }
-  const x = (offset: number) => frame.left + ((offset - minimumOffset) / (maximumOffset - minimumOffset)) * (frame.right - frame.left);
-  const y = (probability: number) => frame.top + ((0.3 - probability) / 0.15) * (frame.bottom - frame.top);
-  const path = (value: (point: PublicBookPoint) => number) => points.map((point, index) => `${index === 0 ? "M" : "L"}${x(point.offsetMs).toFixed(1)} ${y(value(point)).toFixed(1)}`).join(" ");
-  const bid = path((point) => point.bestBid);
-  const ask = path((point) => point.bestAsk);
-  const bidReverse = [...points].reverse().map((point) => `L${x(point.offsetMs).toFixed(1)} ${y(point.bestBid).toFixed(1)}`).join(" ");
-  const goalX = x(0);
+  if (nowMs < Date.parse(fixture.captureStartUtc)) return "Capture window scheduled";
+  return "Frozen capture window";
+}
+
+function EditorialHeader() {
   return (
-    <figure className="command-chart">
-      <div className="command-chart-head"><span>Public executable book</span><span><i className="chart-bid-dot" />Best bid <i className="chart-ask-dot" />Best ask</span></div>
-      <svg viewBox="0 0 652 226" role="img" aria-labelledby="command-chart-title command-chart-desc">
-        <title id="command-chart-title">{featured.home.name}–{featured.away.name} public {featured.marketOutcomeLabel} book around the first goal</title>
-        <desc id="command-chart-desc">The public executable bid and ask repriced before the goal reached Samaritan. Exact TXLine probability levels are withheld.</desc>
-        <defs><linearGradient id="command-spread" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#9183e5" stopOpacity=".26" /><stop offset="1" stopColor="#9183e5" stopOpacity=".015" /></linearGradient></defs>
-        <g className="command-chart-grid"><line x1="28" x2="624" y1="58" y2="58" /><line x1="28" x2="624" y1="126" y2="126" /><line x1="28" x2="624" y1="194" y2="194" /></g>
-        <path className="command-spread-area" d={`${ask} ${bidReverse} Z`} />
-        <path className="command-bid-line" d={bid} />
-        <path className="command-ask-line" d={ask} />
-        <g className="command-goal"><line x1={goalX} x2={goalX} y1="18" y2="194" /><circle cx={goalX} cy={y(goalPoint.bestAsk)} r="5" /><text x={goalX + 9} y="35">GOAL FIRST SEEN</text></g>
-        <g className="command-chart-axis"><text x="28" y="216">T−5s</text><text x={goalX} y="216" textAnchor="middle">{featured.clockLabel}</text><text x="624" y="216" textAnchor="end">T+30s</text></g>
-      </svg>
-    </figure>
+    <header className="editorial-nav">
+      <a className="editorial-brand" href="/command" aria-label="Samaritan overview">
+        <BrandMark />
+        <span>Samaritan</span>
+      </a>
+      <nav className="editorial-links" aria-label="Product navigation">
+        <a className="active" href="/command" aria-current="page">Overview</a>
+        <a href="/matchroom">Live match</a>
+        <a href="/casebook">Decisions</a>
+        <a href="/study">Performance</a>
+        <a href="/proof">Proof</a>
+      </nav>
+      <div className="editorial-observer-state"><i aria-hidden="true" /><span>Observer mode · no real orders</span></div>
+    </header>
   );
 }
 
-function SystemDeck({ snapshot }: { snapshot: CommandSnapshot }) {
-  return (
-    <section className="command-system-deck" id="system" aria-labelledby="system-deck-title">
-      <div className="system-posture">
-        <span className="posture-icon"><Icon name="pulse" /></span>
-        <span><small>Snapshot posture</small><b id="system-deck-title">{snapshot.system.label}</b><em>{snapshot.system.detail}</em></span>
-      </div>
-      <div className="feed-deck">
-        {snapshot.system.feeds.map((feed) => (
-          <div className={`feed-state ${feed.status}`} key={feed.id}>
-            <span><i />{feed.statusLabel}</span><b>{feed.label}</b><small>{feed.detail}</small>
-          </div>
-        ))}
-      </div>
-      <div className="deck-time"><small>Offline snapshot</small><time dateTime={snapshot.generatedAt}>{new Date(snapshot.generatedAt).toISOString().slice(11, 16)} UTC</time><span>Generated artifact · read only</span></div>
-    </section>
-  );
-}
-
-function LiveTxlinePulse() {
+function useLivePulse() {
   const [pulse, setPulse] = useState<TxlinePulse | null>(null);
   const [failed, setFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
@@ -103,169 +82,176 @@ function LiveTxlinePulse() {
     };
   }, [attempt]);
 
-  const connected = pulse?.status === "connected" && !failed;
-  const status = failed ? "degraded" : pulse?.status ?? "checking";
-  const freshness = failed ? "unknown" : pulse?.freshnessClass ?? "unknown";
-  const checkedAt = pulse?.checkedAt;
+  return { pulse, failed, refresh: () => setAttempt((value) => value + 1) };
+}
+
+function SignalPath() {
   return (
-    <section className={`command-live-pulse ${connected ? "connected" : "degraded"}`} aria-labelledby="live-pulse-title">
-      <header>
-        <span><i /><b id="live-pulse-title">LIVE DERIVED METADATA · NOT STUDY EVIDENCE</b></span>
-        <em>{status}</em>
-      </header>
-      <div className="command-live-pulse-grid">
-        <div className="pulse-identity"><span><Icon name="pulse" /></span><span><small>Official server-side check</small><b>TXLine mainnet · SL12</b><em>{connected ? "Fixture snapshot reached through the credential boundary." : "Connectivity is unavailable or degraded; no feed state is inferred."}</em></span></div>
-        <div><small>Latency bucket</small><b>{pulse?.latencyMsRounded === null || pulse === null ? "—" : `≤ ${pulse.latencyMsRounded} ms`}</b></div>
-        <div><small>Aggregate fixtures</small><b>{pulse?.aggregateFixtureCount ?? "—"}</b></div>
-        <div><small>Response freshness</small><b>{freshness}</b></div>
-        <div><small>Checked</small><b>{checkedAt ? `${checkedAt.slice(11, 19)} UTC` : "Waiting"}</b></div>
-      </div>
-      <footer><Icon name="lock" /><span><b>Connectivity metadata only.</b> No fixture identity, kickoff, raw row, odds, probability, or v2 observation is exposed or admitted.</span><button type="button" onClick={() => setAttempt((value) => value + 1)}>Refresh</button></footer>
-    </section>
+    <figure className="editorial-signal-path" aria-labelledby="editorial-path-title editorial-path-description">
+      <figcaption>
+        <span>Derived signal path</span>
+        <b>no active edge</b>
+      </figcaption>
+      <svg viewBox="0 0 520 420" role="img">
+        <title id="editorial-path-title">Match-to-market signal path</title>
+        <desc id="editorial-path-description">An illustrative probability path reaches the watched match. No eligible trading signal is active.</desc>
+        <line className="editorial-path-axis" x1="402" y1="38" x2="402" y2="382" />
+        <path className="editorial-path-glow" d="M10 338 C108 340 158 320 220 270 C277 224 326 246 383 187 C424 144 456 109 492 64" />
+        <path className="editorial-path-line" d="M10 338 C108 340 158 320 220 270 C277 224 326 246 383 187 C424 144 456 109 492 64" />
+        <path className="editorial-path-future" d="M405 185 C450 158 486 166 510 218" />
+        <circle className="editorial-path-point" cx="220" cy="270" r="8" />
+        <circle className="editorial-ball-shell" cx="402" cy="183" r="49" />
+        <polygon className="editorial-ball-mark" points="402,160 417,171 411,189 393,189 387,171" />
+        <path className="editorial-ball-seams" d="M402 160 L398 142 M417 171 L438 166 M411 189 L423 207 M393 189 L380 207 M387 171 L366 165 M398 142 L381 133 M398 142 L420 134 M438 166 L443 187 M423 207 L402 220 M380 207 L361 190 M366 165 L381 133" />
+      </svg>
+      <div className="editorial-gate-note"><Icon name="shield" /><span>Risk gate closed</span></div>
+    </figure>
   );
 }
 
-function FeaturedCase({ snapshot }: { snapshot: CommandSnapshot }) {
-  const featured = snapshot.featuredCase;
-  const minutes = Math.floor(featured.clockSeconds / 60);
-  const seconds = featured.clockSeconds % 60;
-  const orderLabel = featured.ordersPlaced === 0 ? "Execution runtime not entered" : `${featured.ordersPlaced} orders placed`;
+function DecisionPath({ fixture }: { fixture: CommandFixture }) {
+  const steps = [
+    { icon: "replay" as const, label: "Match", value: `${fixture.home.name} vs ${fixture.away.name}` },
+    { icon: "chart" as const, label: "Market", value: "Paired observation" },
+    { icon: "spark" as const, label: "Signal", value: "Awaiting eligible edge" },
+    { icon: "shield" as const, label: "Decision", value: "No action" }
+  ];
   return (
-    <section className="command-feature surface reveal r1" aria-labelledby="featured-title">
-      <div className="feature-copy">
-        <div className="feature-eyebrow"><ProvenanceBadge tone="capture" label="Real capture · retrospective" /><em>Case {featured.caseId}</em></div>
-        <div className="feature-scoreline" aria-label={`${featured.home.name} ${featured.scoreAtCursor.home}, ${featured.away.name} ${featured.scoreAtCursor.away} at ${minutes} minutes ${seconds} seconds`}>
-          <span className="feature-team"><i className={`command-crest ${featured.home.code.toLowerCase()}`}>{featured.home.code}</i><b>{featured.home.name}</b></span>
-          <span className="feature-score"><small>{featured.clockLabel}</small><strong>{featured.scoreLabel}</strong><em>first goal seen</em></span>
-          <span className="feature-team away"><b>{featured.away.name}</b><i className={`command-crest ${featured.away.code.toLowerCase()}`}>{featured.away.code}</i></span>
+    <section className="editorial-decision-path" aria-label="Samaritan decision path">
+      {steps.map((step) => (
+        <div className="editorial-path-step" key={step.label}>
+          <span className="editorial-step-icon"><Icon name={step.icon} /></span>
+          <span><b>{step.label}</b><small>{step.value}</small></span>
         </div>
-        <span className="feature-kicker">Retrospective opportunity review</span>
-        <h2 id="featured-title">The market had already moved.</h2>
-        <p>{featured.conclusion}</p>
-        <div className="feature-metrics">
-          <div><span>TXLine movement</span><b>{movementBps(featured.consensusMoveFromBaselineBps)}</b><small>25-bps bucket · level withheld</small></div>
-          <div><span>Executable ask</span><b>{percent(featured.bestAsk)}</b></div>
-          <div className="gap"><span>Pre-trigger market move</span><b>{movementBps(featured.preTriggerMarketMoveBps)}</b></div>
-        </div>
-        <div className="feature-verdict"><span><Icon name="shield" /></span><span><small>Retrospective feasibility verdict</small><b>{orderLabel} · research only</b></span></div>
-        <a className="command-primary-action" href="/matchroom"><Icon name="play" /><span>Open captured case replay</span><Icon name="arrow" /></a>
-      </div>
-      <div className="feature-visual">
-        <MiniProbabilityChart featured={featured} />
-        <div className="chart-conclusion"><span>Market repriced first</span><b>{movementBps(featured.preTriggerMarketMoveBps)}</b><small>public {featured.marketOutcomeLabel} book move before TXLine first seen</small></div>
-      </div>
-    </section>
-  );
-}
-
-function FixtureCard({ fixture, browserNowMs, lead }: { fixture: CommandFixture; browserNowMs: number; lead: boolean }) {
-  const kickoff = dateParts(fixture.kickoffUtc);
-  const capture = dateParts(fixture.captureStartUtc);
-  return (
-    <article className={`fixture-card ${fixture.phase} ${lead ? "lead" : ""}`}>
-      <div className="fixture-date"><b>{kickoff.day}</b><span>{kickoff.month}</span></div>
-      <div className="fixture-card-main">
-        <div className="fixture-status"><span><i />At export: {fixture.statusLabel}</span><em>{frozenCaptureWindowLabel(fixture.captureStartUtc, fixture.captureEndUtc, browserNowMs)}</em></div>
-        <div className="fixture-versus"><span><i className={`mini-crest ${fixture.home.code.toLowerCase()}`}>{fixture.home.code}</i><b>{fixture.home.name}</b></span><em>vs</em><span><b>{fixture.away.name}</b><i className={`mini-crest ${fixture.away.code.toLowerCase()}`}>{fixture.away.code}</i></span></div>
-        <div className="fixture-times"><span><small>Capture begins</small><b>{capture.time} UTC</b></span><span><small>Kickoff</small><b>{kickoff.time} UTC</b></span></div>
-        <div className="fixture-boundary"><Icon name="lock" /><span><b>Capture only</b><small>{fixture.identityStatus === "exact_match_confirmed" ? "Identity confirmed at export" : "Historical config reviewed at export"} · non-tradeable</small></span></div>
-      </div>
-    </article>
-  );
-}
-
-function CaptureSchedule({ snapshot }: { snapshot: CommandSnapshot }) {
-  const [browserNowMs, setBrowserNowMs] = useState(() => Date.now());
-  useEffect(() => {
-    const refresh = window.setInterval(() => setBrowserNowMs(Date.now()), 60_000);
-    return () => window.clearInterval(refresh);
-  }, []);
-  return (
-    <aside className="capture-schedule surface reveal r2" aria-labelledby="capture-title">
-      <header className="command-panel-head"><div><span>Fixture watch</span><h2 id="capture-title">Capture schedule</h2></div><ProvenanceBadge tone="configured" label={`Frozen export · ${snapshot.fixtureSchedule.length} configured`} /></header>
-      <p className="schedule-intro">Frozen at export {new Date(snapshot.generatedAt).toISOString()}. Browser-clock timing describes configured windows, not live recorder state.</p>
-      <div className="fixture-stack">
-        {snapshot.fixtureSchedule.map((fixture, index) => <FixtureCard key={fixture.captureId} fixture={fixture} browserNowMs={browserNowMs} lead={index === 0} />)}
-      </div>
-      <div className="schedule-rule"><Icon name="shield" /><span><b>Admission stays fail-closed</b><small>Capture does not authorize a trade. Replay and paper-study gates still apply.</small></span></div>
-    </aside>
-  );
-}
-
-function RecentCases({ snapshot }: { snapshot: CommandSnapshot }) {
-  return (
-    <section className="command-cases surface reveal r3" aria-labelledby="cases-title">
-      <header className="command-panel-head"><div><span>Captured case record</span><h2 id="cases-title">Replay-checked captured cases</h2></div><a href="/casebook">Open Casebook <Icon name="arrow" /></a></header>
-      <div className="case-table-head"><span>Case</span><span>Market read</span><span>Evidence</span><span>Outcome</span></div>
-      {snapshot.recentCases.map((item) => (
-        <a className="command-case-row" href="/casebook" key={item.caseId}>
-          <span className="case-identity"><i>{item.home.code}</i><span><b>{item.fixtureLabel}</b><small>{item.caseId} · retrospective feasibility</small></span></span>
-          <span className="case-market"><b>{item.marketLabel}</b><small>{movementBps(item.preTriggerMarketMoveBps)} before signal</small></span>
-          <span className="case-evidence"><i /><span><b>Real capture · retrospective</b><small>{item.canonicalEvents.toLocaleString("en-US")} events</small></span></span>
-          <span className="case-outcome"><b>{item.dispositionLabel}</b><small>{item.reason}</small><Icon name="arrow" /></span>
-        </a>
       ))}
-      <div className="case-empty"><span><Icon name="clock" /></span><span><b>{snapshot.additionalCaseState.label}</b><small>{snapshot.additionalCaseState.detail}</small></span></div>
     </section>
   );
 }
 
-function StudyPanel({ snapshot }: { snapshot: CommandSnapshot }) {
-  const study = snapshot.study;
-  const counts = study.qualifyingCounts;
-  const observationCopy = counts.signals === 0
-    ? "Zero fresh observations qualify."
-    : `${counts.signals} fresh signal${counts.signals === 1 ? " qualifies" : "s qualify"} from the registered v2 ledger.`;
+function FeaturedDecision({ snapshot }: { snapshot: CommandSnapshot }) {
+  const [evidenceOpen, setEvidenceOpen] = useState(false);
+  const featured = snapshot.featuredCase;
   return (
-    <section className="command-study surface reveal r4" id="study" aria-labelledby="study-title">
-      <header className="command-panel-head"><div><span>Evidence governance</span><h2 id="study-title">Paper protocol audit</h2></div><span className="sealed-label"><Icon name="lock" />{study.statusLabel}</span></header>
-      <div className="study-message"><span className="study-lock"><Icon name="shield" /></span><span><b>V2 is registered for forward paper only.</b><small>{observationCopy} Invalidated v1 remains separate audit history; the real-money gate is closed.</small></span></div>
-      <div className="study-progress">
-        <div><span><b>{counts.filledMatches}</b> / {study.requiredFilledMatches}</span><small>fresh filled matches</small><i><em style={{ width: `${Math.min(100, counts.filledMatches / study.requiredFilledMatches * 100)}%` }} /></i></div>
-        <div><span><b>{counts.fills}</b> / {study.requiredFills}</span><small>fresh fills</small><i><em style={{ width: `${Math.min(100, counts.fills / study.requiredFills * 100)}%` }} /></i></div>
+    <section className="editorial-feature" aria-labelledby="editorial-feature-title">
+      <div className="editorial-feature-heading">
+        <span>Featured decision · {featured.home.name} {featured.scoreAtCursor.home}–{featured.scoreAtCursor.away} {featured.away.name} · {featured.clockLabel}</span>
+        <em><Icon name="check" /> Correct decline</em>
       </div>
-      <div className="study-meta"><span><small>Protocol status</small><b>Active forward paper</b></span><span><small>Config hash</small><code title={study.configHash}>{compactHash(study.configHash)}</code></span></div>
+      <h2 id="editorial-feature-title">The market had already moved. Samaritan stood down.</h2>
+      <p>The candidate arrived after the public executable book repriced. Samaritan preserved the observation and kept the execution runtime closed.</p>
+      <div className="editorial-feature-metrics">
+        <span><small>Market moved first</small><b>{movementBps(featured.preTriggerMarketMoveBps)}</b></span>
+        <span><small>Executable ask</small><b>{percent(featured.bestAsk)}</b></span>
+        <span><small>Orders placed</small><b>{featured.ordersPlaced}</b></span>
+      </div>
+      <div className="editorial-feature-actions">
+        <button type="button" onClick={() => setEvidenceOpen((open) => !open)} aria-expanded={evidenceOpen} aria-controls="editorial-evidence">
+          {evidenceOpen ? "Hide the evidence" : "View the evidence"}
+        </button>
+        <a href="/casebook">Open decisions <Icon name="arrow" /></a>
+      </div>
+      <div className={`editorial-evidence ${evidenceOpen ? "open" : ""}`} id="editorial-evidence">
+        <h3>Decision trail</h3>
+        <div className="editorial-evidence-table" role="region" aria-label="Featured decision evidence" tabIndex={0}>
+          <table>
+            <thead><tr><th>Stage</th><th>Observation</th><th>Result</th></tr></thead>
+            <tbody>
+              <tr><td>Candidate</td><td>TXLine movement entered the disclosed 25-bps bucket</td><td>Recorded</td></tr>
+              <tr><td>Market check</td><td>Public {featured.marketOutcomeLabel} book had moved {movementBps(featured.preTriggerMarketMoveBps)}</td><td>Too late</td></tr>
+              <tr><td>Runtime boundary</td><td>{featured.conclusion}</td><td>No trade</td></tr>
+              <tr><td>Replay</td><td>{featured.canonicalEvents.toLocaleString("en-US")} canonical events</td><td>Verified</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </section>
   );
 }
 
-function CommandProof({ snapshot }: { snapshot: CommandSnapshot }) {
-  const validLedgerChains = [snapshot.proof.bountyLedgerValid, snapshot.proof.longRunLedgerValid].filter(Boolean).length;
+function QuietProof({ snapshot }: { snapshot: CommandSnapshot }) {
+  const ledgerValid = snapshot.proof.bountyLedgerValid && snapshot.proof.longRunLedgerValid;
   return (
-    <aside className="command-proof surface reveal r5" id="proof" aria-labelledby="command-proof-title">
-      <header className="command-panel-head"><div><span>Integrity spine</span><h2 id="command-proof-title">Offline integrity checks</h2></div><ProvenanceBadge tone="offline" label="Local replay check" /></header>
-      <div className="command-proof-hero"><span>{snapshot.proof.replayIdentityParity ? "PASS" : "FAIL"}</span><div><b>Replay identity parity</b><small>{snapshot.proof.replayIdentityParity ? "Deterministic replay matched twice" : "Local replay check failed"}</small></div></div>
-      <div className="command-proof-grid"><span><small>Canonical events</small><b>{snapshot.proof.canonicalEvents.toLocaleString("en-US")}</b></span><span><small>Evidence fixtures</small><b>{snapshot.proof.evidenceFixtures}</b></span><span><small>V2 study chains</small><b>{validLedgerChains} valid</b></span><span><small>Paired replays</small><b>{snapshot.proof.pairedBookReplays}</b></span></div>
-      <div className="command-hash"><span>Replay identity</span><code title={snapshot.proof.replayIdentityHash}>{compactHash(snapshot.proof.replayIdentityHash)}</code></div>
-      <div className="proof-policy"><Icon name="lock" /><span><b>Public observer boundary</b><small>Derived evidence only · no wallet or raw feed access</small></span></div>
+    <aside className="editorial-proof" aria-labelledby="editorial-proof-title">
+      <h3 id="editorial-proof-title">Trust, kept quiet.</h3>
+      <p>The proof is present without competing with the decision.</p>
+      <a href="/proof">
+        <i aria-hidden="true" />
+        <Icon name="replay" />
+        <span><b>Replay verified</b><small>{snapshot.proof.canonicalEvents.toLocaleString("en-US")} canonical events</small></span>
+      </a>
+      <a href="/proof">
+        <i aria-hidden="true" />
+        <Icon name="lock" />
+        <span><b>{ledgerValid ? "Ledger intact" : "Ledger check failed"}</b><small>Append-only decision trail</small></span>
+      </a>
+      <a href="/study">
+        <i aria-hidden="true" />
+        <Icon name="chart" />
+        <span><b>V2 study · {snapshot.study.qualifyingCounts.filledMatches}/{snapshot.study.requiredFilledMatches} matches</b><small>{snapshot.study.qualifyingCounts.fills}/{snapshot.study.requiredFills} qualifying fills</small></span>
+      </a>
+      <a href="/proof">
+        <i aria-hidden="true" />
+        <Icon name="shield" />
+        <span><b>Money gate closed</b><small>Observer build · read only</small></span>
+      </a>
+      <code title={snapshot.proof.replayIdentityHash}>Replay {compactHash(snapshot.proof.replayIdentityHash)}</code>
     </aside>
   );
 }
 
 function CommandView({ snapshot }: { snapshot: CommandSnapshot }) {
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  const { pulse, failed, refresh } = useLivePulse();
+  useEffect(() => {
+    const timer = window.setInterval(() => setNowMs(Date.now()), 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
+  const fixture = useMemo(() => chooseFocusFixture(snapshot.fixtureSchedule, nowMs), [snapshot.fixtureSchedule, nowMs]);
+  if (!fixture) throw new Error("Command snapshot has no displayable fixture");
+  const pulseConnected = !failed && pulse?.status === "connected";
+  const pulseCopy = pulseConnected
+    ? `TXLine mainnet · SL12${pulse.latencyMsRounded === null ? "" : ` · ≤ ${pulse.latencyMsRounded} ms`}`
+    : "Live pulse unavailable · frozen evidence remains available";
+
   return (
-    <div className="app-shell command-shell">
-      <Navigation active="command" caseCount={snapshot.recentCases.length} />
-      <main className="workspace" id="command">
-        <Topbar title="Command" modeLabel="Offline snapshot" modeClass="offline" />
-        <SystemDeck snapshot={snapshot} />
-        <div className="command-content">
-          <LiveTxlinePulse />
-          <div className="command-lead-grid"><FeaturedCase snapshot={snapshot} /><CaptureSchedule snapshot={snapshot} /></div>
-          <div className="command-evidence-grid"><RecentCases snapshot={snapshot} /><div className="command-side-stack"><StudyPanel snapshot={snapshot} /><CommandProof snapshot={snapshot} /></div></div>
-        </div>
-        <MobileNavigation active="command" />
-      </main>
+    <div className="editorial-command">
+      <div className="editorial-page">
+        <EditorialHeader />
+        <main>
+          <section className="editorial-hero" aria-labelledby="editorial-hero-title">
+            <div className="editorial-hero-copy">
+              <span className="editorial-capture-state"><i aria-hidden="true" />{fixturePosture(fixture, nowMs)}</span>
+              <h1 id="editorial-hero-title">Watching {fixture.home.name} vs {fixture.away.name}.</h1>
+              <p>Samaritan follows the match, measures the market, and acts only when the evidence survives every risk gate.</p>
+              <div className="editorial-watch-meta">
+                <span><Icon name="pulse" /></span>
+                <span><b>Kickoff · {utcTime(fixture.kickoffUtc)}</b><small>{pulseCopy} · exact event family confirmed</small></span>
+                <button type="button" onClick={refresh} aria-label="Refresh TXLine connectivity">Refresh</button>
+              </div>
+            </div>
+            <SignalPath />
+          </section>
+          <DecisionPath fixture={fixture} />
+          <div className="editorial-content-grid">
+            <FeaturedDecision snapshot={snapshot} />
+            <QuietProof snapshot={snapshot} />
+          </div>
+        </main>
+        <footer className="editorial-footer">
+          <span>Derived evidence only · no raw feed or wallet access</span>
+          <span>Deborah · participant and project owner</span>
+        </footer>
+      </div>
     </div>
   );
 }
 
 function CommandLoading() {
-  return <main className="load-screen"><BrandMark /><span className="load-kicker">Samaritan / Command</span><h1>Assembling the evidence desk</h1><div className="load-line"><i /></div><p>Revalidating configured fixtures, offline ledger state, and the captured replay before anything is shown.</p></main>;
+  return <main className="editorial-load"><BrandMark /><span>Samaritan / Overview</span><h1>Assembling the evidence view</h1><div><i /></div><p>Revalidating the frozen replay and public observer boundaries.</p></main>;
 }
 
 function CommandError({ retry }: { retry: () => void }) {
-  return <main className="load-screen error-screen"><span className="error-mark"><Icon name="shield" /></span><span className="load-kicker">Fail-closed boundary</span><h1>Command evidence unavailable</h1><p>A fixture or evidence identity could not be verified. Samaritan will not substitute stale or fabricated artifact state.</p><button type="button" onClick={retry}>Retry offline load</button></main>;
+  return <main className="editorial-load editorial-load-error"><span><Icon name="shield" /></span><small>Fail-closed boundary</small><h1>Overview evidence unavailable</h1><p>Samaritan will not substitute stale or fabricated artifact state.</p><button type="button" onClick={retry}>Retry evidence load</button></main>;
 }
 
 export function CommandApp() {

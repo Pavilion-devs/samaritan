@@ -1,6 +1,6 @@
 # Samaritan UI/UX Specification
 
-*Status: Matchroom v2 dark hybrid approved by Deborah as the binding production direction on July 13, 2026. V1 remains preserved as a comparison baseline. Production frontend implementation may proceed against this contract; real-money gates are unchanged.*
+*Status: Deborah approved the editorial Overview direction on July 18, 2026. It is the binding first-impression and navigation language for the public observer, while the evidence-dense analytical routes retain their specialized layouts. Real-money gates are unchanged.*
 
 > **July 18 governance status:** paper-study v1 is invalidated, suspended, and preserved only as zero-observation audit history. Deborah registered corrected v2 for forward paper observation only. The dashboard must show registration separately from evidence: v2 has no qualifying observation until a fresh fixture passes every admission gate, and the real-money gate remains closed.
 
@@ -69,13 +69,13 @@ The public navigation contains five destinations.
 
 | Destination | Job |
 |---|---|
-| **Command** | Answer "what is Samaritan watching and doing now?" |
-| **Matchroom** | Explain one fixture, its selected market, probability movement, and active decision lifecycle |
-| **Casebook** | Search and inspect every signal, escalation, veto, no-trade, fill, close, and settlement |
-| **Study** | Explain the invalidated v1 audit, corrected historical signal evidence, and the human gate before any v2 paper observations |
+| **Overview** | Answer "what is Samaritan watching and doing now?" |
+| **Live match** | Explain one fixture, its selected market, probability movement, and active decision lifecycle |
+| **Decisions** | Search and inspect every signal, escalation, veto, no-trade, fill, close, and settlement |
+| **Performance** | Explain the invalidated v1 audit, corrected historical signal evidence, and the human gate before any v2 paper observations |
 | **Proof** | Verify ledger hashes, replay identity, source references, validation records, and the exact Solana anchor status |
 
-There is no marketing-only landing page in v1. The root route opens **Command**, with a compact explainer integrated into the product.
+There is no marketing-only landing page in v1. The root route opens **Overview**, with the product explanation integrated into the current watch, decision path, featured case, and quiet proof rail.
 
 ## 5. Global shell
 
@@ -348,13 +348,13 @@ Required views:
 
 The bounty release is intentionally unanchored and displays `NOT SUBMITTED`; it must not show a placeholder or fake explorer link. A future separately authorized anchor may replace that state only after network verification succeeds.
 
-## 8. Visual direction: Live Intelligence
+## 8. Visual direction: Editorial Intelligence
 
-Live Intelligence is a polished sports-analytics product, not a trading terminal or editorial match report. Matchroom v2 uses approximately **70% SportsTensor spatial hierarchy** for composition, whitespace, chart organization, evidence tables, and modular rhythm, with approximately **30% Live Matches sporting energy** for the score-first masthead, dark operational character, lime active states, and compact match tension.
+Editorial Intelligence is a polished sports-market product, not a trading terminal, sportsbook, or generic admin dashboard. The public Overview uses Samaritan's social language as its source of truth: warm paper, navy typography, an electric-blue signal path, large editorial statements, generous negative space, and progressive evidence disclosure. Matchroom and the evidence routes retain denser analytical composition where the task requires it.
 
-Neither reference is reproduced directly. Samaritan's Decision Rail, replay identity, evidence provenance, paper state, and deterministic risk boundaries remain the product's signature.
+The two layers remain one product. Overview establishes the match, market, signal, decision, and trust hierarchy in seconds; deeper routes expose the complete Decision Rail, replay identity, provenance, study state, and deterministic risk boundaries.
 
-The interface should feel native to an elite match-analysis room: immediate score context, restrained market data, and a visible decision outcome. It must not resemble a casino, crypto exchange, generic admin template, or faux command center. There are no photographic hero sections, oversized editorial headlines, beige report canvases, glowing sci-fi grids, or decorative market theatrics.
+The interface should feel composed, disciplined, football-native, and evidence-led. It must not resemble a casino, crypto exchange, generic admin template, or faux command center. Overview may use oversized editorial typography and a warm grid canvas, but never decorative data claims, fake live activity, photographic spectacle, or market theatrics.
 
 ### Color tokens
 
@@ -534,7 +534,7 @@ Golden demo flow:
 
 The v1 and v2 comparison checkpoints remain in the private, gitignored `design/` workspace and are intentionally excluded from the public repository. Their approved dark-hybrid direction is implemented in the production dashboard; this public document does not link to unavailable private assets.
 
-The dark hybrid is the launch direction. Light mode is a deferred, non-blocking enhancement; the light style frame is its visual reference and must retain information-architecture and semantic-state parity when implemented.
+The editorial light Overview is the launch first impression. Evidence routes retain their darker analytical treatment until they are deliberately migrated to the same editorial system; semantic-state and information-boundary parity are mandatory throughout that migration.
 
 Both checkpoints use the verified Spain-Belgium capture and deliberately end in `NO TRADE`: the live-lane study found that Polymarket moved before TXLine and produced no clean stale-quote window. They are design prototypes, not production frontend code.
 
