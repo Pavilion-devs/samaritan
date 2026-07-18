@@ -59,14 +59,13 @@ Samaritan is designed as an auditable decision layer for professional trading te
 
 ## Required links
 
-Replace every placeholder only after testing it in a signed-out/incognito browser.
+The MVP links below passed signed-out desktop/mobile and API-method checks. Replace the remaining video placeholder only after public playback is watched end to end.
 
-- **Live and working MVP:** `[PUBLIC_MVP_URL]`
-- **Public judge-evidence endpoint:** `[PUBLIC_MVP_URL]/api/judge/evidence`
+- **Live and working MVP:** [samaritan-txline-2026.asaborodaniel.chatgpt.site](https://samaritan-txline-2026.asaborodaniel.chatgpt.site/)
+- **Public judge-evidence endpoint:** [samaritan-txline-2026.asaborodaniel.chatgpt.site/api/judge/evidence](https://samaritan-txline-2026.asaborodaniel.chatgpt.site/api/judge/evidence)
 - **Live demo video (≤5:00, publicly viewable):** `[YOUTUBE_OR_LOOM_URL]`
 - **Public repository:** [github.com/Pavilion-devs/samaritan](https://github.com/Pavilion-devs/samaritan)
 - **Technical documentation:** [Samaritan technical overview](https://github.com/Pavilion-devs/samaritan/blob/main/docs/submission/technical-overview.md)
-- **Optional X profile/post:** `[PUBLIC_X_URL_OR_REMOVE]`
 
 The bounty release intentionally includes no Solana explorer link because no decision-receipt anchor is submitted. If Deborah separately changes that scope later, add a link only after the public `anchor:verify` command passes against the exact receipt.
 

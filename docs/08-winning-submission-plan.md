@@ -12,7 +12,7 @@ It is a bounty-critical overlay on `plan.md`, not a replacement for the long-ter
 
 ## 0. July 18 winner-ready checkpoint
 
-The product is no longer an idea looking for a demo. The working tree has the core judge story implemented, while the exact public commit, hosted URL, and final media package remain release gates:
+The product is no longer an idea looking for a demo. The core judge story and public no-login deployment are implemented. The remaining release gates are the exact default-branch commit and CI result, the final video, sponsor clarification, and Deborah's human review and submission:
 
 | Surface | Current evidence | Status |
 |---|---|---|
@@ -22,22 +22,22 @@ The product is no longer an idea looking for a demo. The working tree has the co
 | Decision proof | The deterministic synthetic lifecycle produces a v2 ledger and offline-verifiable receipt; exact final hashes must be recorded only after the public commit and bundle are frozen | **Ready, local integrity only; final hashes pending freeze** |
 | Claude invocation evidence | Separate append-only hash chain verifies hash-only run metadata locally; a receipt may carry a generation-time reference, but its offline verifier does not independently prove membership | **Local audit only; no provider attestation and no active v2 run** |
 | Public evidence bundle | A strict allowlist of derived artifacts passes the public-data audit during development; exact file count and bundle hash must come from the final frozen export | **Ready for final public-commit audit** |
-| Dashboard | Command, Matchroom, Casebook, Study, and Proof build and serve read-only | **Ready locally; deployment and signed-out verification remain open** |
+| Dashboard | Command, Matchroom, Casebook, Study, and Proof are deployed read-only at the [public judge MVP](https://samaritan-txline-2026.asaborodaniel.chatgpt.site/) | **Deployed; signed-out desktop/mobile routes and API methods verified** |
 | Historical claim | Corrected causal/economic v4 reports 38 held-out normalized buys / 18 fixtures / `+132.7` bps after proxy / clustered interval `+14.3` to `+243.9` | **Signal research only; v2 registered July 18 for forward paper observation** |
 | External anchor | Offline devnet preparation and human-gated tooling exist; no signer, RPC submission, wallet action, or transaction is part of the bounty release | **Intentionally unanchored; no explorer claim** |
 | Capture expansion | France–Spain failed closed before kickoff. England–Argentina also failed closed after a watchdog-detected Polymarket stall and incomplete terminal manifests, so no semifinal paired capture is currently admissible | **No eligible semifinal paired capture; capture-only evidence remains blocked** |
 
-Development snapshots have passed root/dashboard typechecks, tests, the deterministic demo, receipt verification, the public-artifact audit, the production dashboard build, dependency gates, and isolated Phase 0 checks. The tree and evidence bundle changed afterward, so earlier test counts, file counts, and hashes are deliberately not release claims. A clean clone and GitHub CI run on the exact frozen public commit remain the authoritative release evidence.
+The release candidate has passed root/dashboard typechecks, tests, the deterministic demo, receipt verification, the public-artifact audit, the production dashboard build, dependency gates, isolated Phase 0 checks, and signed-out production-route checks. A clean clone and GitHub CI run on the final public commit remain the authoritative code-release evidence.
 
 The remaining path to submission is deliberately small and evidence-sensitive:
 
 1. Preserve both failed semifinal captures as fail-closed evidence; any later capture remains separate until every registered-study admission gate passes.
 2. Keep registered v2 on fresh versioned ledgers and admit nothing until exact evidence and mapping gates pass.
-3. Freeze the implemented judge-evidence manifest, Proof route, and derived-only TXLine pulse without publishing licensed rows or exact probabilities.
-4. Freeze an intentional public Git commit, run CI from that exact commit, merge it to the public default branch, and deploy the no-login dashboard.
-5. Deborah sends and retains the sponsor clarification, reviews every claim in her own words, narrates the sub-five-minute video, verifies the deployed URL incognito/mobile, and submits the entry herself.
+3. Preserve the frozen judge-evidence manifest, Proof route, and derived-only TXLine pulse without publishing licensed rows or exact probabilities.
+4. Freeze an intentional public Git commit, run CI from that exact commit, and merge it to the public default branch.
+5. Deborah sends and retains the sponsor clarification, reviews every claim in her own words, narrates and verifies the sub-five-minute video, and submits the entry herself.
 
-The current environment exposed no controllable browser target, so the final rendered/incognito visual pass is a real open gate—not a box to mark from build output.
+The deployed site has passed signed-out route, strict API-method, desktop, and mobile-width checks. The uploaded video still requires its own signed-out, end-to-end playback check.
 
 ### July 18 competitor delta
 
@@ -70,7 +70,7 @@ The bounty submission addresses the five published criteria directly:
 2. **Autonomous Operation:** one synthetic, explicitly performance-excluded case completes the conductor end to end with deterministic stubs; an authentic Claude lifecycle is not claimed without an admitted fixture.
 3. **Clean, deterministic, defensible logic/code:** code owns eligibility, paper risk, pre-action ledgering, execution, and failure handling.
 4. **Innovation/novelty:** an LLM can contribute bounded judgment without receiving authority over money, while refusals and invalidated research remain first-class evidence.
-5. **Production readiness:** a stranger can run the no-wallet judge path and independently verify disclosed decision ordering and paper results; the hosted no-login URL remains open until signed-out verification passes.
+5. **Production readiness:** a stranger can open the [no-wallet judge path](https://samaritan-txline-2026.asaborodaniel.chatgpt.site/), inspect its failure boundaries, and independently verify disclosed decision ordering and paper results.
 
 The submission will not depend on:
 
@@ -143,7 +143,7 @@ Samaritan is winner-ready only when all of the following are true:
 - [x] The decision hash authenticates the full canonical record, including event type and timestamps.
 - [x] The bounty release intentionally remains unanchored: no transaction or explorer link is claimed. Any later devnet submission would be a separate, explicitly authorized post-release action.
 - [x] An independent offline verifier validates the frozen receipt. Network-backed anchor verification remains conditional on an actually submitted transaction.
-- [ ] The deployed dashboard exposes only licence-safe derived data.
+- [x] The deployed dashboard exposes only the allowlisted, licence-safe derived bundle and seven-field aggregate connectivity pulse; its public-artifact audit passes.
 - [ ] Run the final claims audit across the README, dashboard, recorded video, and submission form on the exact public commit; no draft review substitutes for that gate.
 - [ ] Deborah can explain and defend the architecture, evidence, limitations, and major design decisions.
 - [ ] Sponsor clarification on human participation and public derived data is retained in writing.
@@ -535,7 +535,7 @@ Required routes:
 Actions:
 
 - [x] Replace offline-only projection assumptions with the frozen public bundle plus runtime API.
-- [x] Bind the service to a validated platform-provided interface/port configuration; deployment remains open.
+- [x] Bind the service to the validated platform interface and deploy the no-login [judge MVP](https://samaritan-txline-2026.asaborodaniel.chatgpt.site/).
 - [x] Correct detector and proof labels.
 - [x] Show zero-state, failure, veto, no-trade, and synthetic paper-fill states honestly and with persistent evidence-class labels.
 - [x] Surface model cost and execution latency in the captured case and downloadable receipt.
@@ -636,7 +636,7 @@ Exception: a frozen item may only be resumed before submission if all winner-rea
 - [x] Keep the bounty release intentionally unanchored; publish no explorer link or network-backed proof claim.
 - [x] Ship the independent offline receipt verifier.
 - [x] Freeze the licence-safe public artifact bundle.
-- [ ] Deploy the read-only dashboard.
+- [x] Deploy the read-only dashboard.
 - [x] Add CI and verify a clean-clone-shaped bundle without private data; rerun from the final public commit.
 
 **End-of-day gate:** a stranger can reproduce and verify the case without private access.
@@ -656,7 +656,7 @@ Exception: a frozen item may only be resumed before submission if all winner-rea
 - [ ] Run the final clean-clone test.
 - [ ] Run CI from the public branch.
 - [ ] Watch the uploaded video from beginning to end.
-- [ ] Test the deployed MVP incognito.
+- [x] Test the deployed MVP signed out across desktop/mobile routes and strict API methods.
 - [ ] Submit before the internal deadline.
 - [ ] Preserve a local copy of the exact submission text and URLs.
 
@@ -800,7 +800,7 @@ No Samaritan decision receipt is on-chain. TXLine access uses Solana-backed subs
 
 ### “Can I reproduce this?”
 
-Yes: use the public clean-clone command and verify the frozen receipt independently. The hosted no-wallet path may be named only after its public URL passes the final signed-out deployment gate.
+Yes: use the public clean-clone command, verify the frozen receipt independently, or open the signed-out [hosted no-wallet path](https://samaritan-txline-2026.asaborodaniel.chatgpt.site/).
 
 ### “What failed?”
 

@@ -124,7 +124,7 @@ The mandatory study before any real-money trading. Deliverable is a written repo
 - [ ] Optional post-bounty ledger anchoring: hash ledger segments → Solana memo transactions; the bounty release intentionally remains unanchored and has no explorer transaction
 - [ ] Merkle spot-validation of acted-on TXLine data remains unimplemented; validation endpoints are documented research, not a current receipt claim
 - [x] Dashboard judge surface implemented against the approved Matchroom v2 dark-hybrid direction in [`docs/UI.md`](docs/UI.md): Command, Matchroom, Decision Rail, Casebook, Study, and Proof; captured, historical, synthetic, paper, and unanchored states remain visibly separated. Light mode is deferred and non-blocking.
-- [ ] Hosted deployment: credentials server-side, judges get a URL, read-only
+- [x] Hosted deployment: credentials remain server-side; judges get a [public, read-only, no-login URL](https://samaritan-txline-2026.asaborodaniel.chatgpt.site/)
 
 **Exit criteria:** a stranger with a link can inspect captured evidence and the clearly separated synthetic lifecycle without credentials, a wallet, or private feed redistribution. Registration is visible but must not be confused with an observed real-Claude case.
 
