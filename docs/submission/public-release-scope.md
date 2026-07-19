@@ -10,13 +10,13 @@ In this document, **public artifacts** means the hosted UI/API responses, frozen
 
 ## Include in the public submission
 
-- Root product metadata and instructions: `AGENTS.md`, `README.md`, `plan.md`, `.nvmrc`, `package.json`, `pnpm-lock.yaml`, and `pnpm-workspace.yaml`.
+- Root product metadata and instructions: `AGENTS.md`, `ARCHITECTURE.md`, `README.md`, `plan.md`, `.nvmrc`, `package.json`, `pnpm-lock.yaml`, and `pnpm-workspace.yaml`.
 - CI: `.github/workflows/ci.yml`.
 - Product code: `src/`, including canonical ingestion contracts, replay, features, detectors, bounded agent harness, deterministic paper risk/execution, ledger, receipt, dashboard server, public audit, and devnet anchor tooling.
 - Judge UI: `apps/dashboard/` source and build configuration, excluding generated `dist/`.
 - Tests: `test/` and the Phase 0 deadline test under `phase0/test/`.
 - Licence-safe frozen proof: `public/artifacts/dashboard/` and the synthetic receipt fixture under `proof/fixtures/`.
-- Documentation: architecture, research methodology and limitations, invalidation record, submission package, proof contracts, and API feedback under `docs/`.
+- Documentation: the product banner under `docs/assets/`, architecture, research methodology and limitations, invalidation record, public technical overview and claims, proof contracts, API feedback, release scope, and third-party notices under `docs/`.
 - Capture-only configuration: reviewed JSON files under `config/captures/`; every public copy must remain `tradeable: false`.
 - Phase 0 source and examples needed to explain official TXLine integration, but never its local secrets, tokens, wallets, captured output, or logs.
 
@@ -28,8 +28,10 @@ The following are enforced by `.gitignore` and must remain absent from both Git 
 - `data/`, SQLite/DuckDB files, `samples/`, raw SSE frames, captured replay archives, logs, and PID files;
 - `content/` social-video projects and renders, which are not part of the judge runtime or final bounty video;
 - `design/` explorations and screenshots, some of which predate the derived-only public data contract;
+- `videos/` recording projects, source media, intermediate renders, and local demo-video working files;
+- superseded phase-status notes, capture schedules, recording scripts, sponsor correspondence drafts, and submission-form drafts listed explicitly in `.gitignore`;
 - one-off `.spain-belgium-verify*.ts` local verification helpers;
-- `node_modules/`, `dist/`, coverage output, OS metadata, and local collaboration notes.
+- `node_modules/`, package-manager caches, `dist/`, coverage output, logs, PID files, editor metadata, OS metadata, and local collaboration notes.
 
 The public artifact auditor is the second line of defence. It rejects raw/reconstructive TXLine field names, likely secrets, private filesystem paths, unsafe links, and oversized artifacts inside the frozen bundle.
 

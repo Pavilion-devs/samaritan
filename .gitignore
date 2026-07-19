@@ -5,6 +5,14 @@
 node_modules/
 dist/
 coverage/
+.pnpm-store/
+tmp/
+output/
+*.tsbuildinfo
+*.log
+*.pid
+.idea/
+.vscode/
 .DS_Store
 
 # Local collaboration/context notes; derived conclusions belong in docs/.
@@ -31,4 +39,19 @@ samples/
 # licence-safe judge artifacts live under apps/ and public/ respectively.
 content/
 design/
+videos/
 .spain-belgium-verify*.ts
+
+# Local research operations, recording scripts, and submission working drafts.
+# Canonical architecture, evidence, proof, and technical-overview documents stay
+# tracked; these files remain available locally but do not belong in the public
+# product repository.
+docs/08-winning-submission-plan.md
+docs/PHASE-*-STATUS.md
+docs/research/capture-readiness.md
+docs/research/*capture-schedule.md
+docs/research/paper-fixture-universe.md
+docs/research/paper-study-ledger-initialization.md
+docs/submission/demo-script*.md
+docs/submission/sponsor-clarification-request.md
+docs/submission/submission-form-draft.md
