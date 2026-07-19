@@ -225,7 +225,7 @@ async function verifyRuntime(): Promise<void> {
   }), env);
   assert(post.status === 405 && post.headers.get("allow") === "GET, HEAD", "Sites Worker accepted a mutating method");
 
-  for (const pathname of ["/command", "/study", "/proof", "/casebook", "/matchroom", "/architecture"]) {
+  for (const pathname of ["/command", "/study", "/proof", "/casebook", "/matchroom", "/architecture", "/docs"]) {
     const deepRoute = await workerModule.default.fetch(new Request(`https://samaritan.test${pathname}`), env);
     assert(deepRoute.status === 200, `Sites Worker SPA fallback failed for ${pathname}`);
     assert((await deepRoute.text()).includes("<div id=\"root\"></div>"), `Sites Worker did not return the SPA for ${pathname}`);

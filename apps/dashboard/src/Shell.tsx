@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-export type ProductRoute = "command" | "matchroom" | "casebook" | "study" | "proof" | "architecture";
+export type ProductRoute = "command" | "matchroom" | "casebook" | "study" | "proof" | "architecture" | "docs";
 
 export type IconName =
   | "arrow"
@@ -57,6 +57,7 @@ export function EditorialNavigation({ active, modeLabel }: { active: ProductRout
     { id: "casebook", href: "/casebook", label: "Decisions" },
     { id: "study", href: "/study", label: "Performance" },
     { id: "architecture", href: "/architecture", label: "Architecture" },
+    { id: "docs", href: "/docs", label: "Docs" },
     { id: "proof", href: "/proof", label: "Proof" }
   ];
 
