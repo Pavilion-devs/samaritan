@@ -9,6 +9,8 @@ type DocLink = {
   icon: IconName;
 };
 
+type DocsTheme = "light" | "dark";
+
 const docsNavigation: Array<{ label: string; links: DocLink[] }> = [
   {
     label: "Getting started",
@@ -16,6 +18,15 @@ const docsNavigation: Array<{ label: string; links: DocLink[] }> = [
       { id: "overview", label: "Overview", description: "What Samaritan is and the rule it is built around.", group: "Getting started", icon: "command" },
       { id: "how-it-works", label: "How it works", description: "The five-stage path from observation to proof.", group: "Getting started", icon: "arrow" },
       { id: "current-status", label: "Current system status", description: "Built, deployed, evidence, and roadmap boundaries.", group: "Getting started", icon: "pulse" }
+    ]
+  },
+  {
+    label: "Technical overview",
+    links: [
+      { id: "technical-overview", label: "Technical overview", description: "The deterministic system spine and its production boundaries.", group: "Technical overview", icon: "system" },
+      { id: "txline-integration", label: "TXLine integration", description: "The official endpoints used by Samaritan and their roles.", group: "Technical overview", icon: "pulse" },
+      { id: "judge-path", label: "Judge path", description: "Run the complete frozen observer and proof workflow locally.", group: "Technical overview", icon: "check" },
+      { id: "production-fit", label: "Production fit", description: "How the reusable harness extends beyond one competition.", group: "Technical overview", icon: "arrow" }
     ]
   },
   {
@@ -54,11 +65,19 @@ pnpm receipt:verify -- public/artifacts/dashboard/synthetic-decision-receipt.jso
 pnpm public:audit
 pnpm dash:build`;
 
+const judgeCommand = `corepack enable
+pnpm install --frozen-lockfile
+pnpm judge`;
+
+const proofCommand = `pnpm demo
+pnpm receipt:verify -- public/artifacts/dashboard/synthetic-decision-receipt.json
+pnpm public:audit`;
+
 function SearchIcon() {
   return <span className="docs-search-icon" aria-hidden="true" />;
 }
 
-function DocsHeader({ onMenu }: { onMenu: () => void }) {
+function DocsHeader({ onMenu, theme, onTheme }: { onMenu: () => void; theme: DocsTheme; onTheme: () => void }) {
   const [query, setQuery] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
   const results = useMemo(() => {
@@ -113,6 +132,16 @@ function DocsHeader({ onMenu }: { onMenu: () => void }) {
           </div>
         ) : null}
       </div>
+      <button
+        className="docs-theme-toggle"
+        type="button"
+        onClick={onTheme}
+        aria-label={`Switch to ${theme === "light" ? "dark" : "light"} mode`}
+        title={`Switch to ${theme === "light" ? "dark" : "light"} mode`}
+      >
+        <span className={`docs-theme-icon ${theme}`} aria-hidden="true"><i /><b /></span>
+        <em>{theme === "light" ? "Dark" : "Light"}</em>
+      </button>
       <nav className="docs-header-links" aria-label="Documentation shortcuts">
         <a href="/architecture">Architecture</a>
         <a href="/proof">Proof</a>
@@ -206,7 +235,7 @@ function DocsArticle() {
             <div><small>The one rule</small><b>Claude may judge. Deterministic code must authorize.</b><p>No model output can size an order, override a veto, access a wallet, or move money directly.</p></div>
           </aside>
           <div className="docs-start-grid">
-            <a href="#how-it-works"><span><Icon name="arrow" /></span><small>Orientation</small><b>Follow the decision path</b><p>See how an observation becomes a signal, thesis, gate, and receipt.</p></a>
+            <a href="#technical-overview"><span><Icon name="system" /></span><small>Technical overview</small><b>Read the system spine</b><p>See the exact source, judgment, risk, execution, and proof boundaries.</p></a>
             <a href="#evidence-classes"><span><Icon name="case" /></span><small>Evidence</small><b>Understand the proof lanes</b><p>Keep captured, historical, synthetic, and registered evidence separate.</p></a>
             <a href="#local-verification"><span><Icon name="proof" /></span><small>Verification</small><b>Reproduce the checks</b><p>Verify the disclosed synthetic receipt locally without a wallet.</p></a>
           </div>
@@ -240,6 +269,71 @@ function DocsArticle() {
               </tbody>
             </table>
           </div>
+        </section>
+
+        <section className="docs-section docs-anchor" id="technical-overview">
+          <SectionHeading eyebrow="Technical overview" title="A deterministic spine with one bounded judgment layer.">Samaritan ingests official market data, turns it into one canonical event stream, raises typed signals in code, invokes Claude only for eligible judgment, and keeps final risk, paper execution, and proof under deterministic control.</SectionHeading>
+          <div className="docs-technical-spine" aria-label="Samaritan technical system flow">
+            <article><span>01</span><Icon name="pulse" /><div><small>Official inputs</small><b>TXLine + Polymarket</b><p>Odds, scores, metadata, books, and resolutions enter through supported interfaces.</p></div></article>
+            <i><Icon name="arrow" /></i>
+            <article><span>02</span><Icon name="replay" /><div><small>Canonical path</small><b>Normalize + serialize</b><p>Live and captured replay produce the same typed event contract.</p></div></article>
+            <i><Icon name="arrow" /></i>
+            <article><span>03</span><Icon name="chart" /><div><small>Deterministic attention</small><b>Features + detectors</b><p>Probability-space features raise rare, structured candidate signals.</p></div></article>
+            <i><Icon name="arrow" /></i>
+            <article><span>04</span><Icon name="spark" /><div><small>Bounded judgment</small><b>Haiku → Opus thesis</b><p>Only eligible cases reach strict model contracts; no model can trade.</p></div></article>
+            <i><Icon name="arrow" /></i>
+            <article><span>05</span><Icon name="shield" /><div><small>Code-owned authority</small><b>Risk → paper → proof</b><p>Hard gates, depth-aware simulation, and the ledger complete the lifecycle.</p></div></article>
+          </div>
+          <div className="docs-technical-truths">
+            <article><small>High-frequency path</small><b>Deterministic TypeScript</b><p>The model never runs per tick and never becomes the source of a signal.</p></article>
+            <article><small>Model exit</small><b><code>submit_thesis</code> only</b><p>The analyst schema contains no stake, order, credential, or wallet field.</p></article>
+            <article><small>Execution class</small><b>Paper simulation only</b><p>Validated tick, fee, minimum-size, depth, and latency evidence are reapplied in code.</p></article>
+            <article><small>Evidence order</small><b>Ledger before action</b><p>Every signal, decision, intent, and result is appended in lifecycle order.</p></article>
+          </div>
+          <aside className="docs-note info"><Icon name="shield" /><div><b>Submission boundary</b><p>Samaritan is Deborah’s project and submission. Claude is a constrained product component—not the participant, submitter, or autonomous owner.</p></div></aside>
+        </section>
+
+        <section className="docs-section docs-anchor" id="txline-integration">
+          <SectionHeading eyebrow="Technical overview" title="TXLine integration">Samaritan uses official TXLine authentication, snapshot, historical, and SSE surfaces. Raw responses and reconstructive probability series never enter the public bundle.</SectionHeading>
+          <div className="docs-endpoint-table">
+            <div className="head"><span>Method</span><span>Endpoint</span><span>Purpose</span></div>
+            <div><code>POST</code><b>/auth/guest/start</b><span>Start the documented guest-authentication flow.</span></div>
+            <div><code>POST</code><b>/api/token/activate</b><span>Activate the wallet-backed subscription; the token remains server-side.</span></div>
+            <div><code>GET</code><b>/api/fixtures/snapshot</b><span>Discover exact fixture and kickoff identities.</span></div>
+            <div><code>GET</code><b>/api/odds/stream</b><span>Consume live odds SSE with gzip and resumable event identity.</span></div>
+            <div><code>GET</code><b>/api/scores/stream</b><span>Consume live score/action SSE on the same canonical bus.</span></div>
+            <div><code>GET</code><b>/api/odds/snapshot/:fixtureId</b><span>Reconstruct current odds state during reconnect and backfill.</span></div>
+            <div><code>GET</code><b>/api/scores/snapshot/:fixtureId</b><span>Reconstruct the current score state after a gap.</span></div>
+            <div><code>GET</code><b>/api/odds/updates/:day/:hour/:interval</b><span>Build the five-minute historical detector-research archive.</span></div>
+            <div><code>GET</code><b>/api/scores/updates/:day/:hour/:interval</b><span>Build the aligned historical score archive.</span></div>
+            <div><code>GET</code><b>/api/scores/historical/:fixtureId</b><span>Recover retained score/action sequences for replay context.</span></div>
+          </div>
+          <div className="docs-normalization-band">
+            <span><small>TXLine Pct</small><b>Divide by 100</b></span>
+            <span><small>Prices</small><b>Integer odds ×1,000</b></span>
+            <span><small>Empty transitions</small><b>Never normalized to zero</b></span>
+            <span><small>Public output</small><b>Derived, non-reconstructive</b></span>
+          </div>
+          <aside className="docs-note warning"><Icon name="pulse" /><div><b>The aggregate connectivity pulse is operational metadata only.</b><p>It is not a trading signal, v2 observation, raw-feed view, or uptime guarantee.</p></div></aside>
+        </section>
+
+        <section className="docs-section docs-anchor" id="judge-path">
+          <SectionHeading eyebrow="Technical overview" title="Run the judge path locally">The frozen observer requires Node 22 and pnpm 11, but no TXLine credential, Anthropic key, wallet, RPC write access, paid subscription, or private capture archive.</SectionHeading>
+          <div className="docs-command-pair">
+            <div><h3>Start the verified observer</h3><p>The judge command runs the clean-clone verification gate before serving the dashboard locally.</p><CodeBlock copyText={judgeCommand}>{judgeCommand}</CodeBlock><small>Then open http://127.0.0.1:4173</small></div>
+            <div><h3>Reproduce the proof path</h3><p>Run the synthetic lifecycle, independently verify its receipt, and audit the public bundle.</p><CodeBlock copyText={proofCommand}>{proofCommand}</CodeBlock><small>Zero wallet, RPC, model, or real-order calls</small></div>
+          </div>
+          <aside className="docs-note info"><Icon name="check" /><div><b>The public audit fails closed.</b><p>It rejects raw or reconstructive TXLine fields, secret patterns, unsafe links, private source paths, and oversized public artifacts.</p></div></aside>
+        </section>
+
+        <section className="docs-section docs-anchor" id="production-fit">
+          <SectionHeading eyebrow="Technical overview" title="Designed as a reusable decision-control layer.">Samaritan is not a tip generator. Its durable product is the harness: normalized evidence, identical replay behavior, bounded judgment, deterministic authorization, failure-safe paper execution, and portable receipts.</SectionHeading>
+          <div className="docs-production-grid">
+            <article><span><Icon name="replay" /></span><small>Adapter boundary</small><h3>New competitions can reuse the same core.</h3><p>Source and venue adapters may change while canonical events, risk authority, and proof contracts remain stable.</p></article>
+            <article><span><Icon name="shield" /></span><small>Professional control</small><h3>Governance is the product.</h3><p>Trading teams and B2B intermediaries get an inspectable decision system rather than an unsupported prediction feed.</p></article>
+            <article><span><Icon name="proof" /></span><small>Portable evidence</small><h3>The record outlives the interface.</h3><p>Receipts preserve the decision lifecycle across model, venue, competition, and frontend changes.</p></article>
+          </div>
+          <aside className="docs-note warning"><Icon name="lock" /><div><b>Continued operation needs the appropriate licences and approvals.</b><p>Post-hackathon TXLine use, any venue execution, and all jurisdictional requirements remain separate operating decisions.</p></div></aside>
         </section>
 
         <section className="docs-section docs-anchor" id="event-model">
@@ -386,6 +480,15 @@ function DocsArticle() {
 export function DocsApp() {
   const [activeId, setActiveId] = useState("overview");
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [theme, setTheme] = useState<DocsTheme>(() => {
+    try {
+      const saved = window.localStorage.getItem("samaritan-docs-theme");
+      if (saved === "light" || saved === "dark") return saved;
+    } catch {
+      // Storage is optional; the system preference remains a safe default.
+    }
+    return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  });
 
   useEffect(() => {
     document.title = "Samaritan Docs · Governed sports-market intelligence";
@@ -398,9 +501,23 @@ export function DocsApp() {
     return () => observer.disconnect();
   }, []);
 
+  useEffect(() => {
+    try {
+      window.localStorage.setItem("samaritan-docs-theme", theme);
+    } catch {
+      // The toggle still works for the current visit when storage is unavailable.
+    }
+    const themeMeta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+    if (themeMeta) themeMeta.content = theme === "dark" ? "#080b12" : "#f4f1e9";
+    document.documentElement.style.colorScheme = theme;
+    return () => {
+      document.documentElement.style.colorScheme = "";
+    };
+  }, [theme]);
+
   return (
-    <div className="docs-app">
-      <DocsHeader onMenu={() => setSidebarOpen(true)} />
+    <div className="docs-app" data-theme={theme}>
+      <DocsHeader onMenu={() => setSidebarOpen(true)} theme={theme} onTheme={() => setTheme((current) => current === "light" ? "dark" : "light")} />
       <div className="docs-shell">
         <DocsSidebar activeId={activeId} open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
         {sidebarOpen ? <button className="docs-sidebar-scrim" type="button" onClick={() => setSidebarOpen(false)} aria-label="Close documentation navigation" /> : null}
