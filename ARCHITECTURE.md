@@ -11,11 +11,10 @@ This document answers two different questions without mixing them:
 1. What has actually been built and can be demonstrated today?
 2. What is the intended post-bounty architecture but is not yet a product claim?
 
-For visual direction, component styling, and interaction details, use
-[`docs/UI.md`](docs/UI.md). For phase gates and future work, use
-[`plan.md`](plan.md). The older [`docs/02-architecture.md`](docs/02-architecture.md)
-is a useful design thesis, but this file is the source of truth for current
-system boundaries and UI data contracts.
+This file is the public source of truth for current system boundaries, UI data
+contracts, implementation status, failure states, and clearly separated roadmap
+work. The deployed explanatory version is available at
+[getsamaritan.xyz/architecture](https://getsamaritan.xyz/architecture).
 
 ## 1. The product in one sentence
 
@@ -631,7 +630,7 @@ When rebuilding the interface:
    product behavior, not an empty state.
 8. Keep the live pulse failure isolated from frozen evidence failure.
 9. Preserve keyboard access, reduced-motion behavior, responsive layouts, and
-   explicit loading/error/empty states from `docs/UI.md`.
+   explicit loading, error, and empty states already implemented in the UI.
 10. Update this file, the public contract, schemas, projections, tests, and frozen
     bundle together whenever a UI change alters the meaning of a claim.
 
@@ -641,11 +640,11 @@ When two sources disagree, resolve them in this order and update the stale sourc
 in the same change:
 
 1. Captured real samples for external API shapes (`samples/`, private captures).
-2. Runtime schemas, code, and verified frozen artifacts.
-3. `AGENTS.md` hard invariants and registered protocol records.
-4. This `ARCHITECTURE.md` for built/deployed/UI boundaries.
-5. `docs/UI.md` for presentation and interaction design.
-6. `plan.md` and `docs/02-architecture.md` for phase sequencing and target design.
+2. Runtime schemas, code, tests, and verified frozen artifacts.
+3. Registered protocol fields and non-overridable runtime invariants.
+4. This `ARCHITECTURE.md` for built, deployed, UI, and roadmap boundaries.
+5. The public [technical overview](docs/submission/technical-overview.md) for the
+   concise judge-facing account.
 
 Useful verification commands:
 

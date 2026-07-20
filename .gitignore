@@ -42,16 +42,19 @@ design/
 videos/
 .spain-belgium-verify*.ts
 
-# Local research operations, recording scripts, and submission working drafts.
-# Canonical architecture, evidence, proof, and technical-overview documents stay
-# tracked; these files remain available locally but do not belong in the public
-# product repository.
-docs/08-winning-submission-plan.md
-docs/PHASE-*-STATUS.md
-docs/research/capture-readiness.md
-docs/research/*capture-schedule.md
-docs/research/paper-fixture-universe.md
-docs/research/paper-study-ledger-initialization.md
+# Internal agent instructions, project history, research journals, recording
+# scripts, and submission working drafts remain available locally but are not
+# part of the public product repository. README.md, ARCHITECTURE.md, the banner,
+# the public technical overview, TXLine notes, attribution, and phase0 README stay
+# tracked.
+AGENTS.md
+WHAT-WE-GOT-WRONG.md
+plan.md
+docs/*.md
+docs/proof/
+docs/research/
 docs/submission/demo-script*.md
+docs/submission/public-release-scope.md
+docs/submission/submission-claims-matrix.md
 docs/submission/sponsor-clarification-request.md
 docs/submission/submission-form-draft.md

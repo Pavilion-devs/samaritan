@@ -205,11 +205,7 @@ test/             Release and invariant test suite
 
 - [Canonical system architecture](ARCHITECTURE.md)
 - [Technical overview](docs/submission/technical-overview.md)
-- [Strategy playbook](docs/03-strategy-playbook.md)
-- [Gate study](docs/06-gate-study.md)
-- [Forward paper v2 registration](docs/10-paper-study-v2-registration.md)
-- [Decision receipt specification](docs/proof/decision-receipt.md)
-- [Public release scope](docs/submission/public-release-scope.md)
+- [TXLine integration notes](docs/submission/txline-api-feedback.md)
 - [Third-party notices](docs/submission/third-party-notices.md)
 
 ---
